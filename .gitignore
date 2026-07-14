@@ -1,0 +1,8 @@
+.env
+__pycache__/
+*.pyc
+*.pdf
+ideas.txt
+history.json
+chats.json
+progress.json

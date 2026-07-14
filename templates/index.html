@@ -1,0 +1,3291 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>PrepSage</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/theme/material-darker.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/python/python.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/sql/sql.min.js"></script>
+<script src="https://unpkg.com/roughjs@4.6.6/bundled/rough.js"></script>
+<style>
+  :root {
+    --bg: #0e1015;
+    --panel: #14161d;
+    --card: #1b1e27;
+    --card-2: #20232e;
+    --border: rgba(255,255,255,0.08);
+    --border-soft: rgba(255,255,255,0.05);
+    --text: #e7e9ee;
+    --text-dim: #9299ab;
+    --text-faint: #656c7e;
+    --accent: #7c6cf6;
+    --accent-2: #5ee6d8;
+    --accent-soft: rgba(124,108,246,0.14);
+    --success: #3ddc97;
+    --success-soft: rgba(61,220,151,0.12);
+    --error: #ff6b6b;
+    --error-soft: rgba(255,107,107,0.12);
+    --sql: #5ee6d8;
+    --py: #f5c542;
+    --design: #ff8fa3;
+    --tradeoff: #9d8cff;
+    --napkin: #6cd67a;
+    --warn: #f5c542;
+    --radius: 10px;
+    --shadow: 0 8px 24px rgba(0,0,0,0.35);
+  }
+
+  * { box-sizing: border-box; }
+
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 8px; }
+  ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.22); }
+
+  html, body { height: 100%; }
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    background: var(--bg);
+    color: var(--text);
+    font-size: 14px;
+  }
+
+  #topbar {
+    position: relative;
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    padding: 14px 20px;
+    background: linear-gradient(180deg, var(--panel), var(--bg));
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  #topbar::after {
+    content: '';
+    position: absolute;
+    left: 0; right: 0; bottom: -1px;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--accent), var(--accent-2), transparent);
+    opacity: 0.45;
+  }
+  #topbar .brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 700;
+    font-size: 17px;
+    letter-spacing: -0.01em;
+  }
+  #topbar .brand .brand-text {
+    background: linear-gradient(90deg, var(--accent), var(--accent-2));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  .logo-mark {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border-radius: 7px;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    color: #0e1015;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    flex-shrink: 0;
+  }
+  #topbar .tagline {
+    color: var(--text-faint);
+    font-size: 12.5px;
+  }
+  #topbar .stats {
+    margin-left: auto;
+    align-self: center;
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    font-size: 12px;
+    color: var(--text-faint);
+    font-family: 'JetBrains Mono', monospace;
+    flex-shrink: 0;
+  }
+  #topbar .stats .bar {
+    width: 84px;
+    height: 5px;
+    border-radius: 3px;
+    background: var(--card);
+    overflow: hidden;
+  }
+  #topbar .stats .bar-fill {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, var(--accent), var(--accent-2));
+    border-radius: 3px;
+    transition: width 0.3s ease;
+  }
+
+  #body { flex: 1; display: flex; min-height: 0; }
+
+  #sidebar {
+    width: 220px;
+    display: flex;
+    flex-direction: column;
+    border-right: 1px solid var(--border);
+    flex-shrink: 0;
+    background: var(--panel);
+    min-height: 0;
+  }
+  #sidebar-search {
+    padding: 12px 10px 8px;
+    flex-shrink: 0;
+  }
+  #sidebar-search input {
+    width: 100%;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-size: 12.5px;
+    padding: 7px 10px;
+    outline: none;
+    font-family: inherit;
+  }
+  #sidebar-search input:focus { border-color: var(--accent); }
+  #sidebar-search input::placeholder { color: var(--text-faint); }
+  #sidebar-list {
+    overflow-y: auto;
+    padding: 0 10px 14px;
+    flex: 1;
+    min-height: 0;
+  }
+  .q-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 9px 10px;
+    margin-bottom: 3px;
+    cursor: pointer;
+    border-radius: 8px;
+    border: 1px solid transparent;
+    transition: background 0.12s ease, border-color 0.12s ease;
+  }
+  .q-item:hover { background: var(--card); }
+  .q-item.active { background: var(--accent-soft); border-color: rgba(124,108,246,0.35); }
+  .q-lang-badge {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    font-weight: 600;
+    padding: 2px 6px;
+    border-radius: 5px;
+    flex-shrink: 0;
+    letter-spacing: 0.02em;
+  }
+  .q-lang-badge.sql { background: rgba(94,230,216,0.15); color: var(--sql); }
+  .q-lang-badge.python { background: rgba(245,197,66,0.15); color: var(--py); }
+  .q-lang-badge.design { background: rgba(255,143,163,0.15); color: var(--design); }
+  .q-lang-badge.tradeoff { background: rgba(157,140,255,0.15); color: var(--tradeoff); }
+  .q-lang-badge.napkin { background: rgba(108,214,122,0.15); color: var(--napkin); }
+  .q-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-dim); font-size: 13px; }
+  .q-item.active .q-title, .q-item:hover .q-title { color: var(--text); }
+  .q-check { display: none; color: var(--success); font-size: 13px; flex-shrink: 0; }
+  .q-item.solved .q-check { display: inline; }
+  .q-diff-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+  .q-diff-dot.easy { background: var(--success); }
+  .q-diff-dot.medium { background: #e6b422; }
+  .q-diff-dot.hard { background: #e6555a; }
+  .q-due-dot { font-size: 12px; color: #e6b422; flex-shrink: 0; }
+
+  .q-section-header {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 10px 6px;
+    background: var(--panel);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    color: var(--text-faint);
+    text-transform: uppercase;
+    cursor: pointer;
+    user-select: none;
+  }
+  .q-section-header:first-child { padding-top: 0; }
+  .q-section-header .dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+  .q-section-header.sql .dot { background: var(--sql); }
+  .q-section-header.python .dot { background: var(--py); }
+  .q-section-header.design .dot { background: var(--design); }
+  .q-section-header.tradeoff .dot { background: var(--tradeoff); }
+  .q-section-header.napkin .dot { background: var(--napkin); }
+  .q-section-header .count { margin-left: auto; color: var(--text-faint); font-weight: 500; }
+  .q-section-header .chevron { flex-shrink: 0; transition: transform 0.12s ease; }
+  .q-section-header.collapsed .chevron { transform: rotate(-90deg); }
+
+  #resizer {
+    width: 5px;
+    flex-shrink: 0;
+    cursor: col-resize;
+    background: var(--border);
+    transition: background 0.15s ease;
+  }
+  #resizer:hover, #resizer.dragging { background: var(--accent); }
+  #sidebar-resizer {
+    width: 5px;
+    flex-shrink: 0;
+    cursor: col-resize;
+    background: var(--border);
+    transition: background 0.15s ease;
+  }
+  #sidebar-resizer:hover, #sidebar-resizer.dragging { background: var(--accent); }
+
+  #main {
+    flex: 1;
+    display: flex;
+    flex-direction: row;
+    padding: 18px 22px;
+    min-width: 0;
+    overflow: hidden;
+    gap: 16px;
+  }
+  #main-left {
+    flex: 0 0 40%;
+    min-width: 260px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    overflow-y: auto;
+  }
+  #main-right {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    overflow-y: auto;
+  }
+
+  #question-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px 18px;
+  }
+  .q-header { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+  #title { margin: 0; font-size: 18px; font-weight: 600; letter-spacing: -0.01em; }
+  #lang-badge {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 3px 8px;
+    border-radius: 6px;
+    letter-spacing: 0.03em;
+    display: none;
+  }
+  #lang-badge.sql { display: inline-block; background: rgba(94,230,216,0.15); color: var(--sql); }
+  #lang-badge.python { display: inline-block; background: rgba(245,197,66,0.15); color: var(--py); }
+  #lang-badge.design { display: inline-block; background: rgba(255,143,163,0.15); color: var(--design); }
+  #lang-badge.tradeoff { display: inline-block; background: rgba(157,140,255,0.15); color: var(--tradeoff); }
+  #lang-badge.napkin { display: inline-block; background: rgba(108,214,122,0.15); color: var(--napkin); }
+  #q-timer {
+    margin-left: auto;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12.5px;
+    color: var(--text-faint);
+    letter-spacing: 0.03em;
+  }
+  #q-timer.stopped { color: var(--good, #4caf82); }
+  #prompt { color: var(--text-dim); line-height: 1.55; }
+  .empty-stats { display: flex; gap: 22px; margin-bottom: 14px; }
+  .empty-stat { display: flex; flex-direction: column; gap: 2px; }
+  .empty-stat .n { font-size: 22px; font-weight: 700; color: var(--text); font-family: 'JetBrains Mono', monospace; }
+  .empty-stat .l { font-size: 11px; color: var(--text-faint); text-transform: uppercase; letter-spacing: 0.06em; }
+  .empty-hint { color: var(--text-faint); font-size: 13px; }
+  #empty-panel { height: 100%; display: flex; align-items: center; justify-content: center; }
+  .empty-hint.due-hint { color: #e6b422; }
+  .empty-hint.due-hint a { color: var(--accent); font-weight: 600; }
+
+  #sample {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px 18px;
+    display: none;
+  }
+  #sample pre {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12.5px;
+    white-space: pre-wrap;
+    background: var(--card-2);
+    border: 1px solid var(--border-soft);
+    border-radius: 6px;
+    padding: 8px 10px;
+    margin: 0 0 12px;
+  }
+
+  .concept-box {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px 18px;
+    display: none;
+  }
+  .concept-box .concept-label {
+    font-size: 11.5px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-faint);
+    margin-bottom: 8px;
+  }
+  .concept-box .concept-text {
+    font-size: 13.5px;
+    line-height: 1.55;
+    color: var(--text-dim);
+  }
+  .concept-box.locked .concept-text { font-style: italic; }
+  .concept-box.revealed {
+    border-color: rgba(124,108,246,0.35);
+    background: rgba(124,108,246,0.06);
+  }
+  .concept-box.revealed .concept-label { color: var(--accent); }
+
+  #editor-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    box-shadow: var(--shadow);
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 260px;
+  }
+  .editor-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px;
+    background: var(--card-2);
+    border-bottom: 1px solid var(--border);
+  }
+  #editor-lang-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--text-faint);
+    letter-spacing: 0.05em;
+  }
+  .editor-actions { display: flex; gap: 8px; }
+  #design-canvas-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    box-shadow: var(--shadow);
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 260px;
+    position: relative;
+  }
+  .canvas-tools { display: flex; gap: 6px; align-items: center; }
+  .tool-btn.active { background: var(--accent); color: #0e1015; border-color: var(--accent); }
+  #clarify-sql-btn.active { background: var(--accent); color: #0e1015; border-color: var(--accent); }
+  #curveball-card { border: 1px dashed var(--warn); border-radius: 8px; margin: 0 12px 10px; padding: 10px 12px; background: rgba(245,197,66,0.06); }
+  #tool-mic.listening, #chat-mic-btn.listening { background: var(--error); color: #0e1015; }
+  #chat-mic-btn.primary-mic { background: var(--accent); color: #0e1015; border-color: var(--accent); animation: micPulse 2.2s ease-in-out infinite; }
+  @keyframes micPulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(124,108,246,0.5); } 50% { box-shadow: 0 0 0 6px rgba(124,108,246,0); } }
+  #req-chips-section { margin-top: 14px; }
+  #req-chips-section:has(#req-chips:empty) { display: none; }
+  .req-chips-label {
+    font-size: 11px; color: var(--text-faint); text-transform: uppercase;
+    letter-spacing: 0.06em; margin-bottom: 6px;
+  }
+  #req-chips {
+    display: flex; flex-direction: column; gap: 6px;
+  }
+  .req-chip {
+    font-size: 12px; line-height: 1.4; padding: 7px 10px; border-radius: 8px;
+    background: var(--card); border: 1px solid var(--border); color: var(--text-dim);
+    white-space: normal;
+  }
+  #pacing-hud {
+    position: absolute; bottom: 14px; left: 50%; transform: translateX(-50%);
+    background: var(--card-2); border: 1px solid var(--warn); color: var(--text);
+    font-size: 12px; padding: 7px 14px; border-radius: 999px;
+    box-shadow: var(--shadow); z-index: 5;
+  }
+  #chatpanel.collapsed { width: 44px !important; overflow: hidden; }
+  #chatpanel.collapsed .chat-title, #chatpanel.collapsed .chat-subtitle,
+  #chatpanel.collapsed #chatlog, #chatpanel.collapsed #replay-bar,
+  #chatpanel.collapsed #selfrate-panel, #chatpanel.collapsed #wrapup-btn,
+  #chatpanel.collapsed #refdesign-btn, #chatpanel.collapsed #mode-group,
+  #chatpanel.collapsed #replay-btn, #chatpanel.collapsed #chatinput,
+  #chatpanel.collapsed .chat-avatar, #chatpanel.collapsed #tts-toggle-btn {
+    display: none !important;
+  }
+  #chatpanel.collapsed .chat-header { padding: 14px 8px; justify-content: center; }
+  #mode-group { margin: 4px 12px 8px; padding: 10px 0 0; border-top: 1px solid var(--border-soft); }
+  .mode-group-label {
+    font-size: 11px; color: var(--text-faint); text-transform: uppercase;
+    letter-spacing: 0.06em; margin-bottom: 6px;
+  }
+  #mode-group .btn { margin: 0 0 6px; }
+  #replay-btn { border-top: 1px solid var(--border-soft); padding-top: 12px !important; }
+  #layer-legend {
+    display: flex; align-items: center; gap: 5px; flex-wrap: wrap;
+    padding: 6px 12px; font-size: 11px; color: var(--text-faint);
+    text-transform: uppercase; letter-spacing: 0.06em;
+    border-bottom: 1px solid var(--border-soft);
+  }
+  #layer-legend .legend-dot { width: 8px; height: 8px; border-radius: 50%; margin-left: 8px; }
+  #layer-legend .legend-dot:first-child { margin-left: 0; }
+  #layer-legend .legend-sep { margin: 0 4px 0 8px; }
+  #layer-legend kbd {
+    font-family: inherit; text-transform: none; font-size: 10px;
+    background: var(--card-2); border: 1px solid var(--border); border-radius: 4px;
+    padding: 1px 5px; margin-left: 3px; color: var(--text-dim);
+  }
+  #canvas-scroll { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; }
+  #design-canvas { width: 100%; height: 100%; background: var(--card-2); cursor: crosshair; display: block; }
+  .canvas-hint { pointer-events: none; fill: var(--text-dim); font-size: 15px; font-weight: 500; }
+  .canvas-hint-sub { fill: var(--text-faint); font-size: 12px; font-weight: 400; }
+  #design-canvas.select-mode { cursor: default; }
+  /* box/arrow/note fill+stroke are drawn by rough.js at render time (see layerColors()); these classes only carry cursor + text styling */
+  .shape-box, .shape-note { cursor: move; }
+  .shape-label { fill: var(--text); font-size: 12px; font-family: 'Inter', sans-serif; text-anchor: middle; }
+  .shape-arrow { cursor: pointer; }
+  .note-label { fill: var(--bg); font-weight: 500; }
+  .arrow-handle { fill: var(--accent); cursor: pointer; }
+  .resize-handle { fill: var(--accent); cursor: nwse-resize; }
+  #design-canvas .rough-shadow { filter: drop-shadow(0 3px 5px rgba(0,0,0,0.4)); }
+  .confirm-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.5);
+    display: flex; align-items: center; justify-content: center; z-index: 100;
+  }
+  .confirm-box {
+    background: var(--card); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 18px 20px; max-width: 320px; box-shadow: var(--shadow);
+  }
+  .confirm-msg { color: var(--text); font-size: 13.5px; margin-bottom: 14px; }
+  .confirm-actions { display: flex; justify-content: flex-end; gap: 8px; }
+  .toast {
+    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+    background: var(--card); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 10px 16px; color: var(--text); font-size: 13px; box-shadow: var(--shadow);
+    z-index: 200; max-width: 380px;
+  }
+  .canvas-inline-edit {
+    position: absolute;
+    background: var(--card-2);
+    border: 1px solid var(--accent);
+    border-radius: 4px;
+    color: var(--text);
+    font-size: 12px;
+    font-family: 'Inter', sans-serif;
+    padding: 2px 6px;
+    outline: none;
+    z-index: 10;
+  }
+  .CodeMirror.locked { opacity: 0.5; }
+  .CodeMirror {
+    flex: 1;
+    height: auto;
+    min-height: 300px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+  }
+  .plan-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    padding: 8px 12px;
+    background: var(--card-2);
+    border-bottom: 1px solid var(--border-soft);
+  }
+  #plan-input, #tradeoff-input, #napkin-input {
+    flex: 1;
+    box-sizing: border-box;
+    padding: 6px 10px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    font-family: inherit;
+    font-size: 12.5px;
+  }
+  #plan-input:focus, #tradeoff-input:focus, #napkin-input:focus { outline: none; border-color: var(--accent); }
+  #plan-input::placeholder, #tradeoff-input::placeholder, #napkin-input::placeholder { color: var(--text-faint); }
+  #plan-feedback, #tradeoff-feedback, #napkin-feedback {
+    padding: 0;
+    font-size: 12px;
+    border-bottom: 1px solid transparent;
+  }
+  #plan-feedback:not(:empty), #tradeoff-feedback:not(:empty), #napkin-feedback:not(:empty) { padding: 7px 12px; border-bottom-color: var(--border-soft); }
+  #plan-feedback.ok, #tradeoff-feedback.ok, #napkin-feedback.ok { color: var(--success); background: var(--success-soft); }
+  #plan-feedback.bad, #tradeoff-feedback.bad, #napkin-feedback.bad { color: var(--error); background: var(--error-soft); }
+  #plan-feedback.pending, #tradeoff-feedback.pending, #napkin-feedback.pending { color: var(--text-faint); }
+  .debrief-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    padding: 8px 12px;
+    background: var(--card-2);
+    border-top: 1px solid var(--border-soft);
+  }
+  .debrief-row input {
+    flex: 1;
+    box-sizing: border-box;
+    padding: 6px 10px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    font-family: inherit;
+    font-size: 12.5px;
+  }
+  .debrief-row input:focus { outline: none; border-color: var(--accent); }
+  .debrief-row input::placeholder { color: var(--text-faint); }
+  #debrief-feedback:not(:empty) { padding: 7px 12px; font-size: 12px; }
+  #debrief-feedback .line { padding: 3px 0; }
+  #debrief-feedback .line.ok { color: var(--success); }
+  #debrief-feedback .line.bad { color: var(--error); }
+  #debrief-feedback .line.pending { color: var(--text-faint); }
+  #spotbug-feedback:not(:empty) { padding: 3px 12px 8px; font-size: 12px; }
+  #spotbug-feedback.ok { color: var(--success); }
+  #spotbug-feedback.bad { color: var(--error); }
+  #spotbug-feedback.pending { color: var(--text-faint); }
+
+  #clarify-gate {
+    background: var(--card);
+    border: 1px dashed var(--border);
+    border-radius: var(--radius);
+    padding: 14px 18px;
+    font-size: 13px;
+    color: var(--text-dim);
+  }
+  #clarify-gate .clarify-progress { font-size: 12px; color: var(--text-faint); margin-top: 6px; }
+  #clarify-gate button { margin-top: 10px; }
+
+  button.btn {
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    padding: 7px 14px;
+    border-radius: 7px;
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition: transform 0.06s ease, background 0.12s ease, border-color 0.12s ease;
+  }
+  button.btn:active { transform: translateY(1px); }
+  button.btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+  .btn-primary {
+    background: linear-gradient(90deg, var(--accent), #6a5ce0);
+    color: #fff;
+  }
+  .btn-primary:hover { filter: brightness(1.08); }
+  .btn-ghost {
+    background: transparent;
+    border-color: var(--border);
+    color: var(--text-dim);
+  }
+  .btn-ghost:hover { border-color: var(--accent); color: var(--text); }
+  .btn-icon { padding: 7px 11px; }
+
+  #results { border-radius: var(--radius); overflow: hidden; }
+  #results:empty { display: none; }
+  #results.pass, #results.fail { animation: resultIn 0.25s ease; }
+  @keyframes resultIn { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes cardIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+  #question-card.fade-in { animation: cardIn 0.18s ease; }
+  .result-banner {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 16px;
+    font-weight: 600;
+    font-size: 13.5px;
+  }
+  .result-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px; height: 20px;
+    border-radius: 50%;
+    font-size: 12px;
+    flex-shrink: 0;
+  }
+  #results.pass .result-banner { background: var(--success-soft); color: var(--success); }
+  #results.pass .result-icon { background: var(--success); color: #0e1015; }
+  #results.fail .result-banner { background: var(--error-soft); color: var(--error); }
+  #results.fail .result-icon { background: var(--error); color: #0e1015; }
+  #results .result-body { padding: 4px 16px 14px; background: var(--card); }
+  #results pre {
+    white-space: pre-wrap;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12.5px;
+    background: var(--card-2);
+    border: 1px solid var(--border-soft);
+    border-radius: 6px;
+    padding: 8px 10px;
+    margin: 2px 0 10px;
+  }
+
+  .tname { font-weight: 600; font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-faint); margin-bottom: 5px; }
+  .datatable { border-collapse: collapse; margin: 0 0 14px; font-size: 12.5px; border-radius: 6px; overflow: hidden; border: 1px solid var(--border-soft); }
+  .datatable th { background: var(--card-2); color: var(--text-dim); font-weight: 600; text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--border); }
+  .datatable td { padding: 5px 10px; border-bottom: 1px solid var(--border-soft); font-family: 'JetBrains Mono', monospace; }
+  .datatable tr:last-child td { border-bottom: none; }
+  .datatable tr:nth-child(even) td { background: rgba(255,255,255,0.015); }
+
+  #chatpanel {
+    width: 360px;
+    flex-shrink: 0;
+    border-left: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    background: var(--panel);
+  }
+  .chat-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--border);
+  }
+  .chat-avatar {
+    width: 32px; height: 32px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    color: #0e1015;
+    flex-shrink: 0;
+  }
+  .chat-title { font-weight: 600; font-size: 13.5px; }
+  .chat-subtitle { font-size: 11.5px; color: var(--text-faint); }
+
+  #chatlog { flex: 1; overflow-y: auto; padding: 14px 14px 6px; display: flex; flex-direction: column; gap: 10px; }
+  #chatlog:empty::after {
+    content: "Ask a follow-up, or just start coding — I'll jump in if you get stuck.";
+    color: var(--text-faint);
+    font-size: 12.5px;
+    line-height: 1.5;
+  }
+  .msg { display: flex; align-items: flex-start; gap: 7px; max-width: 92%; }
+  .msg.me { align-self: flex-end; flex-direction: row-reverse; }
+  .msg-avatar {
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    display: flex; align-items: center; justify-content: center;
+    font-size: 9px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    color: #0e1015;
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+  .msg-text {
+    padding: 8px 11px;
+    border-radius: 12px;
+    font-size: 13px;
+    line-height: 1.45;
+    white-space: pre-wrap;
+  }
+  .msg.tutor .msg-text { background: var(--card); border: 1px solid var(--border-soft); border-top-left-radius: 4px; }
+  .msg.me .msg-text { background: linear-gradient(135deg, var(--accent), #6a5ce0); color: #fff; border-top-right-radius: 4px; }
+  .msg.err .msg-text { background: var(--error-soft); color: var(--error); border-color: transparent; }
+  .msg.system { align-self: center; max-width: 100%; }
+  .msg.system .msg-text {
+    background: transparent;
+    border: none;
+    padding: 4px 0;
+    color: var(--text-dim);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    text-align: center;
+  }
+  .debrief-checklist { margin: 6px 0 0 0; padding-top: 8px; border-top: 1px solid var(--border-soft); }
+  .checklist-row { font-size: 12px; line-height: 1.6; color: var(--text-dim); }
+
+  #chatinput { display: flex; gap: 8px; padding: 12px 14px 16px; border-top: 1px solid var(--border); }
+  #chatinput input {
+    flex: 1;
+    background: var(--card);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 9px 12px;
+    border-radius: 20px;
+    font-family: inherit;
+    font-size: 13px;
+    outline: none;
+    transition: border-color 0.12s ease;
+  }
+  #chatinput input:focus { border-color: var(--accent); }
+  #chatinput input::placeholder { color: var(--text-faint); }
+
+  #tutor-fab {
+    position: fixed;
+    bottom: 62px;
+    z-index: 60;
+    width: 46px;
+    height: 46px;
+    border-radius: 50%;
+    cursor: pointer;
+    user-select: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    box-shadow: 0 4px 14px rgba(0,0,0,0.35);
+    transition: transform 0.15s ease;
+  }
+  #tutor-fab .fab-icon {
+    display: inline-flex;
+    color: #0e1015;
+    animation: fab-bob 1.4s ease-in-out infinite;
+  }
+  #tutor-fab:hover .fab-icon { animation-duration: 0.6s; }
+  #tutor-fab:hover { transform: scale(1.06); }
+  #tutor-fab:active { transform: scale(0.9); }
+  @keyframes fab-bob {
+    0%, 100% { transform: translateX(0); }
+    50% { transform: translateX(3px); }
+  }
+  #tutor-fab.alert { animation: fab-alert 0.5s ease-in-out infinite; }
+  @keyframes fab-alert {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.14); }
+  }
+  #fab-badge {
+    position: absolute;
+    top: -2px; right: -2px;
+    width: 13px; height: 13px;
+    border-radius: 50%;
+    background: var(--error);
+    border: 2px solid var(--bg);
+    display: none;
+  }
+  #tutor-fab.alert #fab-badge { display: block; }
+
+  #fab-bubble {
+    position: fixed;
+    z-index: 61;
+    background: var(--card);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 6px 11px;
+    border-radius: 10px;
+    font-size: 12.5px;
+    max-width: 190px;
+    box-shadow: var(--shadow);
+    pointer-events: none;
+    opacity: 0;
+    transform: translateY(4px);
+    transition: opacity 0.18s ease, transform 0.18s ease;
+  }
+  #fab-bubble.show { opacity: 1; transform: translateY(0); }
+</style>
+</head>
+<body>
+<div id="topbar">
+  <span class="brand"><span class="logo-mark">PS</span><span class="brand-text">PrepSage</span></span>
+  <span class="tagline">Interview prep that adapts to you, with a tutor watching your back</span>
+  <div class="stats">
+    <span id="solved-count">0/0 solved</span>
+    <div class="bar"><div class="bar-fill" id="solved-bar"></div></div>
+  </div>
+  <span id="deadline-widget" style="color: var(--text-dim); font-size: 13px; cursor: pointer;" onclick="setInterviewDeadline()" title="Set your interview date — review intervals compress as it approaches"></span>
+  <button class="btn btn-ghost" style="margin-left: 8px;" onclick="startMockLoop()" title="Chain a SQL/Python, design, and tradeoff question into one continuous mock interview">🔁 Mock interview</button>
+  <a href="/dashboard" style="color: var(--text-dim); text-decoration: none; font-size: 13px;">📊 Dashboard</a>
+</div>
+<div id="mock-loop-bar" style="display:none; align-items:center; gap:10px; padding:8px 24px; background:var(--panel); border-bottom:1px solid var(--border); font-size:13px;">
+  <span id="mock-loop-label"></span>
+  <button class="btn btn-ghost" id="mock-loop-next" onclick="mockLoopNext()" style="margin-left:auto;">Next stage →</button>
+  <button class="btn btn-ghost" onclick="exitMockLoop()">Exit</button>
+</div>
+<div id="body">
+  <div id="sidebar">
+    <div id="sidebar-search">
+      <input id="q-search" type="text" placeholder="Filter questions...">
+    </div>
+    <nav id="sidebar-list"></nav>
+  </div>
+  <div id="sidebar-resizer"></div>
+  <main id="main">
+    <div id="main-left">
+      <div id="question-card">
+        <div class="q-header">
+          <h1 id="title">Select a question</h1>
+          <span id="lang-badge" class="badge"></span>
+          <span id="q-timer"></span>
+        </div>
+        <div id="prompt"></div>
+      </div>
+      <div id="req-chips-section">
+        <div class="req-chips-label">Confirmed requirements</div>
+        <div id="req-chips"></div>
+      </div>
+      <div id="sample"></div>
+      <div id="clarify-gate" style="display:none;"></div>
+      <div id="concept-box" class="concept-box"></div>
+      <div id="trace-box" style="display:none; background:var(--card); border:1px solid var(--border); border-radius:var(--radius); padding:2px 18px;">
+        <details id="trace-details">
+          <summary style="cursor:pointer; padding:12px 0; font-size:13px; font-weight:600; color:var(--text-dim);">🧩 Code translation practice — trace it before you code it</summary>
+          <div style="padding-bottom:14px;">
+            <div id="trace-pattern" style="font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:0.04em;color:var(--accent);margin-bottom:8px;"></div>
+            <div id="trace-skeleton" style="margin-bottom:12px;"></div>
+            <div id="trace-steps" style="display:flex;flex-direction:column;gap:8px;"></div>
+            <div style="display:flex; align-items:center; gap:10px; margin-top:10px;">
+              <button id="trace-check-btn" class="btn btn-ghost" onclick="checkTrace()" style="font-size:12px;">Check my trace</button>
+              <span id="trace-summary" style="font-size:12px; color:var(--text-faint);"></span>
+            </div>
+          </div>
+        </details>
+      </div>
+    </div>
+    <div id="main-right">
+      <div id="empty-panel">
+        <span class="empty-hint">Pick a question from the sidebar to get started</span>
+      </div>
+      <div id="editor-card" style="display:none;">
+        <div class="editor-toolbar">
+          <span id="editor-lang-label"></span>
+          <div class="editor-actions">
+            <button id="run-btn" class="btn btn-ghost" onclick="runSample()">▶ Run</button>
+            <button id="hint-btn" class="btn btn-ghost" onclick="askHint()">💡 Hint</button>
+            <button id="spotbug-btn" class="btn btn-ghost" onclick="startSpotBug()">🐛 Spot the bug</button>
+            <button id="clarify-sql-btn" class="btn btn-ghost" onclick="toggleSqlClarify()">🎯 Clarify first</button>
+            <button id="curveball-btn" class="btn btn-ghost" onclick="startCurveball()">🌀 Curveball</button>
+            <button id="twist-btn" class="btn btn-ghost" onclick="askTwist()" disabled title="Solve it first">🔁 Twist</button>
+            <button id="dryrun-btn" class="btn btn-ghost" onclick="askDryRun()" disabled title="Solve it first">👣 Dry run</button>
+            <button id="submit-btn" class="btn btn-primary" onclick="submitCode()">Submit</button>
+          </div>
+        </div>
+        <div class="plan-row">
+          <input id="plan-input" type="text" placeholder="Your approach + time complexity, before you code…" oninput="onPlanInput()">
+          <button id="check-approach-btn" class="btn btn-ghost" onclick="checkApproach()" disabled>Check approach</button>
+        </div>
+        <div id="plan-feedback"></div>
+        <textarea id="editor"></textarea>
+        <div id="spotbug-card" style="display:none;">
+          <div style="padding:8px 12px 0; color:var(--text-faint); font-size:12px;">Someone else's code for this problem — find what's wrong with it.</div>
+          <pre id="spotbug-code" style="margin:8px 12px; padding:10px 12px; background:var(--card-2); border:1px solid var(--border); border-radius:6px; font-family:'JetBrains Mono',monospace; font-size:12.5px; white-space:pre-wrap; max-height:220px; overflow:auto;"></pre>
+          <div class="plan-row">
+            <input id="spotbug-input" type="text" placeholder="What's wrong with this code, and how would you fix it?">
+            <button id="spotbug-grade-btn" class="btn btn-ghost" onclick="gradeSpotBug()">Grade my answer</button>
+            <button class="btn btn-ghost" onclick="closeSpotBug()">✕ Close</button>
+          </div>
+          <div id="spotbug-feedback"></div>
+        </div>
+        <div id="curveball-card" style="display:none;">
+          <div id="curveball-twist" style="padding:10px 12px 4px; font-size:13px;"></div>
+          <div class="plan-row">
+            <button id="curveball-grade-btn" class="btn btn-ghost" onclick="gradeCurveball()">Check my updated code</button>
+            <button class="btn btn-ghost" onclick="closeCurveball()">✕ Close</button>
+          </div>
+          <div id="curveball-feedback"></div>
+        </div>
+      </div>
+      <div id="design-canvas-card" style="display:none;">
+        <div class="editor-toolbar">
+          <div class="canvas-tools">
+            <button id="tool-select" class="btn btn-ghost tool-btn active" onclick="setCanvasTool('select')" title="Select / move">↖ Select</button>
+            <button id="tool-box" class="btn btn-ghost tool-btn" onclick="setCanvasTool('box')" title="Add a component box. Select a box + press L to tag its layer, Cmd/Ctrl+D to duplicate.">▭ Box</button>
+            <button id="tool-arrow" class="btn btn-ghost tool-btn" onclick="setCanvasTool('arrow')" title="Click a box, then click another to connect. Double-click an arrow to label it.">→ Arrow</button>
+            <button id="tool-text" class="btn btn-ghost tool-btn" onclick="setCanvasTool('text')" title="Add a note. Cmd/Ctrl+D to duplicate.">🗒 Note</button>
+            <button id="tool-mic" class="btn btn-ghost tool-btn" onmousedown="startMic('canvas', this)" ontouchstart="event.preventDefault(); startMic('canvas', this)" title="Hold to speak a note">🎤</button>
+          </div>
+          <div class="canvas-tools">
+            <button id="canvas-delete-btn" class="btn btn-ghost" onclick="deleteSelected()" disabled title="Delete the selected box/arrow/note (or press Delete)">Delete</button>
+            <button id="canvas-clear-btn" class="btn btn-ghost" onclick="clearCanvas()">Clear</button>
+            <button id="diagram-restore-btn" class="btn btn-ghost" style="display:none;" onclick="restoreOwnDiagram()">← Back to my diagram</button>
+          </div>
+        </div>
+        <div id="layer-legend">
+          <span class="legend-dot" style="background:var(--accent-2)"></span>source
+          <span class="legend-dot" style="background:var(--accent)"></span>processing
+          <span class="legend-dot" style="background:var(--success)"></span>storage
+          <span class="legend-dot" style="background:var(--py)"></span>consumer
+          <span class="legend-sep">—</span>select a box, press <kbd>L</kbd> to tag
+        </div>
+        <div id="canvas-scroll">
+          <svg id="design-canvas" onmousedown="canvasMouseDown(event)" onmousemove="canvasMouseMove(event)" onmouseup="canvasMouseUp(event)" onmouseleave="canvasMouseUp(event)"></svg>
+        </div>
+        <div id="pacing-hud" style="display:none;"></div>
+      </div>
+      <div id="tradeoff-card" style="display:none;">
+        <div class="plan-row" style="justify-content:flex-end;">
+          <button id="tradeoff-spar-btn" class="btn btn-ghost" onclick="startTradeoffSpar()">🥊 Spar with tutor</button>
+          <button id="tradeoff-reroll-btn" class="btn btn-ghost" onclick="rerollTradeoff()">🎲 New scenario</button>
+        </div>
+        <div class="plan-row">
+          <input id="tradeoff-input" type="text" placeholder="Your choice + the tradeoff reasoning behind it…">
+          <button id="tradeoff-grade-btn" class="btn btn-ghost" onclick="gradeTradeoff()">Grade my answer</button>
+        </div>
+        <div id="tradeoff-feedback"></div>
+        <div id="tradeoff-spar" style="display:none; margin-top:8px; padding:10px; border:1px solid var(--border); border-radius:8px; background:var(--card-2);">
+          <div id="tradeoff-spar-log" style="display:flex; flex-direction:column; gap:8px; margin-bottom:8px; font-size:12.5px; max-height:240px; overflow-y:auto;"></div>
+          <div style="display:flex; gap:6px;">
+            <input id="tradeoff-spar-input" placeholder="Argue your side…" style="flex:1; background:var(--card); border:1px solid var(--border); border-radius:6px; color:var(--text); padding:6px 8px; font-size:12px;" onkeydown="if (event.key === 'Enter') sendTradeoffSpar();">
+            <button class="btn btn-ghost" onclick="sendTradeoffSpar()">Send</button>
+          </div>
+        </div>
+      </div>
+      <div id="napkin-card" style="display:none;">
+        <div class="plan-row" style="justify-content:space-between;">
+          <span id="napkin-timer" style="font-family:'JetBrains Mono',monospace; font-size:13px; color:var(--text-faint);"></span>
+          <button id="napkin-reroll-btn" class="btn btn-ghost" onclick="rerollNapkin()">🎲 New numbers</button>
+        </div>
+        <textarea id="napkin-assumptions" placeholder="Your assumptions (optional) — e.g. 'assume 10% of DAU are concurrent, avg payload 2KB'…" style="width:100%; min-height:50px; margin:0 0 8px; padding:8px 12px; background:var(--card-2); border:none; border-bottom:1px solid var(--border-soft); color:var(--text); font-family:inherit; font-size:13px; resize:vertical; box-sizing:border-box;"></textarea>
+        <div class="plan-row">
+          <input id="napkin-input" type="text" placeholder="Your estimate…">
+          <span id="napkin-unit" style="color:var(--text-faint); font-size:12.5px; align-self:center;"></span>
+          <button id="napkin-grade-btn" class="btn btn-ghost" onclick="gradeNapkin()">Check answer</button>
+        </div>
+        <div id="napkin-feedback"></div>
+        <div id="napkin-assumption-feedback" style="padding:0 12px 8px; font-size:12.5px; color:var(--text-dim);"></div>
+      </div>
+      <div id="results"></div>
+      <div id="debrief-row" class="debrief-row" style="display:none">
+        <input id="complexity-input" type="text" placeholder="Actual time/space complexity of your code…">
+        <input id="edge-input" type="text" placeholder="Edge cases you'd test…">
+        <button id="narration-mic" class="btn btn-ghost" onmousedown="startMic('narration', this)" ontouchstart="event.preventDefault(); startMic('narration', this)" title="Hold to narrate your approach out loud, like you'd explain it to an interviewer">🎤 Narrate</button>
+        <button id="debrief-btn" class="btn btn-ghost" onclick="submitDebrief()">Debrief</button>
+      </div>
+      <div id="narration-readout" style="display:none; font-size:12px; color:var(--text-dim); padding:4px 12px;"></div>
+      <div id="debrief-feedback"></div>
+    </div>
+  </main>
+  <div id="resizer"></div>
+  <aside id="chatpanel" style="display:none;">
+    <div class="chat-header">
+      <span class="chat-avatar">PS</span>
+      <div>
+        <div class="chat-title">Tutor</div>
+        <div class="chat-subtitle">here to help, not to solve it for you</div>
+      </div>
+      <button id="tts-toggle-btn" class="btn btn-ghost btn-icon" style="margin-left:auto;" onclick="toggleTTS()" title="Mute/unmute spoken replies">🔊</button>
+      <button id="chat-collapse-btn" class="btn btn-ghost btn-icon" onclick="toggleChatCollapse()" title="Collapse chat, focus canvas">»</button>
+    </div>
+    <div id="chatlog"></div>
+    <div id="replay-bar" style="display:none; padding:8px 12px; border-top:1px solid var(--border); align-items:center; gap:8px;">
+      <button class="btn btn-ghost" onclick="exitReplay()">✕ Exit replay</button>
+      <input id="replay-slider" type="range" min="0" max="0" value="0" style="flex:1;" oninput="scrubReplay(this.value)">
+      <span id="replay-turn-label" style="font-size:12px; color:var(--text-dim); white-space:nowrap;">0 / 0</span>
+      <button class="btn btn-ghost" onclick="copyReplayLink()" title="Copy a link that opens this replay">🔗 Share</button>
+    </div>
+    <div id="replay-comments" style="display:none; margin:0 12px 8px; padding:10px; border:1px solid var(--border); border-radius:8px; background:var(--card-2);">
+      <div id="replay-comments-list" style="display:flex; flex-direction:column; gap:6px; margin-bottom:8px; font-size:12.5px;"></div>
+      <div style="display:flex; gap:6px;">
+        <input id="replay-comment-author" placeholder="Name" style="width:90px; background:var(--card); border:1px solid var(--border); border-radius:6px; color:var(--text); padding:6px 8px; font-size:12px;">
+        <input id="replay-comment-text" placeholder="Comment on this turn…" style="flex:1; background:var(--card); border:1px solid var(--border); border-radius:6px; color:var(--text); padding:6px 8px; font-size:12px;" onkeydown="if (event.key === 'Enter') postReplayComment();">
+        <button class="btn btn-ghost" onclick="postReplayComment()">Post</button>
+      </div>
+    </div>
+    <div id="selfrate-panel" style="display:none; margin:0 12px 8px; padding:10px; border:1px solid var(--border); border-radius:8px; background:var(--card-2);">
+      <div style="font-size:12px; color:var(--text-dim); margin-bottom:6px;">Before you see the debrief — which of these do you think you missed or went shallow on?</div>
+      <div id="selfrate-options"></div>
+      <button class="btn btn-primary" style="margin-top:8px;" onclick="submitSelfRating()">Submit self-rating &amp; get debrief</button>
+    </div>
+    <button id="wrapup-btn" class="btn btn-primary" style="display:none; margin:0 12px 8px;" onclick="wrapUpInterview()">Wrap up interview</button>
+    <button id="refdesign-btn" class="btn btn-ghost" style="display:none; margin:0 12px 8px;" onclick="showReferenceDesign()">📐 Show reference design</button>
+    <div id="mode-group">
+      <div class="mode-group-label">or practice a narrower mode</div>
+      <button id="clarify-btn" class="btn btn-ghost" style="display:none;" onclick="startClarifyDrill()">🎯 Clarify-only drill</button>
+      <button id="end-drill-btn" class="btn btn-ghost" style="display:none;" onclick="endClarifyDrill()">End drill</button>
+      <button id="adversarial-btn" class="btn btn-ghost" style="display:none;" onclick="startAdversarialMode()">🧨 Break this design</button>
+    </div>
+    <button id="replay-btn" class="btn btn-ghost" style="display:none; margin:8px 12px 8px;" onclick="startReplay()">🕐 Replay session</button>
+    <div id="chatinput">
+      <button id="chat-mic-btn" class="btn btn-ghost btn-icon" onmousedown="startMic('chat', this)" ontouchstart="event.preventDefault(); startMic('chat', this)" title="Hold to talk">🎤</button>
+      <input id="chatbox" placeholder="ask a follow-up…" onkeydown="if(event.key==='Enter') sendMessage()">
+      <button class="btn btn-primary btn-icon" onclick="sendMessage()">➤</button>
+    </div>
+  </aside>
+</div>
+<script>
+let cm = CodeMirror.fromTextArea(document.getElementById('editor'), {theme: 'material-darker', lineNumbers: true});
+requestAnimationFrame(() => cm.refresh());
+new ResizeObserver(() => cm.refresh()).observe(document.getElementById('editor-card'));
+let current = null;
+let clarifyMode = false;
+let selectedPersona = '';
+let adversarialMode = false;
+let adversarialFlaws = [];
+let replayTurns = [];
+let replayComments = [];
+let mockLoop = null; // {ids: [...], stage: 0} — null when no loop is active
+let savedChatHTMLBeforeReplay = null;
+let savedShapesBeforeReplay = null;
+let ttsEnabled = true;
+let designChips = [];
+let pacingTimer = null;
+let lastRunSummary = '';
+const CONCEPT_TAXONOMIES = {{ concept_taxonomies | tojson }};
+
+const IDLE_NUDGE_MS = 45000;
+let idleTimer = null;
+let stuck = false;
+let nudgeSent = false;
+let reinforced = false;
+let stateCache = {}; // qid -> {code, chatHTML, resultsHTML, resultsClass, lastRunSummary, stuck, nudgeSent, reinforced, shapes}
+let timers = {}; // qid -> {elapsed, running}
+let timerInterval = null;
+
+// ---- design canvas (system design questions) ----
+let shapes = []; // {id, type:'box'|'text', label, x, y, w, h} | {id, type:'arrow', fromId, toId, label}
+let shapeSeq = 1;
+let canvasTool = 'select';
+let selectedShapeId = null;
+let lastClickShapeId = null;
+let lastClickTime = 0;
+let arrowDraft = null; // {fromId}
+let dragState = null; // {id, offsetX, offsetY} or {id, end:'fromId'|'toId'}
+let lastCanvasClick = {x: 140, y: 100};
+let mediaRecorder = null;
+let audioChunks = [];
+const measureCtx = document.createElement('canvas').getContext('2d');
+measureCtx.font = '12px Inter, sans-serif';
+
+function wrapText(text, maxWidth) {
+  const words = String(text).split(/\s+/).filter(Boolean);
+  if (!words.length) return [''];
+  const lines = [];
+  let line = words[0];
+  for (let i = 1; i < words.length; i++) {
+    const test = line + ' ' + words[i];
+    if (measureCtx.measureText(test).width > maxWidth) {
+      lines.push(line);
+      line = words[i];
+    } else {
+      line = test;
+    }
+  }
+  lines.push(line);
+  return lines;
+}
+let micTarget = null;
+let narrationText = '';
+
+function newShapeId() { return 's' + (shapeSeq++); }
+
+function boxAt(x, y) {
+  return shapes.find(s => s.type === 'box' && x >= s.x && x <= s.x + s.w && y >= s.y && y <= s.y + s.h);
+}
+
+function shapeAt(x, y, type) {
+  return shapes.find(s => s.type === type && x >= s.x && x <= s.x + s.w && y >= s.y && y <= s.y + s.h);
+}
+
+function setCanvasTool(tool) {
+  canvasTool = tool;
+  arrowDraft = null;
+  document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
+  const btn = document.getElementById('tool-' + tool);
+  if (btn) btn.classList.add('active');
+  const svg = document.getElementById('design-canvas');
+  if (svg) svg.classList.toggle('select-mode', tool === 'select');
+  renderCanvas();
+}
+
+function svgPoint(evt) {
+  const svg = document.getElementById('design-canvas');
+  const rect = svg.getBoundingClientRect();
+  return {x: evt.clientX - rect.left, y: evt.clientY - rect.top};
+}
+
+function canvasMouseDown(evt) {
+  evt.preventDefault();
+  const openEdit = document.querySelector('.canvas-inline-edit');
+  if (openEdit) openEdit.blur();
+  const pt = svgPoint(evt);
+  lastCanvasClick = pt;
+  const hitBox = boxAt(pt.x, pt.y);
+  const hitText = shapeAt(pt.x, pt.y, 'text');
+
+  if (canvasTool === 'box') {
+    if (hitBox) return;
+    const shape = {id: newShapeId(), type: 'box', label: '', x: snap(pt.x - 55), y: snap(pt.y - 25), w: 110, h: 50};
+    shapes.push(shape);
+    setCanvasTool('select');
+    startInlineEdit(shape);
+    return;
+  }
+  if (canvasTool === 'text') {
+    if (hitText) return;
+    const shape = {id: newShapeId(), type: 'text', label: '', x: snap(pt.x - 50), y: snap(pt.y - 20), w: 100, h: 40};
+    shapes.push(shape);
+    setCanvasTool('select');
+    startInlineEdit(shape);
+    return;
+  }
+  if (canvasTool === 'arrow') {
+    const hitAnchor = hitBox || hitText;
+    if (!hitAnchor) return;
+    if (!arrowDraft) {
+      arrowDraft = {fromId: hitAnchor.id};
+      renderCanvas();
+    } else if (hitAnchor.id !== arrowDraft.fromId) {
+      shapes.push({id: newShapeId(), type: 'arrow', fromId: arrowDraft.fromId, toId: hitAnchor.id, label: ''});
+      arrowDraft = null;
+      setCanvasTool('select');
+      saveCurrentState();
+    }
+    return;
+  }
+  // select tool
+  const shape = hitBox || hitText;
+  if (shape) {
+    const now = Date.now();
+    const isDoubleClick = lastClickShapeId === shape.id && now - lastClickTime < 400;
+    lastClickShapeId = shape.id;
+    lastClickTime = now;
+    selectedShapeId = shape.id;
+    if (isDoubleClick) {
+      lastClickShapeId = null;
+      renderCanvas();
+      startInlineEdit(shape);
+      return;
+    }
+    dragState = {id: shape.id, offsetX: pt.x - shape.x, offsetY: pt.y - shape.y};
+  } else {
+    lastClickShapeId = null;
+    selectedShapeId = null;
+  }
+  renderCanvas();
+}
+
+function canvasMouseMove(evt) {
+  if (!dragState) return;
+  const pt = svgPoint(evt);
+  const shape = shapes.find(s => s.id === dragState.id);
+  if (!shape) return;
+  if (dragState.end) {
+    const hitAnchor = boxAt(pt.x, pt.y) || shapeAt(pt.x, pt.y, 'text');
+    if (hitAnchor && hitAnchor.id !== shape[dragState.end === 'fromId' ? 'toId' : 'fromId']) shape[dragState.end] = hitAnchor.id;
+  } else if (dragState.resize) {
+    shape.w = Math.max(60, snap(pt.x - shape.x));
+    shape.h = Math.max(30, snap(pt.y - shape.y));
+  } else {
+    shape.x = snap(pt.x - dragState.offsetX);
+    shape.y = snap(pt.y - dragState.offsetY);
+  }
+  renderCanvas();
+}
+
+function canvasMouseUp() {
+  if (dragState) saveCurrentState();
+  dragState = null;
+}
+
+function startArrowHandleDrag(arrowId, end, evt) {
+  evt.stopPropagation();
+  selectedShapeId = arrowId;
+  dragState = {id: arrowId, end};
+}
+
+function deleteSelected() {
+  if (!selectedShapeId) return;
+  shapes = shapes.filter(s => s.id !== selectedShapeId && s.fromId !== selectedShapeId && s.toId !== selectedShapeId);
+  selectedShapeId = null;
+  renderCanvas();
+  saveCurrentState();
+}
+
+function showToast(message) {
+  const existing = document.querySelector('.toast');
+  if (existing) existing.remove();
+  const t = document.createElement('div');
+  t.className = 'toast';
+  t.textContent = message;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 5000);
+}
+
+function showConfirm(message, onConfirm) {
+  const overlay = document.createElement('div');
+  overlay.className = 'confirm-overlay';
+  overlay.innerHTML = '<div class="confirm-box"><div class="confirm-msg"></div><div class="confirm-actions">'
+    + '<button class="btn btn-ghost" id="confirm-no">Cancel</button>'
+    + '<button class="btn btn-primary" id="confirm-yes">Clear</button></div></div>';
+  overlay.querySelector('.confirm-msg').textContent = message;
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+  overlay.querySelector('#confirm-no').onclick = () => overlay.remove();
+  overlay.querySelector('#confirm-yes').onclick = () => { overlay.remove(); onConfirm(); };
+  document.body.appendChild(overlay);
+}
+
+function clearCanvas() {
+  if (!shapes.length) return;
+  showConfirm("Clear the whole whiteboard? This can't be undone.", () => {
+    shapes = [];
+    selectedShapeId = null;
+    renderCanvas();
+    saveCurrentState();
+  });
+}
+
+const GRID = 10;
+function snap(v) { return Math.round(v / GRID) * GRID; }
+
+// port-snapped edge point: pick the cardinal side facing the other shape instead of
+// a raw center-to-center intersection, so arrows always leave/enter straight (no corner-clipping).
+function edgePoint(box, towardX, towardY) {
+  const cx = box.x + box.w / 2, cy = box.y + box.h / 2;
+  const dx = towardX - cx, dy = towardY - cy;
+  if (!dx && !dy) return {x: cx, y: cy};
+  if (Math.abs(dx) > Math.abs(dy)) return {x: dx > 0 ? box.x + box.w : box.x, y: cy};
+  return {x: cx, y: dy > 0 ? box.y + box.h : box.y};
+}
+
+function svgEl(tag, attrs) {
+  const el = document.createElementNS('http://www.w3.org/2000/svg', tag);
+  for (const k in attrs) el.setAttribute(k, attrs[k]);
+  return el;
+}
+
+const LAYER_COLORS = {
+  source: {stroke: '#5ee6d8', fill: 'rgba(94,230,216,0.35)'},
+  processing: {stroke: '#7c6cf6', fill: 'rgba(124,108,246,0.35)'},
+  storage: {stroke: '#3ddc97', fill: 'rgba(61,220,151,0.35)'},
+  consumer: {stroke: '#f5c542', fill: 'rgba(245,197,66,0.35)'}
+};
+function layerColors(layer) { return LAYER_COLORS[layer] || {stroke: '#9299ab', fill: 'rgba(146,153,171,0.28)'}; }
+
+let roughSvgGen = null;
+function getRC(svg) { if (!roughSvgGen) roughSvgGen = rough.svg(svg); return roughSvgGen; }
+
+// small deterministic tilt so notes read as hand-placed sticky notes, not a UI element
+function noteTilt(id) { const n = parseInt(id.slice(1), 10) || 0; return (n % 2 === 0 ? 1 : -1) * 1.4; }
+
+function renderCanvas() {
+  const svg = document.getElementById('design-canvas');
+  if (!svg) return;
+  svg.innerHTML = '<defs>'
+    + '<pattern id="dot-grid" width="' + GRID * 2 + '" height="' + GRID * 2 + '" patternUnits="userSpaceOnUse">'
+    + '<circle cx="1.5" cy="1.5" r="1.5" fill="rgba(255,255,255,0.055)"></circle></pattern>'
+    + ['default', 'source', 'processing', 'storage', 'consumer'].map(l => {
+        const color = l === 'default' ? '#9299ab' : LAYER_COLORS[l].stroke;
+        return '<marker id="arrowhead-' + l + '" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto">'
+          + '<path d="M0,0 L9,4.5 L0,9 z" fill="' + color + '"></path></marker>';
+      }).join('')
+    + '</defs>';
+  svg.appendChild(svgEl('rect', {x: 0, y: 0, width: '100%', height: '100%', fill: 'url(#dot-grid)', 'pointer-events': 'none'}));
+  const rc = getRC(svg);
+  const byId = Object.fromEntries(shapes.map(s => [s.id, s]));
+
+  if (shapes.length === 0) {
+    const hint = svgEl('text', {x: '50%', y: '44%', 'text-anchor': 'middle', class: 'canvas-hint'});
+    hint.textContent = 'Sketch your architecture here';
+    svg.appendChild(hint);
+    const sub = svgEl('text', {x: '50%', y: '44%', dy: '22', 'text-anchor': 'middle', class: 'canvas-hint canvas-hint-sub'});
+    sub.textContent = 'Box for a component · Arrow to connect two · Note for assumptions — syncs to the tutor automatically';
+    svg.appendChild(sub);
+  }
+
+  shapes.filter(s => s.type === 'arrow').forEach(a => {
+    const from = byId[a.fromId], to = byId[a.toId];
+    if (!from || !to) return;
+    const p1 = edgePoint(from, to.x + to.w / 2, to.y + to.h / 2);
+    const p2 = edgePoint(to, from.x + from.w / 2, from.y + from.h / 2);
+    const selected = a.id === selectedShapeId;
+    const color = layerColors(from.layer).stroke;
+    const line = rc.line(p1.x, p1.y, p2.x, p2.y, {stroke: color, strokeWidth: selected ? 2.4 : 1.6, roughness: 1.3, bowing: 1});
+    line.setAttribute('class', 'shape-arrow' + (selected ? ' selected' : ''));
+    line.setAttribute('marker-end', 'url(#arrowhead-' + (from.layer || 'default') + ')');
+    line.addEventListener('mousedown', (e) => {
+      e.stopPropagation();
+      canvasTool = 'select';
+      setCanvasTool('select');
+      const now = Date.now();
+      const isDoubleClick = lastClickShapeId === a.id && now - lastClickTime < 400;
+      lastClickShapeId = a.id;
+      lastClickTime = now;
+      selectedShapeId = a.id;
+      renderCanvas();
+      if (isDoubleClick) {
+        lastClickShapeId = null;
+        startArrowLabelEdit(a, (p1.x + p2.x) / 2, (p1.y + p2.y) / 2);
+      }
+    });
+    svg.appendChild(line);
+    if (a.label) {
+      const t = svgEl('text', {x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2 - 6, style: 'fill:var(--text-faint); font-size:11px;'});
+      t.textContent = a.label;
+      svg.appendChild(t);
+    }
+    if (selected) {
+      [['fromId', p1], ['toId', p2]].forEach(([end, p]) => {
+        const h = svgEl('circle', {cx: p.x, cy: p.y, r: 5, class: 'arrow-handle'});
+        h.addEventListener('mousedown', (e) => startArrowHandleDrag(a.id, end, e));
+        svg.appendChild(h);
+      });
+    }
+  });
+
+  // baseline nudge: SVG has no reliable cross-browser vertical-center text alignment,
+  // so bake the offset into the tspan y instead of relying on dominant-baseline.
+  const TEXT_BASELINE_NUDGE = 4;
+
+  shapes.filter(s => s.type === 'box').forEach(b => {
+    const lineHeight = 15;
+    const lines = wrapText(b.label || '(untitled)', b.w - 16);
+    b.h = Math.max(b.h || 50, lines.length * lineHeight + 16);
+    const selected = b.id === selectedShapeId;
+    const colors = layerColors(b.layer);
+    const rect = rc.rectangle(b.x, b.y, b.w, b.h, {
+      stroke: colors.stroke, fill: colors.fill, fillStyle: 'hachure', fillWeight: 0.8, hachureGap: 5,
+      roughness: 1.15, strokeWidth: selected ? 2.5 : 1.5
+    });
+    rect.setAttribute('class', 'shape-box' + (selected ? ' selected' : ''));
+    const rectTitle = svgEl('title', {});
+    rectTitle.textContent = b.layer ? `layer: ${b.layer} (press L to cycle)` : 'select and press L to tag a layer (source/processing/storage/consumer)';
+    rect.appendChild(rectTitle);
+    svg.appendChild(rect);
+    const t = svgEl('text', {x: b.x + b.w / 2, y: b.y + b.h / 2 - (lines.length - 1) * lineHeight / 2 + TEXT_BASELINE_NUDGE, class: 'shape-label'});
+    t.style.pointerEvents = 'none';
+    lines.forEach((line, i) => {
+      const tspan = svgEl('tspan', {x: b.x + b.w / 2, dy: i === 0 ? 0 : lineHeight});
+      tspan.textContent = line;
+      t.appendChild(tspan);
+    });
+    svg.appendChild(t);
+    if (selected) {
+      const handle = svgEl('rect', {x: b.x + b.w - 7, y: b.y + b.h - 7, width: 10, height: 10, class: 'resize-handle'});
+      handle.addEventListener('mousedown', (e) => { e.stopPropagation(); dragState = {id: b.id, resize: true}; });
+      svg.appendChild(handle);
+    }
+  });
+
+  shapes.filter(s => s.type === 'text').forEach(tx => {
+    const lineHeight = 15;
+    const lines = wrapText(tx.label || '(empty note)', tx.w - 16);
+    tx.h = Math.max(tx.h || 40, lines.length * lineHeight + 16);
+    const selected = tx.id === selectedShapeId;
+    const cx = tx.x + tx.w / 2, cy = tx.y + tx.h / 2;
+    const g = svgEl('g', {transform: `rotate(${noteTilt(tx.id)} ${cx} ${cy})`, class: 'rough-shadow'});
+    const rect = rc.rectangle(tx.x, tx.y, tx.w, tx.h, {
+      stroke: '#c99a2e', fill: '#f5c542', fillStyle: 'solid', roughness: 1.6, strokeWidth: selected ? 2.5 : 1.5
+    });
+    rect.setAttribute('class', 'shape-note' + (selected ? ' selected' : ''));
+    g.appendChild(rect);
+    const t = svgEl('text', {x: cx, y: cy - (lines.length - 1) * lineHeight / 2 + TEXT_BASELINE_NUDGE, class: 'shape-label note-label'});
+    t.style.pointerEvents = 'none';
+    lines.forEach((line, i) => {
+      const tspan = svgEl('tspan', {x: cx, dy: i === 0 ? 0 : lineHeight});
+      tspan.textContent = line;
+      t.appendChild(tspan);
+    });
+    g.appendChild(t);
+    if (selected) {
+      const handle = svgEl('rect', {x: tx.x + tx.w - 7, y: tx.y + tx.h - 7, width: 10, height: 10, class: 'resize-handle'});
+      handle.addEventListener('mousedown', (e) => { e.stopPropagation(); dragState = {id: tx.id, resize: true}; });
+      g.appendChild(handle);
+    }
+    svg.appendChild(g);
+  });
+
+  if (arrowDraft) {
+    const from = byId[arrowDraft.fromId];
+    if (from) {
+      const hint = svgEl('text', {x: from.x, y: from.y - 8, style: 'fill:var(--accent); font-size:11px;'});
+      hint.textContent = 'click a target box…';
+      svg.appendChild(hint);
+    }
+  }
+
+  const deleteBtn = document.getElementById('canvas-delete-btn');
+  if (deleteBtn) deleteBtn.disabled = !selectedShapeId;
+
+  const wrapper = document.getElementById('canvas-scroll');
+  if (wrapper) {
+    const contentBottom = shapes.reduce((max, s) => Math.max(max, (s.y || 0) + (s.h || 0)), 0) + 40;
+    svg.style.height = contentBottom > wrapper.clientHeight ? contentBottom + 'px' : '100%';
+  }
+}
+
+function createInlineEditInput(midX, midY, initialValue, onCommit) {
+  const card = document.getElementById('design-canvas-card');
+  const svg = document.getElementById('design-canvas');
+  const existing = card.querySelector('.canvas-inline-edit');
+  if (existing) existing.remove();
+  const input = document.createElement('input');
+  input.className = 'canvas-inline-edit';
+  input.value = initialValue || '';
+  const cardRect = card.getBoundingClientRect();
+  const svgRect = svg.getBoundingClientRect();
+  const offsetX = svgRect.left - cardRect.left;
+  const offsetY = svgRect.top - cardRect.top;
+  input.style.left = (offsetX + midX - 50) + 'px';
+  input.style.top = (offsetY + midY - 10) + 'px';
+  input.style.width = '100px';
+  const commit = () => {
+    onCommit(input.value.trim());
+    input.remove();
+    renderCanvas();
+    saveCurrentState();
+  };
+  input.addEventListener('keydown', (e) => { if (e.key === 'Enter') input.blur(); });
+  input.addEventListener('blur', commit);
+  card.appendChild(input);
+  input.focus();
+  input.select();
+}
+
+function startInlineEdit(shape) {
+  createInlineEditInput(shape.x + shape.w / 2, shape.y + shape.h / 2, shape.label, (val) => { shape.label = val; });
+}
+
+function startArrowLabelEdit(arrow, midX, midY) {
+  createInlineEditInput(midX, midY, arrow.label, (val) => { arrow.label = val; });
+}
+
+function serializeCanvasForLLM() {
+  if (!shapes.length) return '';
+  const byId = Object.fromEntries(shapes.map(s => [s.id, s]));
+  const lines = [];
+  shapes.filter(s => s.type === 'box').forEach(b => lines.push(`Box: ${b.label || '(unlabeled)'}${b.layer ? ` [${b.layer}]` : ''}`));
+  shapes.filter(s => s.type === 'arrow').forEach(a => {
+    const from = byId[a.fromId], to = byId[a.toId];
+    if (!from || !to) return;
+    lines.push(`Arrow: ${from.label || '(unlabeled)'} -> ${to.label || '(unlabeled)'}${a.label ? ` [${a.label}]` : ''}`);
+  });
+  shapes.filter(s => s.type === 'text').forEach(t => lines.push(`Note: ${t.label}`));
+  return lines.join('\n');
+}
+
+async function startMic(target, btnEl) {
+  if (mediaRecorder) return;
+  micTarget = target;
+  let stream;
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  } catch (err) {
+    showToast('Microphone access is blocked. Click the lock/site-info icon in the address bar, set Microphone to Allow, then reload the page.');
+    return;
+  }
+  audioChunks = [];
+  const rec = new MediaRecorder(stream);
+  rec.ondataavailable = (e) => { if (e.data.size > 0) audioChunks.push(e.data); };
+  rec.onstop = async () => {
+    stream.getTracks().forEach(t => t.stop());
+    btnEl.classList.remove('listening');
+    mediaRecorder = null;
+    if (!audioChunks.length) return;
+    const blob = new Blob(audioChunks, { type: 'audio/webm' });
+    const form = new FormData();
+    form.append('audio', blob, 'note.webm');
+    btnEl.disabled = true;
+    try {
+      const res = await fetch('/api/transcribe', { method: 'POST', body: form }).then(r => r.json());
+      if (res.error) { showToast('Transcription failed: ' + res.error); return; }
+      const text = (res.text || '').trim();
+      if (!text) return;
+      if (micTarget === 'chat') {
+        const box = document.getElementById('chatbox');
+        box.value = (box.value ? box.value + ' ' : '') + text;
+        if (isDesignQuestion()) {
+          sendMessage();
+        } else {
+          box.focus();
+        }
+      } else if (micTarget === 'narration') {
+        narrationText = (narrationText ? narrationText + ' ' : '') + text;
+        const readout = document.getElementById('narration-readout');
+        readout.style.display = '';
+        readout.textContent = '🎤 ' + narrationText;
+      } else {
+        shapes.push({id: newShapeId(), type: 'text', label: text, x: lastCanvasClick.x - 50, y: lastCanvasClick.y - 20, w: 100, h: 40});
+        renderCanvas();
+        saveCurrentState();
+      }
+    } catch (err) {
+      showToast('Transcription request failed: ' + err.message);
+    } finally {
+      btnEl.disabled = false;
+    }
+  };
+  mediaRecorder = rec;
+  rec.start();
+  btnEl.classList.add('listening');
+}
+
+function stopMic() {
+  if (mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
+}
+document.addEventListener('mouseup', stopMic);
+document.addEventListener('touchend', stopMic);
+
+const LAYER_CYCLE = ['', 'source', 'processing', 'storage', 'consumer'];
+function duplicateSelected() {
+  const shape = shapes.find(s => s.id === selectedShapeId);
+  if (!shape || shape.type === 'arrow') return;
+  const clone = {...shape, id: newShapeId(), x: shape.x + 20, y: shape.y + 20};
+  shapes.push(clone);
+  selectedShapeId = clone.id;
+  renderCanvas();
+  saveCurrentState();
+}
+function cycleLayer() {
+  const shape = shapes.find(s => s.id === selectedShapeId);
+  if (!shape || shape.type !== 'box') return;
+  shape.layer = LAYER_CYCLE[(LAYER_CYCLE.indexOf(shape.layer || '') + 1) % LAYER_CYCLE.length];
+  renderCanvas();
+  saveCurrentState();
+}
+
+document.addEventListener('keydown', (e) => {
+  if (!(current && current.lang === 'design' && selectedShapeId
+      && !['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName))) return;
+  if (e.key === 'Delete' || e.key === 'Backspace') {
+    e.preventDefault();
+    deleteSelected();
+  } else if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'd') {
+    e.preventDefault();
+    duplicateSelected();
+  } else if (e.key.toLowerCase() === 'l' && !e.metaKey && !e.ctrlKey) {
+    e.preventDefault();
+    cycleLayer();
+  }
+});
+
+function formatTime(s) {
+  return String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0');
+}
+
+function isSolved(id) {
+  const item = document.querySelector(`.q-item[data-id="${id}"]`);
+  return !!(item && item.classList.contains('solved'));
+}
+
+function updateTimerDisplay() {
+  if (!current) return;
+  const t = timers[current.id];
+  const el = document.getElementById('q-timer');
+  el.textContent = formatTime(t.elapsed);
+  el.className = t.running ? '' : 'stopped';
+}
+
+function startTimerFor(id) {
+  clearInterval(timerInterval);
+  if (!timers[id]) timers[id] = {elapsed: 0, running: true};
+  if (isSolved(id)) timers[id].running = false;
+  updateTimerDisplay();
+  if (timers[id].running) {
+    timerInterval = setInterval(() => {
+      timers[id].elapsed++;
+      updateTimerDisplay();
+    }, 1000);
+  }
+}
+
+function stopTimer(id) {
+  if (timers[id]) timers[id].running = false;
+  clearInterval(timerInterval);
+  updateTimerDisplay();
+}
+
+function renderConceptBox(q, solved) {
+  const box = document.getElementById('concept-box');
+  box.style.display = 'block';
+  box.className = 'concept-box ' + (solved ? 'revealed' : 'locked');
+  box.innerHTML = '';
+  const label = document.createElement('div');
+  label.className = 'concept-label';
+  label.textContent = solved ? '💡 Key idea' : '🔒 Key idea';
+  const text = document.createElement('div');
+  text.className = 'concept-text';
+  text.textContent = solved ? q.concept : 'Solve this to reveal the underlying pattern and the common trap.';
+  box.appendChild(label);
+  box.appendChild(text);
+}
+
+let planApproved = false;
+
+function saveCurrentState() {
+  if (!current) return;
+  stateCache[current.id] = {
+    code: cm.getValue(),
+    chatHTML: document.getElementById('chatlog').innerHTML,
+    resultsHTML: document.getElementById('results').innerHTML,
+    resultsClass: document.getElementById('results').className,
+    lastRunSummary, stuck, nudgeSent, reinforced,
+    plan: document.getElementById('plan-input').value,
+    approved: planApproved,
+    feedbackHTML: document.getElementById('plan-feedback').outerHTML,
+    complexityInput: document.getElementById('complexity-input').value,
+    edgeInput: document.getElementById('edge-input').value,
+    debriefFeedbackHTML: document.getElementById('debrief-feedback').outerHTML,
+    shapes: JSON.parse(JSON.stringify(shapes)),
+    persona: selectedPersona,
+    tradeoffInput: document.getElementById('tradeoff-input').value,
+    tradeoffFeedbackHTML: document.getElementById('tradeoff-feedback').outerHTML,
+    napkinInput: document.getElementById('napkin-input').value,
+    napkinFeedbackHTML: document.getElementById('napkin-feedback').outerHTML,
+  };
+}
+
+function onPlanInput() {
+  document.getElementById('check-approach-btn').disabled = document.getElementById('plan-input').value.trim().length === 0;
+}
+
+function setEditorLocked(locked) {
+  cm.setOption('readOnly', locked);
+  cm.getWrapperElement().classList.toggle('locked', locked);
+  document.getElementById('run-btn').disabled = locked;
+  document.getElementById('submit-btn').disabled = locked;
+}
+
+function setPlanFeedback(kind, text) {
+  const el = document.getElementById('plan-feedback');
+  el.className = kind;
+  el.textContent = text;
+}
+
+async function checkApproach() {
+  const btn = document.getElementById('check-approach-btn');
+  const plan = document.getElementById('plan-input').value;
+  btn.disabled = true;
+  setPlanFeedback('pending', 'Checking your approach…');
+  const res = await (await fetch('/api/check-approach', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({question_id: current.id, plan})
+  })).json();
+  btn.disabled = false;
+  setPlanFeedback(res.ok ? 'ok' : 'bad', (res.ok ? '✓ ' : '✗ ') + res.feedback);
+  if (res.ok) {
+    planApproved = true;
+    setEditorLocked(false);
+  }
+}
+
+let spotBugNote = null;
+
+async function startSpotBug() {
+  const btn = document.getElementById('spotbug-btn');
+  btn.disabled = true;
+  btn.textContent = 'Loading…';
+  const res = await (await fetch('/api/spot-bug', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({question_id: current.id})
+  })).json();
+  btn.disabled = false;
+  btn.textContent = '🐛 Spot the bug';
+  if (res.error) { showToast('Could not generate a code-review drill: ' + res.error); return; }
+  spotBugNote = res.bug_note;
+  document.getElementById('spotbug-code').textContent = res.code;
+  document.getElementById('spotbug-input').value = '';
+  document.getElementById('spotbug-feedback').textContent = '';
+  document.getElementById('spotbug-card').style.display = 'block';
+}
+
+function closeSpotBug() {
+  document.getElementById('spotbug-card').style.display = 'none';
+  spotBugNote = null;
+}
+
+async function gradeSpotBug() {
+  const answer = document.getElementById('spotbug-input').value.trim();
+  if (!answer || !spotBugNote) return;
+  const btn = document.getElementById('spotbug-grade-btn');
+  const el = document.getElementById('spotbug-feedback');
+  btn.disabled = true;
+  el.className = 'pending';
+  el.textContent = 'Grading…';
+  const res = await (await fetch('/api/spot-bug-grade', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({question_id: current.id, bug_note: spotBugNote, answer})
+  })).json();
+  btn.disabled = false;
+  el.className = res.ok ? 'ok' : 'bad';
+  el.textContent = (res.ok ? '✓ ' : '✗ ') + res.feedback;
+}
+
+let curveballActive = false;
+
+async function startCurveball() {
+  const btn = document.getElementById('curveball-btn');
+  btn.disabled = true;
+  btn.textContent = 'Loading…';
+  const res = await (await fetch('/api/curveball', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({question_id: current.id})
+  })).json();
+  btn.disabled = false;
+  btn.textContent = '🌀 Curveball';
+  if (res.error) { showToast('Could not generate a curveball: ' + res.error); return; }
+  curveballActive = true;
+  document.getElementById('curveball-twist').textContent = '🌀 Interviewer: ' + res.twist;
+  document.getElementById('curveball-feedback').textContent = '';
+  document.getElementById('curveball-card').style.display = 'block';
+  addMsg('system', 'Interviewer changed the requirements mid-solve');
+}
+
+function closeCurveball() {
+  document.getElementById('curveball-card').style.display = 'none';
+  curveballActive = false;
+}
+
+async function gradeCurveball() {
+  if (!curveballActive) return;
+  const btn = document.getElementById('curveball-grade-btn');
+  const el = document.getElementById('curveball-feedback');
+  btn.disabled = true;
+  el.className = 'pending';
+  el.textContent = 'Grading…';
+  const res = await (await fetch('/api/curveball-grade', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({question_id: current.id, code: cm.getValue()})
+  })).json();
+  btn.disabled = false;
+  el.className = res.ok ? 'ok' : 'bad';
+  el.textContent = (res.ok ? '✓ ' : '✗ ') + res.feedback;
+}
+
+let sqlClarifyMode = false;
+let sqlClarifyAsked = 0;
+const SQL_CLARIFY_MIN = 2;
+
+function toggleSqlClarify() {
+  if (sqlClarifyMode) { revealSqlClarify(); return; }
+  sqlClarifyMode = true;
+  sqlClarifyAsked = 0;
+  document.getElementById('sample').style.display = 'none';
+  document.getElementById('clarify-sql-btn').classList.add('active');
+  renderSqlClarifyGate();
+  addMsg('system', "Clarify-first mode — I'll ask about the schema and edge cases before coding");
+}
+
+function renderSqlClarifyGate() {
+  const gate = document.getElementById('clarify-gate');
+  gate.style.display = 'block';
+  const remaining = Math.max(0, SQL_CLARIFY_MIN - sqlClarifyAsked);
+  gate.innerHTML = `🎯 Schema hidden — ask the tutor about the table shape, nulls, ties, or edge cases first.` +
+    `<div class="clarify-progress">${remaining > 0 ? `Ask ${remaining} more clarifying question${remaining === 1 ? '' : 's'} to unlock, or reveal now.` : 'Ready when you are.'}</div>` +
+    `<button class="btn btn-ghost" onclick="revealSqlClarify()">Reveal schema &amp; start coding</button>`;
+}
+
+function revealSqlClarify() {
+  sqlClarifyMode = false;
+  if (current) renderSample(current);
+  document.getElementById('clarify-gate').style.display = 'none';
+  document.getElementById('clarify-sql-btn').classList.remove('active');
+}
+
+function closeSqlClarify() {
+  sqlClarifyMode = false;
+  sqlClarifyAsked = 0;
+  if (current) renderSample(current);
+  document.getElementById('clarify-gate').style.display = 'none';
+  document.getElementById('clarify-sql-btn').classList.remove('active');
+}
+
+async function gradeTradeoff() {
+  const btn = document.getElementById('tradeoff-grade-btn');
+  const answer = document.getElementById('tradeoff-input').value;
+  const el = document.getElementById('tradeoff-feedback');
+  btn.disabled = true;
+  el.className = 'pending';
+  el.textContent = 'Grading…';
+  const res = await (await fetch('/api/tradeoff-grade', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({question_id: current.id, answer})
+  })).json();
+  btn.disabled = false;
+  el.className = res.ok ? 'ok' : 'bad';
+  el.textContent = (res.ok ? '✓ ' : '✗ ') + res.feedback;
+  if (res.ok) markSolved(current.id);
+}
+
+async function rerollTradeoff() {
+  const btn = document.getElementById('tradeoff-reroll-btn');
+  btn.disabled = true;
+  btn.textContent = 'Loading…';
+  const res = await (await fetch('/api/tradeoff-regenerate', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({question_id: current.id})
+  })).json();
+  btn.disabled = false;
+  btn.textContent = '🎲 New scenario';
+  if (res.error) { showToast('Could not generate a new scenario: ' + res.error); return; }
+  current.title = res.title;
+  current.prompt = res.prompt;
+  document.getElementById('title').textContent = res.title;
+  document.getElementById('prompt').textContent = res.prompt;
+  document.getElementById('tradeoff-input').value = '';
+  document.getElementById('tradeoff-feedback').outerHTML = '<div id="tradeoff-feedback"></div>';
+  resetTradeoffSpar();
+}
+
+let tradeoffSparStarted = false;
+
+function resetTradeoffSpar() {
+  tradeoffSparStarted = false;
+  document.getElementById('tradeoff-spar').style.display = 'none';
+  document.getElementById('tradeoff-spar-log').innerHTML = '';
+}
+
+async function startTradeoffSpar() {
+  document.getElementById('tradeoff-spar').style.display = '';
+  if (tradeoffSparStarted) return;
+  tradeoffSparStarted = true;
+  const opener = document.getElementById('tradeoff-input').value.trim() ||
+    "I'll go with whichever option seems safer here — convince me otherwise.";
+  await sendTradeoffSpar(opener);
+}
+
+async function sendTradeoffSpar(prefill) {
+  const inputEl = document.getElementById('tradeoff-spar-input');
+  const message = prefill !== undefined ? prefill : inputEl.value.trim();
+  if (!message) return;
+  appendSparTurn('you', message);
+  inputEl.value = '';
+  const res = await (await fetch('/api/tradeoff-spar', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({question_id: current.id, message})
+  })).json();
+  if (res.error) { appendSparTurn('tutor', 'Error: ' + res.error); return; }
+  appendSparTurn('tutor', res.reply);
+}
+
+function appendSparTurn(who, text) {
+  const log = document.getElementById('tradeoff-spar-log');
+  const div = document.createElement('div');
+  div.innerHTML = `<b>${who === 'you' ? 'You' : '🥊 Tutor'}:</b> ${escapeHtml(text)}`;
+  log.appendChild(div);
+  log.scrollTop = log.scrollHeight;
+}
+
+async function gradeNapkin() {
+  const btn = document.getElementById('napkin-grade-btn');
+  const answer = document.getElementById('napkin-input').value;
+  const assumptions = document.getElementById('napkin-assumptions').value;
+  const el = document.getElementById('napkin-feedback');
+  const aEl = document.getElementById('napkin-assumption-feedback');
+  btn.disabled = true;
+  el.className = 'pending';
+  el.textContent = 'Checking…';
+  aEl.textContent = '';
+  const res = await (await fetch('/api/napkin-grade', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({question_id: current.id, answer, assumptions})
+  })).json();
+  btn.disabled = false;
+  el.className = res.ok ? 'ok' : 'bad';
+  el.textContent = (res.ok ? '✓ ' : '✗ ') + res.feedback + (res.explanation ? ' ' + res.explanation : '');
+  aEl.textContent = res.assumption_feedback ? '💭 ' + res.assumption_feedback : '';
+  if (res.ok) markSolved(current.id);
+}
+
+let napkinTimerInterval = null;
+
+function startNapkinCountdown(seconds) {
+  clearInterval(napkinTimerInterval);
+  let left = seconds;
+  const el = document.getElementById('napkin-timer');
+  const render = () => {
+    const clamped = Math.max(0, left);
+    el.textContent = left <= 0 ? "⏱ time's up — finish your estimate"
+      : `⏱ ${Math.floor(clamped / 60)}:${String(clamped % 60).padStart(2, '0')}`;
+    el.style.color = left <= 15 ? 'var(--error)' : 'var(--text-faint)';
+  };
+  render();
+  napkinTimerInterval = setInterval(() => {
+    left--;
+    render();
+    if (left <= 0) clearInterval(napkinTimerInterval);
+  }, 1000);
+}
+
+async function rerollNapkin() {
+  const btn = document.getElementById('napkin-reroll-btn');
+  btn.disabled = true;
+  const oldLabel = btn.textContent;
+  btn.textContent = 'Rolling…';
+  try {
+    const r = await fetch('/api/napkin-regenerate', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({question_id: current.id})
+    });
+    const d = await r.json();
+    if (d.error) {
+      const el = document.getElementById('napkin-feedback');
+      el.className = 'bad';
+      el.textContent = 'Could not generate a new scenario — try again.';
+      return;
+    }
+    current.prompt = d.prompt;
+    current.unit = d.unit;
+    document.getElementById('prompt').textContent = d.prompt;
+    document.getElementById('napkin-unit').textContent = d.unit || '';
+    document.getElementById('napkin-input').value = '';
+    document.getElementById('napkin-assumptions').value = '';
+    document.getElementById('napkin-feedback').outerHTML = '<div id="napkin-feedback"></div>';
+    document.getElementById('napkin-assumption-feedback').textContent = '';
+    startNapkinCountdown(90);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = oldLabel;
+  }
+}
+
+async function submitDebrief() {
+  const complexity = document.getElementById('complexity-input').value.trim();
+  const edge_cases = document.getElementById('edge-input').value.trim();
+  const btn = document.getElementById('debrief-btn');
+  const fb = document.getElementById('debrief-feedback');
+  if (!complexity || !edge_cases) {
+    fb.innerHTML = '';
+    const line = document.createElement('div');
+    line.className = 'line bad';
+    line.textContent = 'Fill in both fields.';
+    fb.appendChild(line);
+    return;
+  }
+  btn.disabled = true;
+  fb.innerHTML = '';
+  const pendingLine = document.createElement('div');
+  pendingLine.className = 'line pending';
+  pendingLine.textContent = 'Grading…';
+  fb.appendChild(pendingLine);
+  const res = await (await fetch('/api/debrief', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({question_id: current.id, code: cm.getValue(), complexity, edge_cases, narration: narrationText})
+  })).json();
+  btn.disabled = false;
+  fb.innerHTML = '';
+  const complexityLine = document.createElement('div');
+  complexityLine.className = 'line ' + (res.complexity_ok ? 'ok' : 'bad');
+  complexityLine.textContent = (res.complexity_ok ? '✓' : '✗') + ' complexity: ' + res.complexity_feedback;
+  const edgeLine = document.createElement('div');
+  edgeLine.className = 'line ' + (res.edge_ok ? 'ok' : 'bad');
+  edgeLine.textContent = (res.edge_ok ? '✓' : '✗') + ' edge cases: ' + res.edge_feedback;
+  fb.appendChild(complexityLine);
+  fb.appendChild(edgeLine);
+  if ('narration_ok' in res) {
+    const narrationLine = document.createElement('div');
+    narrationLine.className = 'line ' + (res.narration_ok ? 'ok' : 'bad');
+    narrationLine.textContent = (res.narration_ok ? '✓' : '✗') + ' narration: ' + res.narration_feedback;
+    fb.appendChild(narrationLine);
+  }
+  narrationText = '';
+  document.getElementById('narration-readout').style.display = 'none';
+}
+
+function resetIdleTimer() {
+  clearTimeout(idleTimer);
+  if (stuck && !nudgeSent) {
+    idleTimer = setTimeout(sendIdleNudge, IDLE_NUDGE_MS);
+  }
+}
+
+function sendIdleNudge() {
+  nudgeSent = true;
+  requestHint({question_id: current.id, code: cm.getValue(), actual: lastRunSummary, proactive: true});
+  fabAlert('Stuck? Click me');
+}
+
+cm.on('change', resetIdleTimer);
+
+async function loadList() {
+  const qs = await (await fetch('/api/questions')).json();
+  const sb = document.getElementById('sidebar-list');
+
+  const groups = [
+    {lang: 'sql', label: 'SQL'},
+    {lang: 'python', label: 'Python'},
+    {lang: 'design', label: 'System Design'},
+    {lang: 'tradeoff', label: 'Tradeoff Drills'},
+    {lang: 'napkin', label: 'Napkin Math'},
+  ];
+
+  groups.forEach(({lang, label}) => {
+    const items = qs.filter(q => q.lang === lang);
+    if (!items.length) return;
+
+    const header = document.createElement('div');
+    header.className = 'q-section-header collapsed ' + lang;
+    header.innerHTML = `<span class="chevron">▾</span><span class="dot"></span><span>${label}</span><span class="count">${items.length}</span>`;
+    header.onclick = () => { header.classList.toggle('collapsed'); applySidebarFilter(); };
+    sb.appendChild(header);
+
+    items.forEach(q => {
+      const d = document.createElement('div');
+      d.className = 'q-item' + (q.solved ? ' solved' : '') + (q.due ? ' due' : '');
+      d.dataset.id = q.id;
+
+      const badge = document.createElement('span');
+      badge.className = 'q-lang-badge ' + q.lang;
+      badge.textContent = {sql: 'SQL', python: 'PY', design: 'SYS', tradeoff: 'T/O', napkin: 'NUM'}[q.lang];
+
+      const title = document.createElement('span');
+      title.className = 'q-title';
+      title.textContent = q.title;
+
+      const check = document.createElement('span');
+      check.className = 'q-check';
+      check.textContent = '✓';
+
+      d.appendChild(badge);
+      d.appendChild(title);
+      if (q.difficulty) {
+        const diff = document.createElement('span');
+        diff.className = 'q-diff-dot ' + q.difficulty.toLowerCase();
+        diff.title = q.difficulty;
+        d.appendChild(diff);
+      }
+      if (q.due) {
+        const due = document.createElement('span');
+        due.className = 'q-due-dot';
+        due.title = 'due for review';
+        due.textContent = '↻';
+        d.appendChild(due);
+      }
+      d.appendChild(check);
+      d.onclick = () => selectQuestion(d, q.id);
+      sb.appendChild(d);
+    });
+  });
+
+  updateProgress();
+  applySidebarFilter();
+  const deepLinkId = new URLSearchParams(location.search).get('q');
+  const deepLinkQ = qs.find(q => q.id === deepLinkId);
+  const deepLinkEl = deepLinkQ && document.querySelector(`.q-item[data-id="${deepLinkId}"]`);
+  if (deepLinkEl) {
+    const header = document.querySelector('.q-section-header.' + deepLinkQ.lang);
+    if (header) { header.classList.remove('collapsed'); applySidebarFilter(); }
+    document.querySelectorAll('.q-item.active').forEach(x => x.classList.remove('active'));
+    deepLinkEl.classList.add('active');
+    await loadQuestion(deepLinkId);
+    const params = new URLSearchParams(location.search);
+    if (params.get('replay') === '1') {
+      adversarialMode = params.get('adversarial') === '1';
+      clarifyMode = params.get('requirements_only') === '1';
+      startReplay();
+    }
+  } else if (!current) {
+    renderEmptyState(qs);
+  }
+}
+
+function applySidebarFilter() {
+  const term = document.getElementById('q-search').value.trim().toLowerCase();
+  document.querySelectorAll('.q-section-header').forEach(h => {
+    const collapsed = h.classList.contains('collapsed');
+    let visible = 0;
+    let next = h.nextElementSibling;
+    while (next && !next.classList.contains('q-section-header')) {
+      const match = !term || next.querySelector('.q-title').textContent.toLowerCase().includes(term);
+      next.style.display = (match && (!collapsed || term)) ? '' : 'none';
+      if (match) visible++;
+      next = next.nextElementSibling;
+    }
+    h.style.display = visible ? '' : 'none';
+  });
+}
+
+function selectQuestion(el, id) {
+  document.querySelectorAll('.q-item.active').forEach(x => x.classList.remove('active'));
+  el.classList.add('active');
+  loadQuestion(id);
+}
+
+function markSolved(id) {
+  const item = document.querySelector(`.q-item[data-id="${id}"]`);
+  if (item) { item.classList.add('solved'); item.classList.remove('due'); }
+  updateProgress();
+}
+
+function updateProgress() {
+  const total = document.querySelectorAll('.q-item').length;
+  const solved = document.querySelectorAll('.q-item.solved').length;
+  document.getElementById('solved-count').textContent = `${solved}/${total} solved`;
+  document.getElementById('solved-bar').style.width = (total ? solved / total * 100 : 0) + '%';
+}
+
+function renderEmptyState(qs) {
+  const sqlCount = qs.filter(q => q.lang === 'sql').length;
+  const pyCount = qs.length - sqlCount;
+  const solved = document.querySelectorAll('.q-item.solved').length;
+  const due = qs.filter(q => q.due);
+  document.getElementById('prompt').innerHTML = `
+    <div class="empty-stats">
+      <div class="empty-stat"><span class="n">${qs.length}</span><span class="l">questions</span></div>
+      <div class="empty-stat"><span class="n">${sqlCount}</span><span class="l">SQL</span></div>
+      <div class="empty-stat"><span class="n">${pyCount}</span><span class="l">Python</span></div>
+      <div class="empty-stat"><span class="n">${solved}</span><span class="l">solved</span></div>
+    </div>
+    ${due.length
+      ? `<p class="empty-hint due-hint">↻ ${due.length} question${due.length === 1 ? '' : 's'} due for review —
+         <a href="#" onclick="loadQuestion('${due[0].id}');return false;">jump in</a></p>`
+      : `<p class="empty-hint">Pick a question from the sidebar to get started.</p>`}`;
+}
+
+async function loadQuestion(id) {
+  if (document.getElementById('replay-bar').style.display !== 'none') exitReplay();
+  window.speechSynthesis && window.speechSynthesis.cancel();
+  clearPacingNudge();
+  clearReqChips();
+  saveCurrentState();
+  const q = await (await fetch(`/api/questions/${id}`)).json();
+  current = q;
+  document.getElementById('empty-panel').style.display = 'none';
+  clearTimeout(idleTimer);
+  const card = document.getElementById('question-card');
+  card.classList.remove('fade-in');
+  void card.offsetWidth;
+  card.classList.add('fade-in');
+  document.getElementById('title').textContent = q.title;
+  document.getElementById('prompt').textContent = q.prompt;
+  const langBadge = document.getElementById('lang-badge');
+  langBadge.className = 'badge ' + q.lang;
+  langBadge.textContent = {sql: 'SQL', python: 'PYTHON', design: 'SYSTEM DESIGN', tradeoff: 'TRADEOFF', napkin: 'NAPKIN MATH'}[q.lang];
+
+  const isDesign = q.lang === 'design';
+  const isTradeoff = q.lang === 'tradeoff';
+  const isNapkin = q.lang === 'napkin';
+  document.getElementById('editor-card').style.display = (isDesign || isTradeoff || isNapkin) ? 'none' : '';
+  document.getElementById('concept-box').style.display = (isDesign || isTradeoff || isNapkin) ? 'none' : '';
+  if (isDesign || isTradeoff || isNapkin) document.getElementById('sample').style.display = 'none';
+  document.getElementById('results').style.display = (isDesign || isTradeoff || isNapkin) ? 'none' : '';
+  document.getElementById('design-canvas-card').style.display = isDesign ? 'flex' : 'none';
+  document.getElementById('wrapup-btn').style.display = isDesign ? '' : 'none';
+  document.getElementById('clarify-btn').style.display = isDesign ? '' : 'none';
+  document.getElementById('adversarial-btn').style.display = isDesign ? '' : 'none';
+  document.getElementById('replay-btn').style.display = isDesign ? '' : 'none';
+  document.getElementById('chat-mic-btn').classList.toggle('primary-mic', isDesign);
+  document.getElementById('end-drill-btn').style.display = 'none';
+  document.getElementById('selfrate-panel').style.display = 'none';
+  document.getElementById('refdesign-btn').style.display = 'none';
+  resetTradeoffSpar();
+  document.getElementById('tradeoff-card').style.display = isTradeoff ? '' : 'none';
+  document.getElementById('napkin-card').style.display = isNapkin ? '' : 'none';
+  document.getElementById('chatpanel').style.display = (isTradeoff || isNapkin) ? 'none' : '';
+  clarifyMode = false;
+  adversarialMode = false;
+  adversarialFlaws = [];
+
+  if (isTradeoff) {
+    document.getElementById('trace-box').style.display = 'none';
+    document.getElementById('debrief-row').style.display = 'none';
+    startTimerFor(id);
+    const cached = stateCache[id];
+    document.getElementById('tradeoff-input').value = (cached && cached.tradeoffInput) || '';
+    document.getElementById('tradeoff-feedback').outerHTML = (cached && cached.tradeoffFeedbackHTML) || '<div id="tradeoff-feedback"></div>';
+    resetIdleTimer();
+    return;
+  }
+
+  if (isNapkin) {
+    document.getElementById('trace-box').style.display = 'none';
+    document.getElementById('debrief-row').style.display = 'none';
+    startTimerFor(id);
+    document.getElementById('napkin-unit').textContent = q.unit || '';
+    const cached = stateCache[id];
+    document.getElementById('napkin-input').value = (cached && cached.napkinInput) || '';
+    document.getElementById('napkin-feedback').outerHTML = (cached && cached.napkinFeedbackHTML) || '<div id="napkin-feedback"></div>';
+    document.getElementById('napkin-assumptions').value = '';
+    document.getElementById('napkin-assumption-feedback').textContent = '';
+    startNapkinCountdown(90);
+    resetIdleTimer();
+    return;
+  }
+
+  if (isDesign) {
+    document.getElementById('trace-box').style.display = 'none';
+    document.getElementById('debrief-row').style.display = 'none';
+    startTimerFor(id);
+    const cached = stateCache[id];
+    const chatlog = document.getElementById('chatlog');
+    shapes = cached && cached.shapes ? JSON.parse(JSON.stringify(cached.shapes)) : [];
+    selectedShapeId = null;
+    setCanvasTool('select');
+    if (cached) {
+      selectedPersona = cached.persona || '';
+      chatlog.innerHTML = cached.chatHTML;
+    } else {
+      selectedPersona = '';
+      chatlog.innerHTML = '';
+      renderPersonaPicker(id);
+    }
+    resetIdleTimer();
+    return;
+  }
+
+  document.getElementById('editor-lang-label').textContent = q.lang === 'sql' ? 'SQL' : 'PYTHON';
+  renderSample(q);
+  renderConceptBox(q, isSolved(id));
+  loadTrace(id);
+  startTimerFor(id);
+  document.getElementById('twist-btn').disabled = !isSolved(id);
+  const dryrunBtn = document.getElementById('dryrun-btn');
+  dryrunBtn.style.display = q.lang === 'python' ? '' : 'none';
+  dryrunBtn.disabled = !isSolved(id);
+  cm.setOption('mode', q.lang === 'sql' ? 'text/x-sql' : 'python');
+
+  const cached = stateCache[id];
+  const results = document.getElementById('results');
+  const planInput = document.getElementById('plan-input');
+  if (cached) {
+    cm.setValue(cached.code);
+    document.getElementById('chatlog').innerHTML = cached.chatHTML;
+    results.innerHTML = cached.resultsHTML;
+    results.className = cached.resultsClass;
+    lastRunSummary = cached.lastRunSummary;
+    stuck = cached.stuck;
+    nudgeSent = cached.nudgeSent;
+    reinforced = cached.reinforced;
+    planInput.value = cached.plan || '';
+    planApproved = !!cached.approved;
+    document.getElementById('plan-feedback').outerHTML = cached.feedbackHTML || '<div id="plan-feedback"></div>';
+    document.getElementById('complexity-input').value = cached.complexityInput || '';
+    document.getElementById('edge-input').value = cached.edgeInput || '';
+    document.getElementById('debrief-feedback').outerHTML = cached.debriefFeedbackHTML || '<div id="debrief-feedback"></div>';
+  } else {
+    cm.setValue(q.code || q.starter_code);
+    results.innerHTML = '';
+    results.className = '';
+    document.getElementById('chatlog').innerHTML = '';
+    lastRunSummary = '';
+    stuck = false;
+    nudgeSent = false;
+    reinforced = false;
+    planInput.value = '';
+    planApproved = false;
+    document.getElementById('plan-feedback').outerHTML = '<div id="plan-feedback"></div>';
+    document.getElementById('complexity-input').value = '';
+    document.getElementById('edge-input').value = '';
+    document.getElementById('debrief-feedback').outerHTML = '<div id="debrief-feedback"></div>';
+  }
+  document.getElementById('debrief-row').style.display = isSolved(id) ? 'flex' : 'none';
+  narrationText = '';
+  document.getElementById('narration-readout').style.display = 'none';
+  closeSpotBug();
+  closeSqlClarify();
+  closeCurveball();
+  setEditorLocked(!planApproved);
+  onPlanInput();
+  resetIdleTimer();
+}
+
+function makeTable(columns, rows) {
+  const table = document.createElement('table');
+  table.className = 'datatable';
+  if (columns && columns.length) {
+    const thead = document.createElement('tr');
+    columns.forEach(c => { const th = document.createElement('th'); th.textContent = c; thead.appendChild(th); });
+    table.appendChild(thead);
+  }
+  (rows || []).forEach(r => {
+    const tr = document.createElement('tr');
+    r.forEach(v => { const td = document.createElement('td'); td.textContent = v === null ? 'NULL' : v; tr.appendChild(td); });
+    table.appendChild(tr);
+  });
+  return table;
+}
+
+function makeLabeled(label, node) {
+  const wrap = document.createElement('div');
+  const h = document.createElement('div');
+  h.className = 'tname';
+  h.textContent = label;
+  wrap.appendChild(h);
+  wrap.appendChild(node);
+  return wrap;
+}
+
+function renderSkeleton(skeletonHTML) {
+  const el = document.getElementById('trace-skeleton');
+  if (!skeletonHTML) { el.style.display = 'none'; return; }
+  el.style.display = 'block';
+  el.innerHTML = skeletonHTML;
+}
+
+let traceProgress = {}; // qid -> {pattern, skeleton, steps: [{q, a, status: 'open'|'correct'|'revealed', attempts, guess}]}
+
+function renderTraceSteps(qid) {
+  const box = document.getElementById('trace-box');
+  const stepsEl = document.getElementById('trace-steps');
+  const t = traceProgress[qid];
+  if (!t || !t.steps.length) { box.style.display = 'none'; return; }
+  box.style.display = 'block';
+  document.getElementById('trace-pattern').textContent = t.pattern ? '⚡ Pattern: ' + t.pattern : '';
+  renderSkeleton(t.skeleton || '');
+  stepsEl.innerHTML = '';
+  let correctCount = 0;
+  t.steps.forEach((s, i) => {
+    const card = document.createElement('div');
+    card.style.cssText = 'background:var(--card-2);border:1px solid var(--border-soft);border-radius:8px;padding:10px 12px;';
+    const qP = document.createElement('div');
+    qP.style.cssText = 'color:var(--text);font-size:13px;line-height:1.5;margin-bottom:8px;';
+    qP.textContent = (i+1) + '. ' + s.q;
+    card.appendChild(qP);
+    if (s.status === 'correct' || s.status === 'revealed') {
+      if (s.status === 'correct') correctCount++;
+      const ansP = document.createElement('div');
+      const isCorrect = s.status === 'correct';
+      ansP.style.cssText = 'font-family:JetBrains Mono,monospace;font-size:13px;color:' + (isCorrect ? 'var(--success)' : 'var(--warn)') + ';';
+      ansP.textContent = (isCorrect ? '✓ ' : '→ revealed: ') + s.a;
+      card.appendChild(ansP);
+    } else {
+      const inp = document.createElement('input');
+      inp.type = 'text';
+      inp.className = 'trace-input';
+      inp.dataset.index = i;
+      inp.value = s.guess || '';
+      inp.placeholder = 'Type the code for this step…';
+      inp.style.cssText = 'width:100%;background:var(--panel);border:1px solid var(--border);border-radius:6px;padding:7px 10px;font-family:JetBrains Mono,monospace;font-size:12.5px;color:var(--text);box-sizing:border-box;';
+      card.appendChild(inp);
+      if (s.attempts > 0) {
+        const tries = document.createElement('div');
+        const left = 3 - s.attempts;
+        tries.style.cssText = 'font-size:11px;color:var(--error);margin-top:5px;';
+        tries.textContent = 'Not quite — ' + left + ' ' + (left === 1 ? 'try' : 'tries') + ' left';
+        card.appendChild(tries);
+      }
+    }
+    stepsEl.appendChild(card);
+  });
+  const allDone = t.steps.every(s => s.status === 'correct' || s.status === 'revealed');
+  document.getElementById('trace-check-btn').style.display = allDone ? 'none' : '';
+  document.getElementById('trace-summary').textContent = correctCount + '/' + t.steps.length + ' correct' + (allDone ? ' — trace complete, now code it.' : '');
+}
+
+async function checkTrace() {
+  const qid = current.id;
+  const t = traceProgress[qid];
+  if (!t) return;
+  const answers = [];
+  document.querySelectorAll('#trace-steps .trace-input').forEach(inp => {
+    const i = parseInt(inp.dataset.index, 10);
+    const guess = inp.value.trim();
+    if (t.steps[i].status === 'open' && guess) {
+      t.steps[i].guess = guess;
+      answers.push({index: i, guess});
+    }
+  });
+  if (!answers.length) return;
+  const btn = document.getElementById('trace-check-btn');
+  const origLabel = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = 'Checking…';
+  try {
+    const res = await (await fetch('/api/trace-check', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({question_id: qid, answers})
+    })).json();
+    for (const r of (res.results || [])) {
+      const st = t.steps[r.index];
+      if (!st) continue;
+      if (r.correct) {
+        st.status = 'correct';
+      } else {
+        st.attempts += 1;
+        if (st.attempts >= 3) st.status = 'revealed';
+      }
+    }
+  } finally {
+    btn.disabled = false;
+    btn.textContent = origLabel;
+  }
+  renderTraceSteps(qid);
+}
+
+async function loadTrace(qid) {
+  if (traceProgress[qid]) { renderTraceSteps(qid); return; }
+  document.getElementById('trace-box').style.display = 'none';
+  const res = await (await fetch('/api/trace', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({question_id: qid, code: cm.getValue()})
+  })).json();
+  traceProgress[qid] = {
+    pattern: res.pattern || '',
+    skeleton: res.skeleton || '',
+    steps: (res.trace || []).map(s => ({q: s.q, a: s.a, status: 'open', attempts: 0, guess: ''}))
+  };
+  renderTraceSteps(qid);
+}
+
+function renderSample(q) {
+  const el = document.getElementById('sample');
+  el.innerHTML = '';
+  if (q.lang === 'sql' && q.sample_tables) {
+    el.style.display = 'block';
+    for (const [name, t] of Object.entries(q.sample_tables)) {
+      el.appendChild(makeLabeled(name, makeTable(t.columns, t.rows)));
+    }
+    if (q.sample_output) {
+      el.appendChild(makeLabeled('example output', makeTable(q.sample_output.columns, q.sample_output.rows)));
+    }
+  } else if (q.sample_call) {
+    el.style.display = 'block';
+    const callPre = document.createElement('pre');
+    callPre.textContent = q.sample_call;
+    el.appendChild(makeLabeled('example call', callPre));
+    if (q.sample_output) {
+      const outPre = document.createElement('pre');
+      outPre.textContent = q.sample_output;
+      el.appendChild(makeLabeled('example output', outPre));
+    }
+  } else {
+    el.style.display = 'none';
+  }
+}
+
+function addMsg(role, text) {
+  const log = document.getElementById('chatlog');
+  const d = document.createElement('div');
+  d.className = 'msg ' + (role === 'system' ? 'system' : role === 'user' ? 'me' : 'tutor');
+
+  if (role !== 'user' && role !== 'system') {
+    const avatar = document.createElement('span');
+    avatar.className = 'msg-avatar';
+    avatar.textContent = 'PS';
+    d.appendChild(avatar);
+  }
+
+  const textSpan = document.createElement('span');
+  textSpan.className = 'msg-text';
+  textSpan.textContent = text;
+  d.appendChild(textSpan);
+
+  log.appendChild(d);
+  log.scrollTop = log.scrollHeight;
+  return d;
+}
+
+async function runSample() {
+  const res = await (await fetch('/api/run', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({question_id: current.id, code: cm.getValue()})
+  })).json();
+  const el = document.getElementById('results');
+  el.innerHTML = '';
+  el.className = (res.passed ? 'pass' : 'fail') + ' sample';
+
+  const header = document.createElement('div');
+  header.className = 'result-banner';
+  const icon = document.createElement('span');
+  icon.className = 'result-icon';
+  icon.textContent = res.passed ? '✓' : '✕';
+  const label = document.createElement('span');
+  label.textContent = res.passed
+    ? 'Sample matches'
+    : 'Sample doesn’t match' + (res.error ? ` — error: ${res.error}` : '');
+  header.appendChild(icon);
+  header.appendChild(label);
+  el.appendChild(header);
+
+  const body = document.createElement('div');
+  body.className = 'result-body';
+  if (current.lang === 'sql') {
+    body.appendChild(makeLabeled(res.passed ? 'output' : 'actual', makeTable(res.actual_columns, res.actual)));
+    if (!res.passed && !res.error) body.appendChild(makeLabeled('expected', makeTable(res.expected_columns, res.expected)));
+  } else {
+    const actualPre = document.createElement('pre'); actualPre.textContent = res.actual;
+    body.appendChild(makeLabeled(res.passed ? 'output' : 'your output', actualPre));
+    if (!res.passed && !res.error) {
+      const expectedPre = document.createElement('pre'); expectedPre.textContent = res.expected;
+      body.appendChild(makeLabeled('expected output', expectedPre));
+    }
+  }
+  el.appendChild(body);
+}
+
+async function submitCode() {
+  const res = await (await fetch('/api/submit', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({question_id: current.id, code: cm.getValue()})
+  })).json();
+  const el = document.getElementById('results');
+  el.innerHTML = '';
+  el.className = res.passed ? 'pass' : 'fail';
+
+  const header = document.createElement('div');
+  header.className = 'result-banner';
+  const icon = document.createElement('span');
+  icon.className = 'result-icon';
+  icon.textContent = res.passed ? '✓' : '✕';
+  const label = document.createElement('span');
+  label.textContent = res.passed
+    ? `PASS — ${res.total_cases}/${res.total_cases} cases`
+    : `FAIL on case ${res.case}/${res.total_cases}` + (res.error ? ` — error: ${res.error}` : '');
+  header.appendChild(icon);
+  header.appendChild(label);
+  el.appendChild(header);
+
+  const body = document.createElement('div');
+  body.className = 'result-body';
+  if (res.passed) {
+    if (current.lang === 'sql') {
+      body.appendChild(makeLabeled('output', makeTable(res.actual_columns, res.actual)));
+    } else {
+      const outPre = document.createElement('pre'); outPre.textContent = res.actual;
+      body.appendChild(makeLabeled('output', outPre));
+    }
+    markSolved(current.id);
+    stopTimer(current.id);
+    renderConceptBox(current, true);
+    document.getElementById('twist-btn').disabled = false;
+    if (current.lang === 'python') document.getElementById('dryrun-btn').disabled = false;
+    document.getElementById('debrief-row').style.display = 'flex';
+  } else if (!res.error) {
+    if (current.lang === 'sql') {
+      body.appendChild(makeLabeled('actual', makeTable(res.actual_columns, res.actual)));
+      body.appendChild(makeLabeled('expected', makeTable(res.expected_columns, res.expected)));
+    } else {
+      const actualPre = document.createElement('pre'); actualPre.textContent = res.actual;
+      const expectedPre = document.createElement('pre'); expectedPre.textContent = res.expected;
+      body.appendChild(makeLabeled('your output', actualPre));
+      body.appendChild(makeLabeled('expected output', expectedPre));
+    }
+  }
+  if (body.childNodes.length) el.appendChild(body);
+
+  lastRunSummary = el.textContent;
+  stuck = !res.passed;
+  nudgeSent = false;
+  if (res.passed && !reinforced) {
+    reinforced = true;
+    requestHint({question_id: current.id, code: cm.getValue(), actual: lastRunSummary, reinforce: true});
+    loadReview(current.id, cm.getValue());
+  }
+  resetIdleTimer();
+}
+
+async function requestHint(body) {
+  const placeholder = addMsg('tutor', 'thinking…');
+  const textEl = placeholder.querySelector('.msg-text');
+  try {
+    const r = await fetch('/api/hint', {
+      method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)
+    });
+    const res = await r.json();
+    if (!r.ok || res.error) {
+      placeholder.className += ' err';
+      textEl.textContent = 'error: ' + (res.error || r.status);
+    } else {
+      textEl.textContent = res.hint;
+    }
+  } catch (e) {
+    placeholder.className += ' err';
+    textEl.textContent = 'error: ' + e.message;
+  }
+}
+
+function askHint() {
+  addMsg('system', 'Hint requested');
+  requestHint({question_id: current.id, code: cm.getValue(), actual: lastRunSummary});
+  nudgeSent = true;
+  resetIdleTimer();
+}
+
+function askTwist() {
+  addMsg('system', 'Asked for a twist');
+  requestHint({question_id: current.id, code: cm.getValue(), actual: lastRunSummary, twist: true});
+  resetIdleTimer();
+}
+
+function askDryRun() {
+  addMsg('system', 'Asked for a dry run');
+  requestHint({question_id: current.id, code: cm.getValue(), actual: lastRunSummary, dry_run: true});
+  resetIdleTimer();
+}
+
+async function loadReview(qid, code) {
+  const placeholder = addMsg('tutor', 'reviewing your solution…');
+  const textEl = placeholder.querySelector('.msg-text');
+  try {
+    const r = await fetch('/api/review', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({question_id: qid, code})
+    });
+    const res = await r.json();
+    if (!r.ok || res.error) {
+      placeholder.className += ' err';
+      textEl.textContent = 'error: ' + (res.error || r.status);
+    } else {
+      textEl.textContent = '🔍 ' + res.review;
+    }
+  } catch (e) {
+    placeholder.className += ' err';
+    textEl.textContent = 'error: ' + e.message;
+  }
+}
+
+function sendMessage() {
+  const box = document.getElementById('chatbox');
+  const text = box.value.trim();
+  if (!text) return;
+  box.value = '';
+  addMsg('user', text);
+  if (current.lang === 'design') {
+    requestInterview({question_id: current.id, message: text, requirements_only: clarifyMode});
+    armPacingNudge();
+  } else {
+    requestHint({question_id: current.id, code: cm.getValue(), actual: lastRunSummary, message: text});
+    if (sqlClarifyMode) {
+      sqlClarifyAsked++;
+      renderSqlClarifyGate();
+    }
+  }
+  nudgeSent = true;
+  resetIdleTimer();
+}
+
+function renderDebriefChecklist(textEl, missed, taxonomy, selfRated) {
+  const wrap = document.createElement('div');
+  wrap.className = 'debrief-checklist';
+  taxonomy.forEach(concept => {
+    const wasMissed = missed.includes(concept);
+    const selfFlagged = selfRated.includes(concept);
+    let icon, note;
+    if (wasMissed && selfFlagged) { icon = '🟡'; note = 'missed — you caught it'; }
+    else if (wasMissed && !selfFlagged) { icon = '❌'; note = 'missed — blind spot'; }
+    else if (!wasMissed && selfFlagged) { icon = '⚠️'; note = 'you flagged this but it was actually fine'; }
+    else { icon = '✅'; note = 'covered'; }
+    const row = document.createElement('div');
+    row.className = 'checklist-row';
+    row.textContent = `${icon} ${concept.replace(/_/g, ' ')} — ${note}`;
+    wrap.appendChild(row);
+  });
+  textEl.appendChild(wrap);
+}
+
+function renderCommunicationScore(textEl, score, note) {
+  if (!score) return;
+  const row = document.createElement('div');
+  row.className = 'checklist-row';
+  row.style.marginTop = '6px';
+  row.textContent = `🗣 Pacing & communication: ${score}/5 — ${note}`;
+  textEl.appendChild(row);
+}
+
+async function requestInterview(body) {
+  const placeholder = addMsg('tutor', 'thinking…');
+  const textEl = placeholder.querySelector('.msg-text');
+  try {
+    const r = await fetch('/api/interview', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({...body, diagram: clarifyMode ? '' : serializeCanvasForLLM(), persona: selectedPersona,
+                             adversarial: adversarialMode, flaws: adversarialFlaws})
+    });
+    const res = await r.json();
+    if (!r.ok || res.error) {
+      placeholder.className += ' err';
+      textEl.textContent = 'error: ' + (res.error || r.status);
+    } else {
+      textEl.textContent = res.reply;
+      if (res.wrap_up && res.concept_taxonomy) {
+        renderDebriefChecklist(textEl, res.missed_concepts || [], res.concept_taxonomy, res.self_rated || []);
+        renderCommunicationScore(textEl, res.communication_score, res.communication_note);
+        document.getElementById('refdesign-btn').style.display = '';
+      }
+      speakTutor(res.reply);
+      extractChips(res.reply);
+      if (res.wrap_up) clearPacingNudge(); else armPacingNudge();
+    }
+  } catch (e) {
+    placeholder.className += ' err';
+    textEl.textContent = 'error: ' + e.message;
+  }
+}
+
+function startInterview(id) {
+  requestInterview({question_id: id, start: true});
+}
+
+const PERSONA_OPTIONS = [
+  ['', 'Standard'],
+  ['skeptical', '🧐 Skeptical'],
+  ['friendly', '🙂 Friendly'],
+  ['silent', '🤐 Silent'],
+];
+
+function renderPersonaPicker(id) {
+  const placeholder = addMsg('tutor', 'Pick an interviewer temperament to start:');
+  const textEl = placeholder.querySelector('.msg-text');
+  const row = document.createElement('div');
+  row.style.cssText = 'display:flex; flex-wrap:wrap; gap:6px; margin-top:8px;';
+  PERSONA_OPTIONS.forEach(([key, text]) => {
+    const btn = document.createElement('button');
+    btn.className = 'btn btn-ghost';
+    btn.textContent = text;
+    btn.onclick = () => {
+      selectedPersona = key;
+      placeholder.remove();
+      startInterview(id);
+    };
+    row.appendChild(btn);
+  });
+  textEl.appendChild(row);
+}
+
+function wrapUpInterview() {
+  clearPacingNudge();
+  const panel = document.getElementById('selfrate-panel');
+  const opts = document.getElementById('selfrate-options');
+  opts.innerHTML = '';
+  const taxonomy = CONCEPT_TAXONOMIES[(current && current.track) || 'data'];
+  taxonomy.forEach(concept => {
+    const label = document.createElement('label');
+    label.style.cssText = 'display:block; font-size:12.5px; margin:3px 0; cursor:pointer;';
+    const cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.value = concept;
+    cb.style.marginRight = '6px';
+    label.appendChild(cb);
+    label.appendChild(document.createTextNode(concept.replace(/_/g, ' ')));
+    opts.appendChild(label);
+  });
+  panel.style.display = '';
+  document.getElementById('wrapup-btn').style.display = 'none';
+}
+
+function submitSelfRating() {
+  const selfRated = Array.from(document.querySelectorAll('#selfrate-options input:checked')).map(cb => cb.value);
+  document.getElementById('selfrate-panel').style.display = 'none';
+  addMsg('system', selfRated.length ? `Self-rated missed: ${selfRated.join(', ')}` : 'Self-rated: nothing missed');
+  requestInterview({question_id: current.id, wrap_up: true, self_rated: selfRated});
+  resetIdleTimer();
+}
+
+async function showReferenceDesign() {
+  const btn = document.getElementById('refdesign-btn');
+  btn.disabled = true;
+  const placeholder = addMsg('tutor', 'thinking…');
+  const textEl = placeholder.querySelector('.msg-text');
+  try {
+    const r = await fetch('/api/reference-design', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({question_id: current.id})
+    });
+    const res = await r.json();
+    if (!r.ok || res.error) {
+      placeholder.className += ' err';
+      textEl.textContent = 'error: ' + (res.error || r.status);
+    } else {
+      textEl.textContent = '📐 Reference design:';
+      const ul = document.createElement('ul');
+      ul.style.cssText = 'margin:6px 0 0; padding-left:18px;';
+      (res.bullets || []).forEach(b => {
+        const li = document.createElement('li');
+        li.textContent = b;
+        ul.appendChild(li);
+      });
+      textEl.appendChild(ul);
+      if ((res.diagram || []).length) {
+        const diagBtn = document.createElement('button');
+        diagBtn.className = 'btn btn-ghost';
+        diagBtn.style.marginTop = '4px';
+        diagBtn.textContent = '🗺 View as diagram';
+        diagBtn.onclick = () => viewReferenceDiagram(res.diagram);
+        textEl.appendChild(diagBtn);
+      }
+      btn.style.display = 'none';
+    }
+  } catch (e) {
+    placeholder.className += ' err';
+    textEl.textContent = 'error: ' + e.message;
+  }
+  btn.disabled = false;
+}
+
+// ponytail: reuses the box/arrow schema already fed to the LLM every turn (serializeCanvasForLLM),
+// just parsed back in reverse, so renderCanvas() needs no changes to draw it.
+let savedShapesBeforeDiagram = null;
+
+function parseDiagramLines(lines) {
+  const boxes = [], arrows = [];
+  (lines || []).forEach(line => {
+    let m = line.match(/^Box:\s*(.+?)(?:\s*\[(\w+)\])?$/);
+    if (m) { boxes.push({label: m[1].trim(), layer: (m[2] || '').toLowerCase()}); return; }
+    m = line.match(/^Arrow:\s*(.+?)\s*->\s*(.+?)(?:\s*\[(.+?)\])?$/);
+    if (m) arrows.push({from: m[1].trim(), to: m[2].trim(), label: m[3] || ''});
+  });
+  const layerOrder = ['source', 'processing', 'storage', 'consumer', ''];
+  const cols = {};
+  layerOrder.forEach(l => cols[l] = []);
+  boxes.forEach(b => (cols[b.layer] || cols['']).push(b));
+  const colW = 190, boxW = 160, rowH = 80;
+  const idByLabel = {};
+  const out = [];
+  let colIdx = 0;
+  layerOrder.forEach(layer => {
+    cols[layer].forEach((b, i) => {
+      const id = newShapeId();
+      idByLabel[b.label] = id;
+      out.push({id, type: 'box', label: b.label, x: 30 + colIdx * colW, y: 30 + i * rowH, w: boxW, h: 50, layer: b.layer});
+    });
+    if (cols[layer].length) colIdx++;
+  });
+  arrows.forEach(a => {
+    const fromId = idByLabel[a.from], toId = idByLabel[a.to];
+    if (fromId && toId) out.push({id: newShapeId(), type: 'arrow', fromId, toId, label: a.label});
+  });
+  return out;
+}
+
+function viewReferenceDiagram(lines) {
+  if (savedShapesBeforeDiagram === null) savedShapesBeforeDiagram = JSON.parse(JSON.stringify(shapes));
+  shapes = parseDiagramLines(lines);
+  selectedShapeId = null;
+  document.getElementById('design-canvas-card').style.display = 'flex';
+  renderCanvas();
+  document.getElementById('diagram-restore-btn').style.display = '';
+}
+
+function restoreOwnDiagram() {
+  if (savedShapesBeforeDiagram === null) return;
+  shapes = savedShapesBeforeDiagram;
+  savedShapesBeforeDiagram = null;
+  selectedShapeId = null;
+  renderCanvas();
+  document.getElementById('diagram-restore-btn').style.display = 'none';
+}
+
+function startClarifyDrill() {
+  clarifyMode = true;
+  document.getElementById('design-canvas-card').style.display = 'none';
+  document.getElementById('wrapup-btn').style.display = 'none';
+  document.getElementById('clarify-btn').style.display = 'none';
+  document.getElementById('end-drill-btn').style.display = '';
+  addMsg('system', 'Clarify-only drill started');
+  requestInterview({question_id: current.id, requirements_only: true, start: true});
+  resetIdleTimer();
+}
+
+async function startAdversarialMode() {
+  clearReqChips();
+  const btn = document.getElementById('adversarial-btn');
+  btn.disabled = true;
+  btn.textContent = 'Loading flawed design…';
+  try {
+    const r = await fetch('/api/adversarial-design', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({question_id: current.id})
+    });
+    const res = await r.json();
+    if (!r.ok || res.error) {
+      btn.disabled = false;
+      btn.textContent = '🧨 Break this design';
+      addMsg('tutor', 'error: ' + (res.error || r.status));
+      return;
+    }
+    adversarialMode = true;
+    adversarialFlaws = res.flaws || [];
+    shapes = parseDiagramLines(res.diagram);
+    selectedShapeId = null;
+    renderCanvas();
+    document.getElementById('chatlog').innerHTML = '';
+    document.getElementById('clarify-btn').style.display = 'none';
+    document.getElementById('adversarial-btn').style.display = 'none';
+    addMsg('system', 'Adversarial drill started');
+    requestInterview({question_id: current.id, start: true});
+    resetIdleTimer();
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '🧨 Break this design';
+  }
+}
+
+function endClarifyDrill() {
+  addMsg('system', 'Clarify-only drill ended');
+  requestInterview({question_id: current.id, requirements_only: true, end_drill: true});
+  clarifyMode = false;
+  document.getElementById('design-canvas-card').style.display = 'flex';
+  document.getElementById('wrapup-btn').style.display = '';
+  document.getElementById('clarify-btn').style.display = '';
+  document.getElementById('end-drill-btn').style.display = 'none';
+  resetIdleTimer();
+}
+
+// ponytail: reuses parseDiagramLines (already built for reference-design + adversarial-mode)
+// to redraw each snapshot — no new diagram rendering code needed.
+async function startReplay() {
+  const r = await fetch(`/api/interview-history?question_id=${encodeURIComponent(current.id)}&adversarial=${adversarialMode ? '1' : '0'}&requirements_only=${clarifyMode ? '1' : '0'}`);
+  const res = await r.json();
+  replayTurns = res.turns || [];
+  if (!replayTurns.length) {
+    addMsg('tutor', 'Nothing to replay yet — have a few exchanges first.');
+    return;
+  }
+  const cr = await fetch(`/api/replay-comments?question_id=${encodeURIComponent(current.id)}&adversarial=${adversarialMode ? '1' : '0'}&requirements_only=${clarifyMode ? '1' : '0'}`);
+  replayComments = (await cr.json()).comments || [];
+  window.speechSynthesis && window.speechSynthesis.cancel();
+  clearPacingNudge();
+  savedChatHTMLBeforeReplay = document.getElementById('chatlog').innerHTML;
+  savedShapesBeforeReplay = JSON.parse(JSON.stringify(shapes));
+  ['chatinput', 'wrapup-btn', 'clarify-btn', 'adversarial-btn', 'replay-btn', 'end-drill-btn'].forEach(id => {
+    const el = document.getElementById(id);
+    el.dataset.replayPrevDisplay = el.style.display;
+    el.style.display = 'none';
+  });
+  const bar = document.getElementById('replay-bar');
+  bar.style.display = 'flex';
+  const slider = document.getElementById('replay-slider');
+  slider.max = replayTurns.length - 1;
+  slider.value = replayTurns.length - 1;
+  scrubReplay(replayTurns.length - 1);
+}
+
+function scrubReplay(idx) {
+  idx = Number(idx);
+  document.getElementById('replay-turn-label').textContent = `${idx + 1} / ${replayTurns.length}`;
+  const log = document.getElementById('chatlog');
+  log.innerHTML = '';
+  for (let i = 0; i <= idx; i++) addMsg(replayTurns[i].role === 'user' ? 'user' : 'tutor', replayTurns[i].text);
+  log.scrollTop = log.scrollHeight;
+  shapes = parseDiagramLines((replayTurns[idx].diagram || '').split('\n'));
+  selectedShapeId = null;
+  renderCanvas();
+  renderReplayComments(idx);
+}
+
+function escapeHtml(s) {
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+async function startMockLoop() {
+  const res = await (await fetch('/api/mock-loop/start')).json();
+  if (!res.ids || !res.ids.length) { showToast('Not enough questions across categories to start a mock interview.'); return; }
+  mockLoop = {ids: res.ids, stage: 0};
+  document.getElementById('mock-loop-bar').style.display = 'flex';
+  updateMockLoopLabel();
+  loadQuestion(mockLoop.ids[0]);
+}
+
+function updateMockLoopLabel() {
+  document.getElementById('mock-loop-label').textContent = `🔁 Mock interview — stage ${mockLoop.stage + 1} / ${mockLoop.ids.length}`;
+  document.getElementById('mock-loop-next').textContent = mockLoop.stage === mockLoop.ids.length - 1 ? 'Finish →' : 'Next stage →';
+}
+
+function mockLoopNext() {
+  if (!mockLoop) return;
+  if (mockLoop.stage < mockLoop.ids.length - 1) {
+    mockLoop.stage++;
+    updateMockLoopLabel();
+    loadQuestion(mockLoop.ids[mockLoop.stage]);
+  } else {
+    finishMockLoop();
+  }
+}
+
+function exitMockLoop() {
+  document.getElementById('mock-loop-bar').style.display = 'none';
+  mockLoop = null;
+}
+
+async function finishMockLoop() {
+  const ids = mockLoop.ids;
+  document.getElementById('mock-loop-bar').style.display = 'none';
+  mockLoop = null;
+  const res = await (await fetch('/api/mock-loop/report?ids=' + ids.join(','))).json();
+  renderMockReport(res.report || []);
+}
+
+function renderMockReport(report) {
+  const rows = report.map(r => {
+    const ev = r.last_event;
+    let detail = 'No attempt logged for this stage.';
+    if (ev) {
+      if (ev.event === 'submit') detail = ev.passed ? '✓ passed' : '✗ not passing yet';
+      else if (ev.event === 'tradeoff') detail = ev.ok ? '✓ solid tradeoff call' : '✗ missed key points';
+      else if (ev.event === 'design_debrief') {
+        const missed = ev.missed_concepts || [];
+        detail = missed.length
+          ? `${missed.length} concept(s) to revisit: ${missed.map(c => c.replace(/_/g, ' ')).join(', ')}`
+          : '✓ covered the key concepts';
+      }
+    }
+    return `<div style="padding:8px 0; border-bottom:1px solid var(--border-soft);">
+      <div style="font-weight:600; font-size:13px;">${escapeHtml(r.title)} <span style="color:var(--text-faint); font-weight:400;">(${escapeHtml(r.lang)})</span></div>
+      <div style="font-size:12.5px; color:var(--text-dim); margin-top:2px;">${escapeHtml(detail)}</div>
+    </div>`;
+  }).join('');
+  const overlay = document.createElement('div');
+  overlay.className = 'confirm-overlay';
+  overlay.innerHTML = `<div class="confirm-box" style="max-width:420px;">
+    <div class="confirm-msg" style="font-weight:600;">🔁 Mock interview report</div>
+    <div>${rows || '<div style="color:var(--text-faint); font-size:13px;">No stages to report.</div>'}</div>
+    <div class="confirm-actions" style="margin-top:14px;"><button class="btn btn-primary" id="mock-report-close">Close</button></div>
+  </div>`;
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+  overlay.querySelector('#mock-report-close').onclick = () => overlay.remove();
+  document.body.appendChild(overlay);
+}
+
+function renderReplayComments(idx) {
+  document.getElementById('replay-comments').style.display = '';
+  const list = document.getElementById('replay-comments-list');
+  const here = replayComments.filter(c => c.turn_idx === idx);
+  list.innerHTML = here.length
+    ? here.map(c => `<div><b>${escapeHtml(c.author)}</b> <span style="color:var(--text-faint);">on turn ${idx + 1}:</span> ${escapeHtml(c.text)}</div>`).join('')
+    : '<div style="color:var(--text-faint);">No comments on this turn yet.</div>';
+}
+
+async function postReplayComment() {
+  const textEl = document.getElementById('replay-comment-text');
+  const text = textEl.value.trim();
+  if (!text) return;
+  const author = document.getElementById('replay-comment-author').value.trim();
+  const idx = Number(document.getElementById('replay-slider').value);
+  const res = await (await fetch('/api/replay-comment', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      question_id: current.id, adversarial: adversarialMode ? '1' : '0', requirements_only: clarifyMode ? '1' : '0',
+      turn_idx: idx, author, text
+    })
+  })).json();
+  if (res.error) { showToast('Could not post comment: ' + res.error); return; }
+  replayComments.push(res.comment);
+  textEl.value = '';
+  renderReplayComments(idx);
+}
+
+function exitReplay() {
+  document.getElementById('replay-bar').style.display = 'none';
+  document.getElementById('replay-comments').style.display = 'none';
+  ['chatinput', 'wrapup-btn', 'clarify-btn', 'adversarial-btn', 'replay-btn', 'end-drill-btn'].forEach(id => {
+    const el = document.getElementById(id);
+    el.style.display = el.dataset.replayPrevDisplay || '';
+  });
+  if (savedChatHTMLBeforeReplay !== null) document.getElementById('chatlog').innerHTML = savedChatHTMLBeforeReplay;
+  if (savedShapesBeforeReplay !== null) shapes = savedShapesBeforeReplay;
+  savedChatHTMLBeforeReplay = null;
+  savedShapesBeforeReplay = null;
+  selectedShapeId = null;
+  renderCanvas();
+  if (document.getElementById('wrapup-btn').style.display !== 'none') armPacingNudge();
+}
+
+function copyReplayLink() {
+  const params = new URLSearchParams({
+    q: current.id,
+    replay: '1',
+    adversarial: adversarialMode ? '1' : '0',
+    requirements_only: clarifyMode ? '1' : '0',
+  });
+  const url = `${location.origin}${location.pathname}?${params.toString()}`;
+  navigator.clipboard.writeText(url).then(
+    () => showToast('Replay link copied — anyone with it can watch this session.'),
+    () => showToast('Could not copy link: ' + url)
+  );
+}
+
+function isDesignQuestion() {
+  return !!current && current.lang === 'design';
+}
+
+// ponytail: ambient TTS so the candidate doesn't have to glance off the whiteboard to read replies
+function speakTutor(text) {
+  if (!ttsEnabled || !isDesignQuestion() || !window.speechSynthesis) return;
+  window.speechSynthesis.cancel();
+  const clean = text.replace(/[*_`#]/g, '').replace(/```[\s\S]*?```/g, '');
+  const u = new SpeechSynthesisUtterance(clean);
+  u.rate = 1.05;
+  window.speechSynthesis.speak(u);
+}
+
+function toggleTTS() {
+  ttsEnabled = !ttsEnabled;
+  document.getElementById('tts-toggle-btn').textContent = ttsEnabled ? '🔊' : '🔇';
+  if (!ttsEnabled) window.speechSynthesis && window.speechSynthesis.cancel();
+}
+
+function toggleChatCollapse() {
+  const panel = document.getElementById('chatpanel');
+  const btn = document.getElementById('chat-collapse-btn');
+  if (panel.classList.contains('collapsed')) {
+    panel.classList.remove('collapsed');
+    panel.style.width = panel.dataset.prevWidth || '360px';
+    btn.textContent = '»';
+    btn.title = 'Collapse chat, focus canvas';
+  } else {
+    panel.dataset.prevWidth = panel.style.width || '360px';
+    panel.classList.add('collapsed');
+    btn.textContent = '«';
+    btn.title = 'Expand chat';
+  }
+}
+
+// ponytail: naive "sentences with a number in them" heuristic, not an LLM call —
+// upgrade to a classified extraction if it starts missing real constraints.
+function extractChips(text) {
+  const sentences = text.match(/[^.?!]*\d[^.?!]*[.?!]/g) || [];
+  const strip = document.getElementById('req-chips');
+  sentences.forEach(s => {
+    const clean = s.trim();
+    if (!clean || designChips.some(c => c.toLowerCase() === clean.toLowerCase())) return;
+    designChips.push(clean);
+    if (designChips.length > 10) designChips.shift();
+    const chip = document.createElement('div');
+    chip.className = 'req-chip';
+    chip.textContent = clean;
+    chip.title = clean;
+    strip.appendChild(chip);
+    while (strip.children.length > 10) strip.removeChild(strip.firstChild);
+  });
+}
+
+function clearReqChips() {
+  designChips = [];
+  document.getElementById('req-chips').innerHTML = '';
+}
+
+function armPacingNudge() {
+  clearTimeout(pacingTimer);
+  document.getElementById('pacing-hud').style.display = 'none';
+  if (!isDesignQuestion() || clarifyMode) return;
+  pacingTimer = setTimeout(() => {
+    document.getElementById('pacing-hud').textContent = '🕑 Quiet for a bit — try narrating your thinking out loud.';
+    document.getElementById('pacing-hud').style.display = '';
+  }, 45000);
+}
+
+function clearPacingNudge() {
+  clearTimeout(pacingTimer);
+  document.getElementById('pacing-hud').style.display = 'none';
+}
+
+const tutorFab = document.createElement('div');
+tutorFab.id = 'tutor-fab';
+tutorFab.title = 'Ask the tutor';
+tutorFab.innerHTML = '<svg class="fab-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="12" x2="18" y2="12"></line><polyline points="12 6 18 12 12 18"></polyline></svg><span id="fab-badge"></span>';
+document.body.appendChild(tutorFab);
+
+const fabBubble = document.createElement('div');
+fabBubble.id = 'fab-bubble';
+document.body.appendChild(fabBubble);
+
+function positionFab() {
+  const panelLeft = document.getElementById('chatpanel').getBoundingClientRect().left;
+  tutorFab.style.right = (window.innerWidth - panelLeft + 12) + 'px';
+}
+positionFab();
+window.addEventListener('resize', positionFab);
+
+function fabSay(text, ms) {
+  fabBubble.textContent = text;
+  const r = tutorFab.getBoundingClientRect();
+  fabBubble.style.left = Math.max(8, r.left - 80) + 'px';
+  fabBubble.style.top = Math.max(8, r.top - 38) + 'px';
+  fabBubble.classList.add('show');
+  clearTimeout(fabSay._t);
+  fabSay._t = setTimeout(() => fabBubble.classList.remove('show'), ms || 2200);
+}
+
+function fabAlert(text) {
+  tutorFab.classList.add('alert');
+  fabSay(text, 5000);
+}
+
+tutorFab.addEventListener('click', () => {
+  tutorFab.classList.remove('alert');
+  if (!current) { fabSay('Pick a question first!', 2000); return; }
+  fabSay('One sec — let me look…', 1400);
+  askHint();
+});
+
+const resizer = document.getElementById('resizer');
+const chatpanel = document.getElementById('chatpanel');
+let resizing = false;
+
+resizer.addEventListener('mousedown', () => {
+  resizing = true;
+  resizer.classList.add('dragging');
+  document.body.style.userSelect = 'none';
+  document.body.style.cursor = 'col-resize';
+});
+
+window.addEventListener('mousemove', (e) => {
+  if (!resizing) return;
+  const newWidth = window.innerWidth - e.clientX;
+  chatpanel.style.width = Math.min(640, Math.max(240, newWidth)) + 'px';
+  positionFab();
+});
+
+window.addEventListener('mouseup', () => {
+  if (!resizing) return;
+  resizing = false;
+  resizer.classList.remove('dragging');
+  document.body.style.userSelect = '';
+  document.body.style.cursor = '';
+});
+
+const sidebarResizer = document.getElementById('sidebar-resizer');
+const sidebar = document.getElementById('sidebar');
+let sidebarResizing = false;
+
+sidebarResizer.addEventListener('mousedown', () => {
+  sidebarResizing = true;
+  sidebarResizer.classList.add('dragging');
+  document.body.style.userSelect = 'none';
+  document.body.style.cursor = 'col-resize';
+});
+
+window.addEventListener('mousemove', (e) => {
+  if (!sidebarResizing) return;
+  const newWidth = e.clientX - sidebar.getBoundingClientRect().left;
+  sidebar.style.width = Math.min(420, Math.max(160, newWidth)) + 'px';
+});
+
+window.addEventListener('mouseup', () => {
+  if (!sidebarResizing) return;
+  sidebarResizing = false;
+  sidebarResizer.classList.remove('dragging');
+  document.body.style.userSelect = '';
+  document.body.style.cursor = '';
+});
+
+loadList();
+loadDeadline();
+
+document.getElementById('q-search').addEventListener('input', applySidebarFilter);
+
+async function loadDeadline() {
+  const r = await fetch('/api/deadline');
+  const d = await r.json();
+  renderDeadlineWidget(d.deadline);
+}
+
+function renderDeadlineWidget(deadline) {
+  const el = document.getElementById('deadline-widget');
+  el.dataset.deadline = deadline || '';
+  if (!deadline) { el.textContent = '🗓 Set interview date'; return; }
+  const days = Math.ceil((new Date(deadline + 'T00:00:00') - new Date()) / 86400000);
+  el.textContent = days > 0 ? `🗓 Interview in ${days}d — reviews compressed` : '🗓 Interview date passed';
+}
+
+async function setInterviewDeadline() {
+  const input = prompt('Interview date (YYYY-MM-DD), blank to clear:', document.getElementById('deadline-widget').dataset.deadline || '');
+  if (input === null) return;
+  const r = await fetch('/api/deadline', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({deadline: input.trim()})});
+  const d = await r.json();
+  renderDeadlineWidget(d.deadline);
+}
+</script>
+</body>
+</html>

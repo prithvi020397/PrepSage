@@ -1,0 +1,252 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>PrepSage — dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0e1015;
+    --panel: #14161d;
+    --card: #1b1e27;
+    --card-2: #20232e;
+    --border: rgba(255,255,255,0.08);
+    --border-soft: rgba(255,255,255,0.05);
+    --text: #e7e9ee;
+    --text-dim: #9299ab;
+    --text-faint: #656c7e;
+    --accent: #7c6cf6;
+    --accent-2: #5ee6d8;
+    --success: #3ddc97;
+    --error: #ff6b6b;
+    --warn: #f5c542;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-size: 14px;
+  }
+  #topbar {
+    display: flex;
+    align-items: baseline;
+    gap: 14px;
+    padding: 16px 24px;
+    background: linear-gradient(180deg, var(--panel), var(--bg));
+    border-bottom: 1px solid var(--border);
+  }
+  #topbar h1 { font-size: 16px; margin: 0; letter-spacing: 0.02em; }
+  #topbar a { color: var(--text-dim); text-decoration: none; font-size: 13px; margin-left: auto; }
+  #topbar a:hover { color: var(--text); }
+  main { max-width: 1100px; margin: 0 auto; padding: 24px; display: flex; flex-direction: column; gap: 18px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px 18px;
+  }
+  .label { text-transform: uppercase; font-size: 11px; letter-spacing: 0.06em; color: var(--text-faint); margin-bottom: 8px; }
+  .big { font-size: 26px; font-weight: 700; }
+  .big .unit { font-size: 15px; color: var(--text-dim); font-weight: 500; }
+  .sub { font-size: 12px; color: var(--text-faint); margin-top: 4px; }
+  .accent { color: var(--accent-2); }
+  .ok { color: var(--success); }
+  .bad { color: var(--error); }
+  .warn-c { color: var(--warn); }
+  .section-title { font-size: 13px; font-weight: 600; margin-bottom: 12px; }
+  .bar-track {
+    height: 6px;
+    border-radius: 3px;
+    background: var(--card-2);
+    overflow: hidden;
+    margin-top: 6px;
+  }
+  .bar-fill { height: 100%; border-radius: 3px; }
+  .metric-row { padding: 10px 0; border-bottom: 1px solid var(--border-soft); }
+  .metric-row:last-child { border-bottom: none; }
+  .metric-row-top { display: flex; justify-content: space-between; font-size: 12.5px; color: var(--text-dim); }
+  .weak-row { display: flex; align-items: center; gap: 10px; padding: 6px 0; font-size: 13px; }
+  .weak-label { width: 170px; flex-shrink: 0; color: var(--text-dim); }
+  .weak-bar-track { flex: 1; height: 8px; background: var(--card-2); border-radius: 4px; overflow: hidden; }
+  .weak-bar-fill { height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent-2)); border-radius: 4px; }
+  .weak-count { width: 24px; text-align: right; color: var(--text-faint); font-size: 12px; }
+  .empty { color: var(--text-faint); font-size: 13px; }
+  .logo-mark {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 22px; height: 22px; border-radius: 6px; margin-right: 8px;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    color: #0e1015; font-size: 10.5px; font-weight: 800; letter-spacing: -0.02em;
+    vertical-align: -5px;
+  }
+</style>
+</head>
+<body>
+  <div id="topbar">
+    <h1><span class="logo-mark">PS</span>PrepSage — dashboard</h1>
+    <a href="/">&larr; back to practice</a>
+  </div>
+  <main>
+    <div class="grid">
+      <div class="card">
+        <div class="label">Solved</div>
+        <div class="big">{{ total_solved }}<span class="unit"> / {{ total_questions }}</span></div>
+        <div class="sub">SQL {{ solved_by_lang.sql }}/{{ total_by_lang.sql }} &middot; Python {{ solved_by_lang.python }}/{{ total_by_lang.python }}</div>
+      </div>
+      <div class="card">
+        <div class="label">Due for review</div>
+        <div class="big {{ 'warn-c' if due_count else '' }}">{{ due_count }}</div>
+        <div class="sub">questions past their spaced-repetition window</div>
+      </div>
+      <div class="card">
+        <div class="label">Debriefs completed</div>
+        <div class="big">{{ debrief_count }}</div>
+        <div class="sub">complexity + edge-case checks after passing</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="section-title">Interview-readiness signals</div>
+      {% if debrief_count == 0 %}
+        <div class="empty">No debriefs yet — solve a question and fill in the complexity/edge-case box to start measuring.</div>
+      {% else %}
+        <div class="metric-row">
+          <div class="metric-row-top"><span>Complexity accuracy — last 10</span><span>{{ complexity_recent }}%</span></div>
+          <div class="bar-track"><div class="bar-fill" style="width: {{ complexity_recent }}%; background: {{ 'var(--success)' if complexity_recent >= 70 else ('var(--warn)' if complexity_recent >= 40 else 'var(--error)') }};"></div></div>
+        </div>
+        <div class="metric-row">
+          <div class="metric-row-top"><span>Complexity accuracy — all time</span><span>{{ complexity_alltime }}%</span></div>
+          <div class="bar-track"><div class="bar-fill" style="width: {{ complexity_alltime }}%; background: var(--text-faint);"></div></div>
+        </div>
+        <div class="metric-row">
+          <div class="metric-row-top"><span>Edge-case accuracy — last 10</span><span>{{ edge_recent }}%</span></div>
+          <div class="bar-track"><div class="bar-fill" style="width: {{ edge_recent }}%; background: {{ 'var(--success)' if edge_recent >= 70 else ('var(--warn)' if edge_recent >= 40 else 'var(--error)') }};"></div></div>
+        </div>
+        <div class="metric-row">
+          <div class="metric-row-top"><span>Edge-case accuracy — all time</span><span>{{ edge_alltime }}%</span></div>
+          <div class="bar-track"><div class="bar-fill" style="width: {{ edge_alltime }}%; background: var(--text-faint);"></div></div>
+        </div>
+        {% if narrated_count %}
+        <div class="metric-row">
+          <div class="metric-row-top"><span>Verbal narration clarity — last 10</span><span>{{ narration_recent }}%</span></div>
+          <div class="bar-track"><div class="bar-fill" style="width: {{ narration_recent }}%; background: {{ 'var(--success)' if narration_recent >= 70 else ('var(--warn)' if narration_recent >= 40 else 'var(--error)') }};"></div></div>
+        </div>
+        <div class="metric-row">
+          <div class="metric-row-top"><span>Verbal narration clarity — all time</span><span>{{ narration_alltime }}%</span></div>
+          <div class="bar-track"><div class="bar-fill" style="width: {{ narration_alltime }}%; background: var(--text-faint);"></div></div>
+        </div>
+        {% endif %}
+      {% endif %}
+    </div>
+
+    <div class="card">
+      <div class="section-title">Weak areas — fails by topic</div>
+      {% if weak_areas %}
+        {% for topic, count in weak_areas %}
+        <div class="weak-row">
+          <div class="weak-label">{{ topic }}</div>
+          <div class="weak-bar-track"><div class="weak-bar-fill" style="width: {{ (count / max_weak * 100) | round }}%;"></div></div>
+          <div class="weak-count">{{ count }}</div>
+        </div>
+        {% endfor %}
+      {% else %}
+        <div class="empty">No fails logged yet — this fills in as you practice.</div>
+      {% endif %}
+    </div>
+
+    <div class="card">
+      <div class="section-title">🎯 Concept mastery map — SQL/Python, weakest first</div>
+      {% if mastery_map %}
+        {% for topic, pct, attempts in mastery_map %}
+        <div class="weak-row">
+          <div class="weak-label">{{ topic }}</div>
+          <div class="weak-bar-track"><div class="weak-bar-fill" style="width: {{ pct }}%; background: {{ 'var(--success)' if pct >= 80 else ('var(--warn)' if pct >= 50 else 'var(--error)') }};"></div></div>
+          <div class="weak-count" style="width: 60px;">{{ pct }}% <span style="color:var(--text-faint);">({{ attempts }})</span></div>
+        </div>
+        {% endfor %}
+      {% else %}
+        <div class="empty">No submissions yet — this fills in as you practice SQL/Python.</div>
+      {% endif %}
+    </div>
+
+    <div class="card">
+      <div class="section-title">System design — concepts to revisit</div>
+      {% if design_debrief_count %}
+        <div class="sub" style="margin-bottom:12px;">Jumped into design before clarifying requirements: <span class="{{ 'bad' if rushed_pct and rushed_pct >= 50 else 'accent' }}">{{ rushed_pct }}%</span> of {{ design_debrief_count }} interview{{ '' if design_debrief_count == 1 else 's' }}</div>
+      {% endif %}
+      {% if concept_misses %}
+        {% for concept, count in concept_misses %}
+        <div class="weak-row">
+          <div class="weak-label">
+            {% if concept in concept_to_tradeoff %}
+              <a href="/?q={{ concept_to_tradeoff[concept] }}" style="color:var(--accent-2); text-decoration:none;" title="Practice this with a tradeoff drill">{{ concept.replace('_', ' ') }} &rarr;</a>
+            {% else %}
+              {{ concept.replace('_', ' ') }}
+            {% endif %}
+          </div>
+          <div class="weak-bar-track"><div class="weak-bar-fill" style="width: {{ (count / max_concept_miss * 100) | round }}%;"></div></div>
+          <div class="weak-count">{{ count }}</div>
+        </div>
+        {% endfor %}
+      {% else %}
+        <div class="empty">No design debriefs yet — wrap up a mock interview to start tracking this.</div>
+      {% endif %}
+    </div>
+
+    <div class="card">
+      <div class="section-title">📓 Real interview postmortem journal</div>
+      <div class="sub" style="margin-bottom:10px;">Got asked something in an actual interview? Log it so it counts toward the tracking above.</div>
+      <textarea id="pm-question" placeholder="The question, as close to verbatim as you remember…" style="width:100%; min-height:50px; margin-bottom:8px; padding:8px 10px; background:var(--card-2); border:1px solid var(--border); border-radius:6px; color:var(--text); font-family:inherit; font-size:13px; resize:vertical; box-sizing:border-box;"></textarea>
+      <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:10px;">
+        <select id="pm-qtype" style="background:var(--card-2); border:1px solid var(--border); border-radius:6px; color:var(--text); padding:6px 8px; font-size:12.5px;">
+          <option value="sql">SQL</option>
+          <option value="python">Python</option>
+          <option value="design">System design</option>
+        </select>
+        <label style="font-size:12.5px; color:var(--text-dim); display:flex; align-items:center; gap:5px;">
+          <input type="checkbox" id="pm-ok"> I nailed it
+        </label>
+        <button id="pm-submit" onclick="submitPostmortem()" style="margin-left:auto; cursor:pointer; background:var(--accent); color:#0e1015; border:none; border-radius:6px; padding:7px 14px; font-size:12.5px; font-weight:600;">Log it</button>
+      </div>
+      <div id="pm-status" class="sub"></div>
+      {% if postmortems %}
+        {% for h in postmortems %}
+        <div class="metric-row">
+          <div class="metric-row-top">
+            <span>{{ h.question }}</span>
+            <span class="{{ 'ok' if h.ok else 'bad' }}">{{ 'nailed it' if h.ok else 'struggled' }}</span>
+          </div>
+          <div class="sub">{{ h.qtype }} &middot; {{ h.get('topic', h.get('concept', '')).replace('_', ' ') }} &middot; {{ h.ts[:10] }}</div>
+        </div>
+        {% endfor %}
+      {% else %}
+        <div class="empty">No real-interview questions logged yet.</div>
+      {% endif %}
+    </div>
+  </main>
+  <script>
+    async function submitPostmortem() {
+      const question = document.getElementById('pm-question').value.trim();
+      const qtype = document.getElementById('pm-qtype').value;
+      const ok = document.getElementById('pm-ok').checked;
+      const status = document.getElementById('pm-status');
+      if (!question) { status.textContent = 'Type the question first.'; status.className = 'sub bad'; return; }
+      const btn = document.getElementById('pm-submit');
+      btn.disabled = true;
+      status.textContent = 'Classifying…';
+      status.className = 'sub';
+      const res = await (await fetch('/api/postmortem', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({question, qtype, ok})
+      })).json();
+      btn.disabled = false;
+      if (res.error) { status.textContent = res.error; status.className = 'sub bad'; return; }
+      location.reload();
+    }
+  </script>
+</body>
+</html>
