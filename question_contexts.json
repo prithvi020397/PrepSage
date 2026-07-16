@@ -1,0 +1,1253 @@
+{
+  "sql-1": {
+    "scenario": "Your team needs to identify the second-highest salary to set a bonus threshold, but duplicate top salaries must be treated as one.",
+    "why_asked": "Tests ability to handle duplicates and distinct values in ranking queries.",
+    "edge_cases": [
+      "Ties in top salary",
+      "Only one distinct salary"
+    ]
+  },
+  "sql-2": {
+    "scenario": "The marketing team needs to identify duplicate customer email addresses in the user database before sending a campaign.",
+    "why_asked": "Tests whether the candidate thinks about correctness beyond the simplest case.",
+    "edge_cases": [
+      "Emails appearing 3+ times, not just twice",
+      "NULL email values and case sensitivity"
+    ]
+  },
+  "sql-3": {
+    "scenario": "Your team needs a daily revenue report showing cumulative sales over time to track growth trends.",
+    "why_asked": "Tests ability to translate a business need into correct window function logic.",
+    "edge_cases": [
+      "Multiple orders on same date (ties)",
+      "Missing dates with no orders"
+    ]
+  },
+  "py-1": {
+    "scenario": "Your team's payment system logs transactions; find two transactions in a list that sum to a suspicious amount for fraud review.",
+    "why_asked": "Tests attention to subtle ordering logic and avoiding premature self-matching in hashmap lookups.",
+    "edge_cases": [
+      "Duplicate values where target equals 2 * value",
+      "Single element list or empty list"
+    ]
+  },
+  "py-2": {
+    "scenario": "Your team needs to compute the highest 7-day average sales from a streaming data pipeline to set dynamic inventory thresholds.",
+    "why_asked": "Tests ability to optimize repeated calculations using sliding window logic under time constraints.",
+    "edge_cases": [
+      "k larger than array length",
+      "all negative numbers in array"
+    ]
+  },
+  "sql-4": {
+    "scenario": "Our CRM needs a unified export of all users and their latest known address, even if they never provided one.",
+    "why_asked": "Tests if you understand when to use LEFT JOIN over INNER JOIN to preserve unmatched rows.",
+    "edge_cases": [
+      "Person with multiple addresses (duplicate rows)",
+      "Address table missing personId entirely (empty join)"
+    ]
+  },
+  "sql-5": {
+    "scenario": "Your team needs the second-highest distinct salary from the employee database to identify a benchmark for compensation analysis.",
+    "why_asked": "Tests ability to handle SQL edge cases and communicate trade-offs in query design.",
+    "edge_cases": [
+      "Ties for highest salary",
+      "Only one distinct salary exists"
+    ]
+  },
+  "sql-6": {
+    "scenario": "Your team needs to identify the 3rd most common salary tier for a compensation benchmarking report.",
+    "why_asked": "Tests ability to reason about distinctness and offset logic in ranking queries.",
+    "edge_cases": [
+      "Fewer than 3 distinct salaries",
+      "Duplicate top salaries skewing rank"
+    ]
+  },
+  "sql-7": {
+    "scenario": "Your team needs to display leaderboard scores for a gaming platform, where tied players share the same rank and ranks are consecutive without gaps.",
+    "why_asked": "Tests ability to translate a real-world ranking rule into precise SQL logic.",
+    "edge_cases": [
+      "Multiple identical scores (ties) sharing same rank",
+      "Empty table returning no rows"
+    ]
+  },
+  "sql-8": {
+    "scenario": "Your team tracks user login streaks; find all user IDs who logged in on 3 consecutive days.",
+    "why_asked": "Tests ability to translate a sequential pattern into relational logic without window functions.",
+    "edge_cases": [
+      "IDs not strictly sequential (gaps).",
+      "Multiple overlapping streaks for same value."
+    ]
+  },
+  "sql-9": {
+    "scenario": "Your team needs to flag employees whose salary exceeds their direct manager's for a compensation audit.",
+    "why_asked": "Tests ability to reason about hierarchical data and join a table to itself.",
+    "edge_cases": [
+      "Employee with no manager (NULL managerId)",
+      "Multiple employees with same salary as manager"
+    ]
+  },
+  "sql-10": {
+    "scenario": "The marketing team needs to identify duplicate customer email addresses in the user table before sending a campaign, to avoid spamming the same person.",
+    "why_asked": "Tests understanding of when to use HAVING vs WHERE with aggregate functions.",
+    "edge_cases": [
+      "Emails with leading/trailing spaces or different cases.",
+      "Table with no duplicates or only one row."
+    ]
+  },
+  "sql-11": {
+    "scenario": "A product team needs to identify customers who have never placed an order to target them with a re-engagement campaign.",
+    "why_asked": "Tests attention to NULL handling in subqueries and joins, and ability to reason about edge cases.",
+    "edge_cases": [
+      "NULL in subquery causes NOT IN to return empty",
+      "Empty Orders table returns all customers"
+    ]
+  },
+  "sql-12": {
+    "scenario": "Your team needs a report showing each department's top earners (including ties) for compensation review.",
+    "why_asked": "Tests ability to reason about row-preserving aggregation vs. group-by collapse.",
+    "edge_cases": [
+      "Multiple employees tied for max salary",
+      "Department with no employees"
+    ]
+  },
+  "sql-13": {
+    "scenario": "Our weather analytics team needs to flag days with rising temperatures to detect heatwaves, but our data has gaps due to sensor outages.",
+    "why_asked": "Tests ability to reason about date-based joins, not just row order or IDs.",
+    "edge_cases": [
+      "Missing dates (gaps in calendar)",
+      "Duplicate records for same date"
+    ]
+  },
+  "sql-14": {
+    "scenario": "New analytics dashboard tracks user retention; engineering needs each player\u2019s first login date per device.",
+    "why_asked": "Tests ability to translate a business timeline into precise relational logic.",
+    "edge_cases": [
+      "Player with multiple logins on same day",
+      "Player never logged in (missing data)"
+    ]
+  },
+  "sql-15": {
+    "scenario": "Your team needs to measure day-two retention for a new mobile game to decide if the onboarding flow is effective.",
+    "why_asked": "Tests ability to translate a business metric into precise SQL logic and handle edge cases.",
+    "edge_cases": [
+      "Players with only one login record.",
+      "Multiple logins on the same day for a player."
+    ]
+  },
+  "sql-16": {
+    "scenario": "The engineering org wants to identify managers with large teams to plan a reorg. You need to pull their names from the employee database.",
+    "why_asked": "Tests ability to self-join or subquery on a foreign key to solve a real grouping problem.",
+    "edge_cases": [
+      "Manager with exactly 5 reports",
+      "Manager with no reports (not in result)"
+    ]
+  },
+  "sql-17": {
+    "scenario": "",
+    "why_asked": "",
+    "edge_cases": []
+  },
+  "sql-18": {
+    "scenario": "Your team needs a list of customers not referred by user ID 2 for a targeted marketing campaign.",
+    "why_asked": "Tests understanding of NULL handling in SQL comparisons, not just syntax.",
+    "edge_cases": [
+      "NULL referee_id values are excluded by default",
+      "Multiple customers with same name but different IDs"
+    ]
+  },
+  "sql-19": {
+    "scenario": "Your team needs to calculate the 2016 premium total for policyholders with a shared 2015 premium but unique coordinates, to detect potential fraud rings.",
+    "why_asked": "Tests ability to reason about independent filters on the same table using aggregation.",
+    "edge_cases": [
+      "Multiple policyholders with same tiv_2015 but same coordinates.",
+      "Null tiv_2015 or null coordinates causing exclusion."
+    ]
+  },
+  "sql-20": {
+    "scenario": "The analytics team needs to identify the most active customer to prioritize a loyalty reward campaign.",
+    "why_asked": "Tests ability to translate a business need into a precise aggregation query.",
+    "edge_cases": [
+      "Ties for most orders (multiple customers).",
+      "Empty table with no orders."
+    ]
+  },
+  "sql-21": {
+    "scenario": "Your team needs a list of large countries for a global resource allocation dashboard, filtering by area or population.",
+    "why_asked": "Tests ability to correctly apply OR logic instead of AND under time pressure.",
+    "edge_cases": [
+      "Countries meeting both thresholds appear once.",
+      "Null values in area or population fields."
+    ]
+  },
+  "sql-22": {
+    "scenario": "Your team needs to identify courses with sufficient enrollment to justify assigning a teaching assistant for the upcoming semester.",
+    "why_asked": "Tests ability to reason about when to filter before vs. after aggregation.",
+    "edge_cases": [
+      "Duplicate student entries in same class",
+      "Class with exactly 5 students including nulls"
+    ]
+  },
+  "sql-23": {
+    "scenario": "",
+    "why_asked": "",
+    "edge_cases": []
+  },
+  "sql-24": {
+    "scenario": "A CRM team needs to deduplicate user records by email, preserving the earliest account for each unique email address.",
+    "why_asked": "Tests reasoning about grouping and self-join to identify survivors, not just syntax.",
+    "edge_cases": [
+      "Multiple rows with same email",
+      "Null email entries"
+    ]
+  },
+  "sql-25": {
+    "scenario": "Your team needs to audit salesperson performance; find those who never sold to RED, including reps with zero total orders.",
+    "why_asked": "Tests ability to reason about set logic and null-safe exclusion, not just SQL syntax.",
+    "edge_cases": [
+      "Salesperson with no orders at all",
+      "Multiple orders to RED by same salesperson"
+    ]
+  },
+  "sql-26": {
+    "scenario": "",
+    "why_asked": "",
+    "edge_cases": []
+  },
+  "sql-27": {
+    "scenario": "Your team needs to validate sensor readings of triangle-shaped brackets before they're sent to manufacturing.",
+    "why_asked": "Tests whether you reason through all necessary conditions, not just the most obvious one.",
+    "edge_cases": [
+      "All sides equal (equilateral) still valid.",
+      "Zero or negative side lengths."
+    ]
+  },
+  "sql-28": {
+    "scenario": "Your team needs the highest customer ID that appears in exactly one transaction to flag a potential data anomaly.",
+    "why_asked": "Tests ability to translate a uniqueness condition into correct aggregation logic.",
+    "edge_cases": [
+      "All values appear more than once.",
+      "Table is empty or contains only NULLs."
+    ]
+  },
+  "sql-29": {
+    "scenario": "The content team needs a curated list of movies with odd IDs and non-boring descriptions for a special weekend feature, sorted by highest rating first.",
+    "why_asked": "Tests ability to translate ambiguous natural language into precise, correct filter logic.",
+    "edge_cases": [
+      "Movies with null or empty descriptions",
+      "Ties in rating requiring stable or secondary sort"
+    ]
+  },
+  "sql-30": {
+    "scenario": "",
+    "why_asked": "",
+    "edge_cases": []
+  },
+  "sql-31": {
+    "scenario": "A bug in the HR system stored all genders backwards; we need a single query to flip every row's sex value before the payroll run.",
+    "why_asked": "Tests if you can reason about set-based operations versus iterative mental models.",
+    "edge_cases": [
+      "Table has zero rows.",
+      "Sex column contains NULL or unexpected values."
+    ]
+  },
+  "sql-32": {
+    "scenario": "Your team needs to identify VIP customers who have purchased every product in the current catalog for a targeted loyalty campaign.",
+    "why_asked": "Tests ability to reason about set coverage and avoid common aggregation pitfalls.",
+    "edge_cases": [
+      "Customer bought same product multiple times.",
+      "Product table is empty or has no customers."
+    ]
+  },
+  "sql-33": {
+    "scenario": "Our streaming platform tracks director-actor collaborations. Identify top duos who've made 3+ films together for a 'frequent collaborators' feature.",
+    "why_asked": "Tests ability to reason about correct group-by key for a multi-column relationship, not just syntax.",
+    "edge_cases": [
+      "Ties on minimum count of 3",
+      "Multiple rows with same timestamp"
+    ]
+  },
+  "sql-34": {
+    "scenario": "Your team needs a quarterly report listing each sale with its product name for the finance dashboard.",
+    "why_asked": "Tests ability to clearly communicate a simple join and its assumptions.",
+    "edge_cases": [
+      "Duplicate sale_ids for same product",
+      "Product name is NULL"
+    ]
+  },
+  "sql-35": {
+    "scenario": "A product analytics team needs to identify the launch year and initial sales details for each product to analyze adoption trends.",
+    "why_asked": "Tests ability to reason about row-level vs. aggregate data and avoid mixing values across rows.",
+    "edge_cases": [
+      "Multiple sales in the same first year (ties).",
+      "Product with no sales (empty result set)."
+    ]
+  },
+  "sql-36": {
+    "scenario": "A product manager wants to know the average tenure of engineers on each project to identify teams that may need more senior support.",
+    "why_asked": "Tests ability to translate a business request into correct aggregation and rounding logic.",
+    "edge_cases": [
+      "Project with no employees (should be excluded or null).",
+      "Duplicate employee_id per project (should not double-count)."
+    ]
+  },
+  "sql-37": {
+    "scenario": "A marketplace team needs to identify products that were exclusively sold during a limited-time promotion window in Q1 2019.",
+    "why_asked": "Tests ability to translate 'all' conditions into set-level logic, avoiding per-row filtering mistakes.",
+    "edge_cases": [
+      "Product with no sales at all (empty group)",
+      "Product sold exactly on the boundary dates (inclusive)"
+    ]
+  },
+  "sql-38": {
+    "scenario": "Our product team needs a daily active user report for January 2021 to measure engagement trends and plan feature rollouts.",
+    "why_asked": "Tests ability to reason about distinct counting and implicit row filtering in aggregation.",
+    "edge_cases": [
+      "Days with zero activity produce no row.",
+      "Same user with multiple activities on one day."
+    ]
+  },
+  "sql-39": {
+    "scenario": "Your team needs to audit whether content creators are artificially inflating their article view counts by viewing their own posts.",
+    "why_asked": "Tests ability to translate a real-world condition into a precise row-level filter.",
+    "edge_cases": [
+      "Author who viewed own article multiple times",
+      "No authors viewed their own articles"
+    ]
+  },
+  "sql-40": {
+    "scenario": "The analytics team needs a report of every user's 2019 purchase activity to identify dormant accounts for a re-engagement campaign.",
+    "why_asked": "Tests ability to preserve all rows in a LEFT JOIN while correctly filtering date conditions.",
+    "edge_cases": [
+      "Users with no orders in 2019 return 0.",
+      "Users with orders in other years but not 2019."
+    ]
+  },
+  "sql-41": {
+    "scenario": "Your team needs to display the current price for each product on a legacy e-commerce site, using a history table of price changes.",
+    "why_asked": "Tests ability to reason about partitioning and selecting the latest record per group.",
+    "edge_cases": [
+      "Product with no changes before the target date.",
+      "Multiple price changes on the same day for one product."
+    ]
+  },
+  "sql-42": {
+    "scenario": "Your team needs to report the percentage of first-time customers who receive their order on the same day they placed it, to measure delivery speed for new users.",
+    "why_asked": "Tests ability to isolate a specific subset (first orders) before applying an aggregate condition, avoiding common misaggregation.",
+    "edge_cases": [
+      "Multiple orders with same earliest date.",
+      "Customers with only one order or none."
+    ]
+  },
+  "sql-43": {
+    "scenario": "The finance team needs a monthly revenue summary per department for a board report, pivoting from a normalized table.",
+    "why_asked": "Tests ability to transform data structure for reporting, not just write a pivot query.",
+    "edge_cases": [
+      "Missing months for an id produce NULLs.",
+      "Multiple rows for same id-month (duplicate) should be impossible."
+    ]
+  },
+  "sql-44": {
+    "scenario": "Your team needs a monthly country-level report of transaction volumes and approval rates to detect regional fraud spikes.",
+    "why_asked": "Tests ability to translate business requirements into correct conditional aggregation and date truncation logic.",
+    "edge_cases": [
+      "Countries with zero approved transactions in a month",
+      "Multiple timezones causing date boundary ambiguity"
+    ]
+  },
+  "sql-45": {
+    "scenario": "You're asked to find the last passenger who can board an airport shuttle given a strict weight limit, using a queue table.",
+    "why_asked": "Tests ability to translate cumulative logic into a precise analytical query.",
+    "edge_cases": [
+      "Empty queue or no one fits under limit.",
+      "Multiple people with same weight or turn value."
+    ]
+  },
+  "sql-46": {
+    "scenario": "Your team needs to flag underperforming search queries by averaging the ratio of rating to position per query, then reporting the share of poor ratings.",
+    "why_asked": "Tests if you recognize row-by-row computation versus aggregate division.",
+    "edge_cases": [
+      "Queries with no rows or all null ratings.",
+      "Duplicate query_name entries with different ratings."
+    ]
+  },
+  "sql-47": {
+    "scenario": "Your team needs to compute the average selling price per product across different price periods for a quarterly revenue report.",
+    "why_asked": "Tests ability to reason about join conditions and handle division by zero.",
+    "edge_cases": [
+      "Product with no matching sales returns 0.",
+      "Sales on exact boundary dates must be included."
+    ]
+  },
+  "sql-48": {
+    "scenario": "A school needs a report of each student's exam attendance count per subject, including subjects they never attempted.",
+    "why_asked": "Tests understanding of Cartesian product and left join to preserve zero-count pairs.",
+    "edge_cases": [
+      "Duplicate exam entries for same student-subject",
+      "Student with no exam records at all"
+    ]
+  },
+  "sql-49": {
+    "scenario": "Your team needs a 7-day rolling revenue report to monitor daily sales trends, starting only after a full week of data exists.",
+    "why_asked": "Tests ability to reason about window functions and incomplete window boundaries.",
+    "edge_cases": [
+      "Fewer than 7 distinct dates in table.",
+      "Multiple customers on same day, no gaps in dates."
+    ]
+  },
+  "sql-50": {
+    "scenario": "The analytics team needs a February 2020 sales report listing products with over 100 units sold to identify top movers for inventory planning.",
+    "why_asked": "Tests ability to filter before aggregation and apply post-aggregation conditions correctly.",
+    "edge_cases": [
+      "Products with zero orders in February not returned.",
+      "Duplicate product_id rows summing correctly."
+    ]
+  },
+  "sql-51": {
+    "scenario": "Your team needs to identify the most active user and the highest-rated movie last February for a monthly engagement report.",
+    "why_asked": "Tests ability to decompose a complex request into independent, composable queries.",
+    "edge_cases": [
+      "Ties broken by alphabetical order for both user and movie.",
+      "No ratings in February 2020 \u2014 returns empty or null result."
+    ]
+  },
+  "sql-52": {
+    "scenario": "A new HR system assigns unique IDs to employees; you need to produce a complete employee roster showing assigned IDs or null for those not yet processed.",
+    "why_asked": "Tests ability to reason about preserving unmatched rows and communicating join semantics clearly.",
+    "edge_cases": [
+      "Employee with no matching unique_id",
+      "Duplicate unique_id values for same employee"
+    ]
+  },
+  "sql-53": {
+    "scenario": "Your trading desk needs a daily P&L report per stock from the transaction ledger.",
+    "why_asked": "Tests ability to translate a business rule into a single, efficient conditional aggregation.",
+    "edge_cases": [
+      "Multiple buys before a sell",
+      "Stock with only buys or only sells"
+    ]
+  },
+  "sql-54": {
+    "scenario": "Your team needs a leaderboard of users ranked by total ride distance, showing zero for those who never rode.",
+    "why_asked": "Tests ability to reason about missing data and correct aggregation with joins.",
+    "edge_cases": [
+      "Users with no rides show 0 distance",
+      "Ties in distance sorted alphabetically by name"
+    ]
+  },
+  "sql-55": {
+    "scenario": "A data engineer needs to generate daily sales summaries for a dashboard, showing each date's unique product count and an alphabetically sorted, comma-separated list of products sold.",
+    "why_asked": "Tests ability to handle missing SQL features with creative subqueries while maintaining correct ordering.",
+    "edge_cases": [
+      "No sales on a date (no row for that date).",
+      "Multiple duplicate product entries on the same day."
+    ]
+  },
+  "sql-56": {
+    "scenario": "Your team needs a list of patients with a diabetes-related condition code (starting with 'DIAB1') for a clinical study eligibility check.",
+    "why_asked": "Tests attention to word-boundary logic in string parsing, not just substring matching.",
+    "edge_cases": [
+      "Condition string might be empty or NULL.",
+      "Code like 'XDIAB100' must be excluded."
+    ]
+  },
+  "sql-57": {
+    "scenario": "The product team wants to identify customers who browse but never buy, to target them with re-engagement campaigns.",
+    "why_asked": "Tests ability to reason about set relationships and missing data, not just write a join.",
+    "edge_cases": [
+      "Customer with zero visits at all",
+      "Multiple transactions on same visit"
+    ]
+  },
+  "sql-58": {
+    "scenario": "The finance team needs a report of accounts whose net balance exceeds $10,000 after all deposits and withdrawals are summed.",
+    "why_asked": "Tests if the candidate understands aggregation filtering with HAVING versus WHERE.",
+    "edge_cases": [
+      "Accounts with only withdrawals (negative sum).",
+      "Accounts with no transactions (NULL sum)."
+    ]
+  },
+  "sql-59": {
+    "scenario": "Your team needs to identify which contests have the highest user engagement by calculating the percentage of total users who registered for each contest.",
+    "why_asked": "Tests if candidate can correctly identify the constant denominator (total users) versus per-contest counts.",
+    "edge_cases": [
+      "Contest with zero registrations (0.00%)",
+      "Ties in percentage sorted by contest_id"
+    ]
+  },
+  "sql-60": {
+    "scenario": "Your team manages factory IoT logs; compute average processing time per machine to flag underperforming equipment.",
+    "why_asked": "Tests ability to reshape event data into a per-process duration before aggregation.",
+    "edge_cases": [
+      "Process with only start or end timestamp",
+      "Multiple processes with identical timestamps"
+    ]
+  },
+  "sql-61": {
+    "scenario": "The user profiles team needs standardized display names after a legacy system imported records with random capitalization.",
+    "why_asked": "Tests ability to reason about string manipulation trade-offs between functions like UPPER and LOWER.",
+    "edge_cases": [
+      "Names with leading/trailing spaces",
+      "Single-character names"
+    ]
+  },
+  "sql-62": {
+    "scenario": "The social media team needs to flag tweets that exceed the 15-character limit for a new display feature.",
+    "why_asked": "Tests attention to strict inequality vs. inclusive bounds in filtering.",
+    "edge_cases": [
+      "Content exactly 15 characters should be excluded.",
+      "Null content or empty strings should be handled."
+    ]
+  },
+  "sql-63": {
+    "scenario": "Your team needs a daily report of unique leads and unique partners per product line to track sales coverage.",
+    "why_asked": "Tests ability to distinguish counting distinct values per column vs. counting distinct pairs.",
+    "edge_cases": [
+      "Rows with NULL in lead_id or partner_id",
+      "Same lead_id and partner_id repeated on same date"
+    ]
+  },
+  "sql-64": {
+    "scenario": "",
+    "why_asked": "",
+    "edge_cases": []
+  },
+  "sql-65": {
+    "scenario": "HR needs a report of managers and their team size plus average age for a leadership pipeline analysis.",
+    "why_asked": "Tests ability to reason about self-referential data and group aggregation logic.",
+    "edge_cases": [
+      "Manager with zero reports (excluded by join)",
+      "Duplicate employee_ids or null reports_to"
+    ]
+  },
+  "sql-66": {
+    "scenario": "",
+    "why_asked": "",
+    "edge_cases": []
+  },
+  "sql-67": {
+    "scenario": "Your team needs to identify products that are both low-fat and recyclable for a new sustainability-focused marketing campaign.",
+    "why_asked": "Tests ability to translate a precise business requirement into correct logical conditions without overcomplicating.",
+    "edge_cases": [
+      "Rows where low_fats or recyclable is NULL",
+      "Duplicate product_id entries in the table"
+    ]
+  },
+  "sql-68": {
+    "scenario": "Your team manages employee-department assignments. You need to identify each employee's primary department for HR reporting, handling cases with no explicit primary but only one department.",
+    "why_asked": "Tests ability to handle conditional logic and edge cases in data pipelines.",
+    "edge_cases": [
+      "Employee with multiple departments and no Y flag (ambiguous).",
+      "Multiple Y flags for same employee (duplicate primary)."
+    ]
+  },
+  "sql-69": {
+    "scenario": "You're building a pricing API for a retail chain; product prices differ by store, and downstream systems need a normalized view.",
+    "why_asked": "Tests ability to articulate a row-to-column reshaping process and justify using UNION ALL over UNION.",
+    "edge_cases": [
+      "All stores null for a product",
+      "Duplicate product-store pairs"
+    ]
+  },
+  "sql-70": {
+    "scenario": "HR needs a report of employee bonuses where only odd-ID employees whose names don't start with 'M' get their full salary as bonus.",
+    "why_asked": "Tests ability to combine multiple conditions precisely in a single CASE expression.",
+    "edge_cases": [
+      "Name starting with 'M' vs containing 'M' elsewhere",
+      "Employee ID even but name not starting with 'M'"
+    ]
+  },
+  "sql-71": {
+    "scenario": "Your team needs to send a 2020 recap email to users who logged in that year, showing their last login date.",
+    "why_asked": "Tests ability to filter before aggregation to avoid incorrect results from later data.",
+    "edge_cases": [
+      "User with no 2020 logins should be excluded.",
+      "Multiple logins on same day; return any valid timestamp."
+    ]
+  },
+  "sql-72": {
+    "scenario": "Your team needs a salary-band headcount report for HR, ensuring every band appears even if empty, to avoid missing budget allocations.",
+    "why_asked": "Tests if you can guarantee all categories in output without relying on GROUP BY's implicit row omission.",
+    "edge_cases": [
+      "Zero accounts in a category",
+      "Income exactly at boundary values (20000, 50000)"
+    ]
+  },
+  "sql-73": {
+    "scenario": "",
+    "why_asked": "",
+    "edge_cases": []
+  },
+  "sql-74": {
+    "scenario": "Our HR system has separate tables for employee names and salaries; find any employee IDs that exist in only one table to fix a data sync bug.",
+    "why_asked": "Tests ability to reason about set completeness and missing data from both directions.",
+    "edge_cases": [
+      "Duplicate employee_id in one table",
+      "Null employee_id values"
+    ]
+  },
+  "sql-75": {
+    "scenario": "A team lead left, and you need to find their direct reports earning under $30k whose manager ID no longer matches any active employee.",
+    "why_asked": "Tests reasoning about NULL handling in NOT IN and explicit condition ordering.",
+    "edge_cases": [
+      "Manager ID is NULL but salary under 30k.",
+      "Manager ID exists but salary is over 30k."
+    ]
+  },
+  "sql-76": {
+    "scenario": "Your team needs to audit teacher workloads: count how many unique subjects each teacher actually teaches across all departments.",
+    "why_asked": "Tests ability to recognize when distinct aggregation is needed over raw counts.",
+    "edge_cases": [
+      "Teacher with no subjects assigned.",
+      "Same subject taught in multiple departments by same teacher."
+    ]
+  },
+  "sql-77": {
+    "scenario": "",
+    "why_asked": "",
+    "edge_cases": []
+  },
+  "sql-78": {
+    "scenario": "A biotech team needs to flag DNA samples for regulatory review, identifying start/stop codons and problematic repeats.",
+    "why_asked": "Tests ability to translate pattern-matching logic into precise SQL conditions without overcomplicating.",
+    "edge_cases": [
+      "Empty or NULL dna_sequence values",
+      "Case sensitivity of sequence patterns"
+    ]
+  },
+  "sql-79": {
+    "scenario": "Your team manages a user database and needs to clean up invalid email addresses before a marketing campaign.",
+    "why_asked": "Tests ability to validate structured data using string operations without regex.",
+    "edge_cases": [
+      "Emails with multiple '@' symbols",
+      "Domain ending in '.com' but no label before it"
+    ]
+  },
+  "sql-80": {
+    "scenario": "A QA engineer needs to validate product serial numbers stored in descriptions to flag only those matching a strict SN-XXXXXXXX format for an audit.",
+    "why_asked": "Tests ability to apply exact pattern matching logic and exclude false positives with negative lookahead thinking.",
+    "edge_cases": [
+      "Serial number with 5 digits after hyphen (invalid).",
+      "Description with 'SN' not followed by proper digits."
+    ]
+  },
+  "sql-81": {
+    "scenario": "Our product team wants to compare average trial vs. paid session lengths for users who converted, to optimize onboarding flow.",
+    "why_asked": "Tests ability to reason about grouping and filtering across multiple conditions in a single query.",
+    "edge_cases": [
+      "Users with multiple trials or payments",
+      "Users with only one activity type"
+    ]
+  },
+  "sql-82": {
+    "scenario": "Our e-commerce team wants to surface frequently co-purchased product pairs to improve cross-sell recommendations and bundle promotions.",
+    "why_asked": "Tests ability to reason about self-joins and avoid double-counting without explicit guidance.",
+    "edge_cases": [
+      "Same product bought multiple times by one user",
+      "Pairs with exactly 3 common customers"
+    ]
+  },
+  "sql-83": {
+    "scenario": "",
+    "why_asked": "",
+    "edge_cases": []
+  },
+  "sql-84": {
+    "scenario": "The library system reports which books are completely checked out, so the acquisitions team can prioritize purchasing more copies.",
+    "why_asked": "Tests ability to translate a business condition into a precise join-and-group logic without extra columns.",
+    "edge_cases": [
+      "Books with zero total_copies (division by zero or no rows).",
+      "Multiple unreturned records for the same book_id (duplicates)."
+    ]
+  },
+  "sql-85": {
+    "scenario": "Your team needs to identify 'golden hour' customers for a targeted loyalty campaign, filtering those who order most during peak restaurant hours and consistently rate highly.",
+    "why_asked": "Tests ability to translate multi-condition business logic into precise, aggregated SQL filters.",
+    "edge_cases": [
+      "Customers with exactly 0 rated orders (NULL average).",
+      "Ties in average_rating require secondary sort by customer_id descending."
+    ]
+  },
+  "sql-86": {
+    "scenario": "The marketing team needs a list of loyal customers for a targeted campaign, based on purchase frequency, engagement duration, and low refund rate.",
+    "why_asked": "Tests ability to combine multiple business rules into a single, efficient SQL query.",
+    "edge_cases": [
+      "Customers with only refunds or no purchases.",
+      "Multiple transactions on the same day affecting span."
+    ]
+  },
+  "sql-87": {
+    "scenario": "The product team needs a list of users showing signs of downgrade churn to target with retention offers before they cancel.",
+    "why_asked": "Tests ability to combine per-row latest data with full-history aggregates using window functions.",
+    "edge_cases": [
+      "User with only one event (no downgrade, gap <60 days).",
+      "Multiple events on same date; tie-breaking for 'most recent'."
+    ]
+  },
+  "sql-88": {
+    "scenario": "A learning platform tracks student progress; product wants a report of students who improved between their first and last exam in each subject.",
+    "why_asked": "Tests ability to extract paired values from grouped extremes without window functions.",
+    "edge_cases": [
+      "Multiple exams on same date; tie-breaking needed.",
+      "Student has only one exam in a subject; no improvement possible."
+    ]
+  },
+  "sql-89": {
+    "scenario": "The HR team wants to identify employees with consistent improvement over their last three performance reviews for a recognition program.",
+    "why_asked": "Tests ability to reason about ordered windowed data and multi-row comparisons.",
+    "edge_cases": [
+      "Fewer than 3 reviews per employee",
+      "Duplicate review dates for same employee"
+    ]
+  },
+  "sql-90": {
+    "scenario": "The health analytics team needs a report of recovered COVID patients and their recovery durations to analyze treatment effectiveness.",
+    "why_asked": "Tests ability to reason through sequential state transitions and temporal logic without procedural thinking.",
+    "edge_cases": [
+      "Patient with multiple positives before first negative",
+      "No negative test after positive (never recovered)"
+    ]
+  },
+  "sql-91": {
+    "scenario": "",
+    "why_asked": "",
+    "edge_cases": []
+  },
+  "sql-92": {
+    "scenario": "Engineering managers want to identify employees whose meeting load consistently exceeds 20 hours per week, so they can redistribute meeting time.",
+    "why_asked": "Tests ability to translate a business rule into multi-level aggregation and filtering logic.",
+    "edge_cases": [
+      "Employee with no meetings in a week",
+      "Ties in meeting_heavy_weeks count"
+    ]
+  },
+  "sql-93": {
+    "scenario": "A retail analytics team needs to flag stores where the highest-priced item has lower stock than the cheapest item, indicating potential mispricing or inventory mismanagement.",
+    "why_asked": "Tests ability to reason about window functions and avoid unnecessary subqueries in a single-pass solution.",
+    "edge_cases": [
+      "Ties in price for most expensive or cheapest product.",
+      "Stores with exactly 3 products but duplicates in product_name."
+    ]
+  },
+  "sql-94": {
+    "scenario": "Your team needs to surface books with sharply divided reader opinions for a recommendation system that highlights controversial titles.",
+    "why_asked": "Tests ability to translate multi-condition business rules into precise, self-consistent SQL logic.",
+    "edge_cases": [
+      "Books with exactly 5 sessions where 3 are extreme.",
+      "Ties in polarization_score with different title ordering."
+    ]
+  },
+  "sql-95": {
+    "scenario": "The ML team needs to identify power users who occasionally exceed their own typical token usage, to optimize prompt throttling thresholds.",
+    "why_asked": "Tests ability to recognize when a statistical property eliminates the need for a subquery.",
+    "edge_cases": [
+      "User with exactly 3 prompts, all same token count.",
+      "User with prompts where max equals average due to identical values."
+    ]
+  },
+  "sql-96": {
+    "scenario": "Our content team wants to identify emotionally consistent users for a loyalty program, based on their reaction history.",
+    "why_asked": "Tests ability to translate a multi-step aggregation and filtering requirement into precise logic.",
+    "edge_cases": [
+      "Ties in reaction frequency broken alphabetically.",
+      "Users with exactly 5 reactions but below 60% threshold."
+    ]
+  },
+  "py-3": {
+    "scenario": "Our log parser needs to verify that nested JSON-like bracket structures in API payloads are valid before processing.",
+    "why_asked": "Tests ability to reason about state transitions and handle mismatched or incomplete pairing.",
+    "edge_cases": [
+      "Empty string should return true",
+      "Closing bracket with empty stack"
+    ]
+  },
+  "py-4": {
+    "scenario": "Your team needs to analyze daily stock prices to identify the best single-day buy and sell opportunity for a trading algorithm.",
+    "why_asked": "Tests ability to optimize a common real-world problem using a single-pass greedy approach.",
+    "edge_cases": [
+      "Prices always decreasing (no profit possible)",
+      "Single price or empty list"
+    ]
+  },
+  "py-5": {
+    "scenario": "You're building a log deduplication pipeline and need to check if two log entries are identical when ignoring punctuation and case.",
+    "why_asked": "Tests ability to handle string normalization and edge cases under real-world constraints.",
+    "edge_cases": [
+      "Empty string or only non-alphanumeric characters",
+      "Mixed case with numbers and punctuation"
+    ]
+  },
+  "py-6": {
+    "scenario": "",
+    "why_asked": "",
+    "edge_cases": []
+  },
+  "py-7": {
+    "scenario": "Your team's log aggregator needs to verify if two event payloads contain the same set of field-value pairs, ignoring order.",
+    "why_asked": "Tests ability to reason about frequency counting and early exit conditions.",
+    "edge_cases": [
+      "Empty strings are valid anagrams.",
+      "Unicode characters with different byte lengths."
+    ]
+  },
+  "py-8": {
+    "scenario": "A data pipeline ingested user IDs 0..n but one ID is missing from the final table; find which one to flag the data quality issue.",
+    "why_asked": "Tests ability to reason about mathematical properties and communicate an O(n) solution clearly.",
+    "edge_cases": [
+      "Single element list (e.g., [0] or [1])",
+      "List with n=0 (empty list)"
+    ]
+  },
+  "py-9": {
+    "scenario": "Your team is building a stair-climbing robot; count distinct step sequences for a given number of stairs using 1 or 2 steps per move.",
+    "why_asked": "Tests ability to recognize and optimize a recurrence relation (Fibonacci) for large inputs.",
+    "edge_cases": [
+      "n = 0 (0 stairs, 1 way: no steps)",
+      "n = 1 (1 stair, 1 way: one 1-step)"
+    ]
+  },
+  "py-10": {
+    "scenario": "Your team needs to quickly compute the Hamming weight of all IDs from 0 to n for a bitmask optimization in a real-time analytics pipeline.",
+    "why_asked": "Tests ability to derive and communicate an efficient recurrence from previously computed values.",
+    "edge_cases": [
+      "n = 0 (single element list)",
+      "Large n near memory limits"
+    ]
+  },
+  "py-11": {
+    "scenario": "",
+    "why_asked": "",
+    "edge_cases": []
+  },
+  "py-12": {
+    "scenario": "Your team is building a real-time fraud detection system that flags suspiciously long sequences of unique transaction IDs per user session.",
+    "why_asked": "Tests ability to optimize a linear scan using a sliding window and state tracking.",
+    "edge_cases": [
+      "Empty string or single character",
+      "Entire string has all unique characters"
+    ]
+  },
+  "py-13": {
+    "scenario": "Your team's analytics pipeline needs to find the longest uninterrupted streak of user logins from a messy, deduplicated daily activity log.",
+    "why_asked": "Tests ability to design an O(n) algorithm by recognizing when to skip redundant work.",
+    "edge_cases": [
+      "Array with duplicates only.",
+      "Empty or single-element array."
+    ]
+  },
+  "py-14": {
+    "scenario": "Your team processes user-generated content tags; you need to cluster tags that are anagrams to detect spam or duplicate topics.",
+    "why_asked": "Tests ability to choose an efficient grouping strategy and communicate trade-offs clearly.",
+    "edge_cases": [
+      "Single-character strings and empty strings.",
+      "Duplicates: same word appearing multiple times."
+    ]
+  },
+  "py-15": {
+    "scenario": "Your team needs to identify the top 10 most frequent error codes from millions of server logs to prioritize fixes.",
+    "why_asked": "Tests ability to optimize for bounded input constraints, not just brute force.",
+    "edge_cases": [
+      "Ties in frequency \u2014 any order is acceptable.",
+      "k larger than number of unique elements."
+    ]
+  },
+  "py-16": {
+    "scenario": "Your team is building a game server that needs to verify if a player can traverse a level from start to finish given variable jump lengths.",
+    "why_asked": "Tests ability to reason about greedy optimization and incremental feasibility without exhaustive search.",
+    "edge_cases": [
+      "Single element array (already at last index)",
+      "Large jump that overshoots the array length"
+    ]
+  },
+  "py-17": {
+    "scenario": "Your team's event-log pipeline has overlapping time ranges; you need to merge them into continuous spans for downstream analytics.",
+    "why_asked": "Tests ability to reason about ordering and state in a single pass.",
+    "edge_cases": [
+      "Empty or single-element input list",
+      "One interval fully contained inside another"
+    ]
+  },
+  "py-18": {
+    "scenario": "Our team is building a calendar scheduling system and needs to merge a new event into an existing sorted list of non-overlapping time blocks.",
+    "why_asked": "Assesses ability to reason through phased logic and handle boundary conditions cleanly.",
+    "edge_cases": [
+      "New interval completely before or after all existing ones.",
+      "New interval overlaps multiple existing intervals at once."
+    ]
+  },
+  "py-19": {
+    "scenario": "Your team manages a calendar API; users report overlapping bookings. Find the fewest events to cancel so the rest fit without conflict.",
+    "why_asked": "Tests ability to recognize greedy optimization and justify why sorting by end time is correct.",
+    "edge_cases": [
+      "Intervals with identical start and end times",
+      "Empty list or single interval"
+    ]
+  },
+  "py-20": {
+    "scenario": "Your team's log search service stores timestamps in a rotated sorted array; find a specific log entry's position quickly.",
+    "why_asked": "Tests ability to adapt binary search logic under non-standard conditions with clear reasoning.",
+    "edge_cases": [
+      "Single-element array, target present or absent",
+      "Target at the rotation pivot point"
+    ]
+  },
+  "py-21": {
+    "scenario": "Your team's log rotation service stores timestamps in a sorted array that gets rotated. Find the earliest timestamp to determine the oldest log entry.",
+    "why_asked": "Tests ability to adapt binary search to non-standard sorted structures.",
+    "edge_cases": [
+      "Single-element array",
+      "Array not rotated (already sorted)"
+    ]
+  },
+  "py-22": {
+    "scenario": "Your team needs to find the maximum water volume between two vertical walls in a reservoir cross-section for capacity planning.",
+    "why_asked": "Tests ability to optimize with two-pointer reasoning and explain why moving the shorter side works.",
+    "edge_cases": [
+      "All heights equal",
+      "Strictly increasing or decreasing heights"
+    ]
+  },
+  "py-23": {
+    "scenario": "Your team needs to identify all customer transaction triplets that net to zero for fraud detection.",
+    "why_asked": "Tests ability to optimize brute-force logic and communicate trade-offs clearly.",
+    "edge_cases": [
+      "All numbers identical (e.g., [0,0,0])",
+      "Large input with many duplicate values"
+    ]
+  },
+  "py-24": {
+    "scenario": "Your team is building a budgeting tool that finds all item combinations from a price list that exactly match a target spend, allowing unlimited use of each item.",
+    "why_asked": "Tests ability to design recursive search with pruning and avoid duplicate permutations.",
+    "edge_cases": [
+      "Empty candidate list or target of zero",
+      "Duplicates in candidates causing repeated combinations"
+    ]
+  },
+  "py-25": {
+    "scenario": "Your team's payment system needs to dispense exact change using the fewest coins from available denominations for a refund feature.",
+    "why_asked": "Tests ability to recognize when greedy algorithms fail and apply dynamic programming.",
+    "edge_cases": [
+      "Amount is 0 (should return 0).",
+      "No combination of coins can make the amount."
+    ]
+  },
+  "py-26": {
+    "scenario": "Your team needs to find the longest chain of increasing timestamps in a massive sorted log file to detect a pattern of gradual system degradation.",
+    "why_asked": "Tests ability to optimize beyond brute force and communicate algorithmic trade-offs clearly.",
+    "edge_cases": [
+      "Empty array or single element",
+      "All identical numbers (no increase)"
+    ]
+  },
+  "py-27": {
+    "scenario": "Your team is comparing two versions of a configuration file to find the longest sequence of unchanged settings.",
+    "why_asked": "Tests ability to break down complex sequence comparison into optimal substructure reasoning.",
+    "edge_cases": [
+      "One or both strings empty",
+      "All characters match or none match"
+    ]
+  },
+  "py-28": {
+    "scenario": "",
+    "why_asked": "",
+    "edge_cases": []
+  },
+  "py-29": {
+    "scenario": "Your team manages a circular street of smart homes; you need to maximize nightly loot from non-adjacent houses, treating first and last as neighbors.",
+    "why_asked": "Tests ability to reduce a circular constraint to two linear subproblems.",
+    "edge_cases": [
+      "Single house: both slices empty, must return its value.",
+      "All houses same value: ensure correct max from two linear runs."
+    ]
+  },
+  "py-30": {
+    "scenario": "Your team is building a smart autocomplete for a messaging app; check if a user's typed string can be split into valid dictionary words.",
+    "why_asked": "Tests ability to recognize when greedy solutions fail and to design a correct DP approach.",
+    "edge_cases": [
+      "Empty string input",
+      "Word reused multiple times in segmentation"
+    ]
+  },
+  "py-31": {
+    "scenario": "A team building a compressed message decoder needs to count possible decodings of a numeric string to validate transmission integrity.",
+    "why_asked": "Tests ability to structure dynamic programming solutions and handle conditional branching and edge cases.",
+    "edge_cases": [
+      "Leading zero kills all decoding paths.",
+      "Single digit zero cannot be decoded."
+    ]
+  },
+  "py-32": {
+    "scenario": "Your team maps delivery drone routes; compute how many distinct paths a drone can take across a city block grid moving only east or south.",
+    "why_asked": "Probes whether the candidate can recognize and optimize overlapping subproblems in path-counting problems.",
+    "edge_cases": [
+      "1x1 grid: exactly one path.",
+      "Very large m,n causing integer overflow."
+    ]
+  },
+  "py-33": {
+    "scenario": "Your team is debugging a network packet analyzer that counts set bits in a 32-bit flag field to detect misconfigured hardware.",
+    "why_asked": "Tests ability to reason about bitwise operations and optimize for performance.",
+    "edge_cases": [
+      "Negative integers (two's complement representation)",
+      "Large integers beyond 32-bit range"
+    ]
+  },
+  "py-34": {
+    "scenario": "Our network packet parser needs to reverse the bit order of a 32-bit header field to match the spec for downstream routing.",
+    "why_asked": "Tests ability to reason about fixed-width binary manipulation and handle implicit leading zeros.",
+    "edge_cases": [
+      "n = 0 (all bits zero)",
+      "n = 0xFFFFFFFF (all bits one)"
+    ]
+  },
+  "py-35": {
+    "scenario": "Our payment system needs to add transaction amounts without using the + operator, due to a legacy constraint in the core ledger module.",
+    "why_asked": "Tests ability to reason about bitwise operations and handle language-specific integer overflow behavior.",
+    "edge_cases": [
+      "Negative integers and zero",
+      "Large numbers causing overflow in 32-bit simulation"
+    ]
+  },
+  "py-36": {
+    "scenario": "Your team needs to flatten a 2D sensor grid into a 1D stream for sequential processing, following a clockwise outward-in path.",
+    "why_asked": "Tests ability to translate spatial traversal logic into clean, maintainable code under boundary constraints.",
+    "edge_cases": [
+      "Single row or column matrix",
+      "Empty matrix (0 rows or 0 columns)"
+    ]
+  },
+  "py-37": {
+    "scenario": "Your team needs to rotate satellite image tiles 90\u00b0 clockwise before stitching them into a map, processing in place to avoid memory spikes.",
+    "why_asked": "Tests ability to decompose a complex transformation into simple, in-place steps.",
+    "edge_cases": [
+      "1x1 matrix (single element).",
+      "Matrix with duplicate values across rows."
+    ]
+  },
+  "py-38": {
+    "scenario": "Your team's image processing pipeline needs to mark corrupted pixels; zeroing an entire row/col flags all related data for re-acquisition.",
+    "why_asked": "Tests ability to separate detection from mutation to avoid unintended cascading side effects.",
+    "edge_cases": [
+      "Matrix with only one row or column.",
+      "No zeros present in the matrix."
+    ]
+  },
+  "py-39": {
+    "scenario": "Your team processes user activity logs; find the longest session where at most k events can be relabeled to a single event type for anomaly detection.",
+    "why_asked": "Tests ability to optimize sliding window logic and handle dynamic constraints under pressure.",
+    "edge_cases": [
+      "k larger than string length",
+      "all characters already the same"
+    ]
+  },
+  "py-40": {
+    "scenario": "You're building a log analysis tool; given a stream of events, find the shortest time window covering all required event types.",
+    "why_asked": "Tests ability to optimize space and time with a dynamic sliding window.",
+    "edge_cases": [
+      "t has duplicate characters, e.g., 'aa'",
+      "s is empty or shorter than t"
+    ]
+  },
+  "py-41": {
+    "scenario": "Your team's text analysis pipeline needs to count all distinct substrings that read the same forwards and backwards in user-generated content.",
+    "why_asked": "Tests ability to reason about combinatorial counting and optimize brute-force logic.",
+    "edge_cases": [
+      "Empty string or single character",
+      "All identical characters (e.g., 'aaaa')"
+    ]
+  },
+  "py-42": {
+    "scenario": "Your team is building a text-analysis service that detects repeated patterns in user comments, and you need the longest symmetric substring.",
+    "why_asked": "Tests ability to optimize brute-force logic and communicate trade-offs clearly.",
+    "edge_cases": [
+      "Single character or empty string.",
+      "All identical characters (e.g., 'aaaa')."
+    ]
+  },
+  "py-43": {
+    "scenario": "Your team is building a real-time feed merger that combines two sorted event streams into one sorted output for downstream processing.",
+    "why_asked": "Tests ability to reason about pointer manipulation and handle boundary conditions without special cases.",
+    "edge_cases": [
+      "Both lists null or empty",
+      "Duplicate values across lists"
+    ]
+  },
+  "py-44": {
+    "scenario": "Your team is building a real-time log processor; you need to efficiently drop the nth-oldest entry from a growing linked list of recent events.",
+    "why_asked": "Tests ability to reason about pointer manipulation and handle boundary conditions cleanly.",
+    "edge_cases": [
+      "n equals list length (remove head)",
+      "n larger than list length (invalid input)"
+    ]
+  },
+  "py-45": {
+    "scenario": "Your team is building a real-time log pipeline; a downstream consumer needs the order of events reversed before aggregation.",
+    "why_asked": "Tests ability to reason about pointer manipulation and in-place mutation without losing data.",
+    "edge_cases": [
+      "Single node list",
+      "Empty list (null head)"
+    ]
+  },
+  "py-46": {
+    "scenario": "Your team's data pipeline processes a linked list of events; a cycle would cause infinite loops, so you need to detect it.",
+    "why_asked": "Tests ability to reason about pointer manipulation and space-time tradeoffs.",
+    "edge_cases": [
+      "Single node pointing to itself",
+      "Empty list (null head)"
+    ]
+  },
+  "py-47": {
+    "scenario": "",
+    "why_asked": "",
+    "edge_cases": []
+  },
+  "py-48": {
+    "scenario": "",
+    "why_asked": "",
+    "edge_cases": []
+  },
+  "py-49": {
+    "scenario": "Your team is merging two user profile databases; verify that the nested preference trees from both sources are identical.",
+    "why_asked": "Tests ability to reason recursively and handle structural comparisons systematically.",
+    "edge_cases": [
+      "One tree null, other non-null",
+      "Nodes with same values but different structure"
+    ]
+  },
+  "py-50": {
+    "scenario": "Your team's photo gallery app stores images in a binary tree; a new UI requires the entire tree to be mirrored for a flipped layout.",
+    "why_asked": "Tests ability to reason recursively and handle tree traversal without confusion.",
+    "edge_cases": [
+      "Empty tree (root is null).",
+      "Single node (no children to swap)."
+    ]
+  },
+  "py-51": {
+    "scenario": "You're building a notification system that sends alerts level-by-level through an org chart, ensuring managers see their direct reports before skipping to deeper teams.",
+    "why_asked": "Tests ability to process hierarchical data in layers, not just depth-first.",
+    "edge_cases": [
+      "Empty tree (root is None).",
+      "Unbalanced tree with missing left/right children."
+    ]
+  },
+  "py-52": {
+    "scenario": "Your team's data pipeline ingests a binary tree of user IDs; validate it's a correct BST before merging into the production lookup table.",
+    "why_asked": "Tests ability to reason about recursive constraints and global invariants, not just local checks.",
+    "edge_cases": [
+      "Single node or empty tree",
+      "Duplicate values violating strict inequality"
+    ]
+  },
+  "py-53": {
+    "scenario": "You're building an analytics dashboard for a product catalog; tree nodes represent categories, and you need the kth cheapest price in sorted order.",
+    "why_asked": "Tests ability to leverage BST structure properties for efficient traversal, not brute force.",
+    "edge_cases": [
+      "Tree is empty or k exceeds total nodes.",
+      "Duplicate values; does k count duplicates?"
+    ]
+  },
+  "py-54": {
+    "scenario": "Your team is building a geographic lookup service that uses a BST of zip codes to find the nearest common regional hub for two delivery addresses.",
+    "why_asked": "Tests if you recognize BST structure to avoid O(n) traversal, not just brute-force search.",
+    "edge_cases": [
+      "p or q is the root itself.",
+      "p equals q, or both are None."
+    ]
+  },
+  "py-55": {
+    "scenario": "A content platform needs to verify if a cached HTML snippet appears exactly within a larger page\u2019s DOM tree, to avoid redundant re-rendering.",
+    "why_asked": "Probes ability to decompose a complex tree problem into reusable recursive comparisons.",
+    "edge_cases": [
+      "Empty subRoot should match any root.",
+      "Duplicate node values across different subtrees can cause false positives."
+    ]
+  },
+  "py-56": {
+    "scenario": "Your team receives serialized tree data in two traversal formats from separate microservices; you need to reconstruct the hierarchy for a reporting pipeline.",
+    "why_asked": "Tests capacity for recursive reasoning and hashmap optimization under time constraints.",
+    "edge_cases": [
+      "Empty preorder and inorder lists",
+      "Skewed tree (all left or right nodes)"
+    ]
+  },
+  "py-57": {
+    "scenario": "Your team's social network graph analysis needs the maximum influence sum along any continuous connection path.",
+    "why_asked": "Tests ability to separate local optimal from global optimal in recursive state.",
+    "edge_cases": [
+      "All negative node values",
+      "Single node tree"
+    ]
+  },
+  "py-58": {
+    "scenario": "Your team needs to merge daily sorted log files from k microservices into one sorted stream for downstream analytics.",
+    "why_asked": "Tests ability to optimize multi-source merging using a heap, not brute-force scanning.",
+    "edge_cases": [
+      "All lists empty or null.",
+      "Tied values across multiple lists."
+    ]
+  },
+  "py-59": {
+    "scenario": "Your team is analyzing daily website traffic logs to find the period with the highest sustained user growth.",
+    "why_asked": "Tests ability to optimize a brute-force solution using incremental reasoning and state tracking.",
+    "edge_cases": [
+      "All negative numbers",
+      "Single-element array"
+    ]
+  },
+  "py-60": {
+    "scenario": "Given a stream of daily returns for a trading portfolio, find the maximum product of any consecutive days' returns.",
+    "why_asked": "Tests ability to handle stateful logic where extreme values can invert unexpectedly.",
+    "edge_cases": [
+      "Array contains zero; product resets.",
+      "Single element array with negative number."
+    ]
+  },
+  "py-61": {
+    "scenario": "Your team is building a spell-checker for a mobile keyboard; you need to verify if a typed word exists in a 2D grid of adjacent letter keys.",
+    "why_asked": "Assesses systematic backtracking reasoning and ability to manage state without corrupting shared data.",
+    "edge_cases": [
+      "Single-cell board matching entire word",
+      "Word longer than total board cells"
+    ]
+  },
+  "py-62": {
+    "scenario": "Your team is analyzing satellite imagery to count distinct landmasses in a coastal region, given a grid of water/land pixels.",
+    "why_asked": "Tests ability to model connected components and reason about traversal order in a grid.",
+    "edge_cases": [
+      "Grid with all '1's (single island)",
+      "Grid with no '1's (zero islands)"
+    ]
+  },
+  "py-63": {
+    "scenario": "Your team manages a university course registration system; you need to validate that prerequisite chains don't create impossible schedules before students enroll.",
+    "why_asked": "Probes ability to model dependencies as graphs and detect circular reasoning in requirements.",
+    "edge_cases": [
+      "Empty prerequisites list",
+      "Self-loop prerequisite (course ID same as prereq)"
+    ]
+  },
+  "py-64": {
+    "scenario": "Your team is building a graph-based recommendation engine and needs to safely duplicate the user interaction graph for A/B testing without mutating the original.",
+    "why_asked": "Tests ability to reason about recursion, memoization, and avoiding infinite loops in cyclic structures.",
+    "edge_cases": [
+      "Null input node.",
+      "Single node with no neighbors."
+    ]
+  },
+  "py-65": {
+    "scenario": "Your team needs to model rainwater drainage across a terrain grid to identify zones that drain to both the Pacific and Atlantic oceans.",
+    "why_asked": "Tests ability to reverse a problem's direction to optimize, and communicate that reasoning clearly.",
+    "edge_cases": [
+      "Single-cell grid (both oceans same cell)",
+      "Flat terrain where all cells reach both oceans"
+    ]
+  },
+  "py-66": {
+    "scenario": "Your team is building a real-time spell-checker for a messaging app, and you need to find all valid dictionary words hidden in a user's emoji grid.",
+    "why_asked": "Tests ability to optimize shared computation across multiple inputs using a trie.",
+    "edge_cases": [
+      "Board with no valid words.",
+      "Duplicate words in input list."
+    ]
+  }
+}

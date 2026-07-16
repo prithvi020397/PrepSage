@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="utf-8">
-<title>PrepSage</title>
+<title>The Loop</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
@@ -205,6 +205,9 @@
   .q-diff-dot.medium { background: #e6b422; }
   .q-diff-dot.hard { background: #e6555a; }
   .q-due-dot { font-size: 12px; color: #e6b422; flex-shrink: 0; }
+  .q-item.due { background: rgba(230,180,34,0.07); }
+  .q-item.due:hover { background: rgba(230,180,34,0.13); }
+  .q-browse-hint { font-size: 11px; color: var(--text-faint); padding: 12px 12px 4px; line-height: 1.5; border-top: 1px solid var(--border-soft); margin-top: 8px; }
 
   .q-section-header {
     position: sticky;
@@ -309,12 +312,58 @@
   }
   #q-timer.stopped { color: var(--good, #4caf82); }
   #prompt { color: var(--text-dim); line-height: 1.55; }
+  #context-box { margin-top: 12px; display: flex; flex-direction: column; gap: 9px; }
+  .ctx-scenario { font-size: 13px; line-height: 1.55; color: var(--text-dim); background: var(--card-2); border-left: 3px solid var(--accent); border-radius: 6px; padding: 9px 12px; }
+  .ctx-why { font-size: 12.5px; color: var(--text-dim); line-height: 1.5; }
+  .ctx-why-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-faint); margin-right: 6px; }
+  .ctx-edges { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 12.5px; }
+  .ctx-chip {
+    background: var(--card-2); border: 1px solid var(--border-soft); border-radius: 20px;
+    padding: 3px 10px; font-size: 11.5px; color: var(--text-dim);
+  }
+  .trace-toggle {
+    display: flex; align-items: center; gap: 8px; width: 100%;
+    background: transparent; border: 1px dashed var(--border); border-radius: 8px;
+    padding: 9px 14px; cursor: pointer; color: var(--text-dim); font-size: 13px; font-weight: 600;
+  }
+  .trace-toggle:hover { border-color: var(--accent); color: var(--text); }
+  .trace-chevron { margin-left: auto; transition: transform .15s; }
+  #trace-body { display: none; }
   .empty-stats { display: flex; gap: 22px; margin-bottom: 14px; }
   .empty-stat { display: flex; flex-direction: column; gap: 2px; }
   .empty-stat .n { font-size: 22px; font-weight: 700; color: var(--text); font-family: 'JetBrains Mono', monospace; }
   .empty-stat .l { font-size: 11px; color: var(--text-faint); text-transform: uppercase; letter-spacing: 0.06em; }
   .empty-hint { color: var(--text-faint); font-size: 13px; }
-  #empty-panel { height: 100%; display: flex; align-items: center; justify-content: center; }
+  #empty-panel { height: 100%; display: flex; align-items: center; justify-content: center; overflow-y: auto; }
+  #command-center { max-width: 540px; width: 100%; padding: 28px 24px; text-align: center; }
+  .cc-hero { margin-bottom: 20px; }
+  .cc-greeting { font-size: 24px; font-weight: 700; letter-spacing: -0.01em; color: var(--text); }
+  .cc-momentum { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-top: 12px; }
+  .cc-pill { font-size: 12px; padding: 4px 11px; border-radius: 999px; background: var(--card-2); color: var(--text-dim); border: 1px solid var(--border-soft); }
+  .cc-pill.due { color: #e6b422; border-color: rgba(230,180,34,0.3); }
+  .cc-start { font-size: 16px; padding: 13px 34px; border-radius: 12px; }
+  .cc-lanes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 20px 0 18px; }
+  .cc-lane { display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 14px 10px; background: var(--card); border: 1px solid var(--border); border-radius: 12px; cursor: pointer; transition: border-color 0.12s ease, transform 0.06s ease; }
+  .cc-lane:hover { border-color: var(--accent); }
+  .cc-lane:active { transform: translateY(1px); }
+  .cc-lane-ico { font-size: 20px; }
+  .cc-lane-title { font-size: 13.5px; font-weight: 600; color: var(--text); }
+  .cc-lane-sub { font-size: 11px; color: var(--text-faint); }
+  .cc-standings { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 18px; max-width: 380px; margin: 0 auto; text-align: left; }
+  .cc-standing { display: flex; justify-content: space-between; font-size: 12.5px; padding: 6px 0; border-bottom: 1px solid var(--border-soft); }
+  .cc-standing-l { color: var(--text-faint); }
+  .cc-standing-v { color: var(--text-dim); font-family: 'JetBrains Mono', monospace; }
+  .cc-or { color: var(--text-faint); font-size: 12px; margin: 18px 0 0; }
+  .start-practice-wrap { text-align: center; max-width: 460px; padding: 24px; }
+  .start-practice-title { font-size: 22px; margin: 0 0 8px; }
+  .start-practice-sub { color: var(--text-dim); font-size: 13.5px; margin: 0 0 18px; line-height: 1.5; }
+  .btn-lg { font-size: 15px; padding: 12px 26px; border-radius: 10px; }
+  .start-practice-or { color: var(--text-faint); font-size: 12px; margin: 14px 0 0; }
+  .mic-toggle { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-dim); cursor: pointer; user-select: none; }
+  .mic-toggle .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--text-faint); transition: background .2s; }
+  .mic-toggle.on .dot { background: var(--success); box-shadow: 0 0 0 3px rgba(80,200,120,.25); }
+  .live-transcript { font-size: 12px; color: var(--text-dim); font-style: italic; min-height: 16px; margin-top: 4px; }
+  .live-transcript.active::after { content: ' ●'; color: var(--error); animation: micPulse 1.2s infinite; }
   .empty-hint.due-hint { color: #e6b422; }
   .empty-hint.due-hint a { color: var(--accent); font-weight: 600; }
 
@@ -322,19 +371,29 @@
     background: var(--card);
     border: 1px solid var(--border);
     border-radius: var(--radius);
-    padding: 14px 18px;
+    padding: 4px 18px 16px;
     display: none;
   }
-  #sample pre {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 12.5px;
-    white-space: pre-wrap;
-    background: var(--card-2);
-    border: 1px solid var(--border-soft);
-    border-radius: 6px;
-    padding: 8px 10px;
-    margin: 0 0 12px;
+  .spec-section { margin-top: 14px; }
+  .spec-section-title {
+    font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em;
+    color: var(--accent); margin-bottom: 7px; display: flex; align-items: center; gap: 7px;
   }
+  .spec-section-title::before { content: ''; width: 3px; height: 12px; background: var(--accent); border-radius: 2px; }
+  .spec-tables { display: flex; flex-wrap: wrap; gap: 14px; }
+  .spec-table-block { flex: 1 1 200px; min-width: 180px; }
+  .spec-tname { font-size: 12px; font-weight: 600; color: var(--text); margin-bottom: 5px; font-family: 'JetBrains Mono', monospace; }
+  .example-card {
+    border: 1px solid var(--border-soft); border-radius: 8px; overflow: hidden; background: var(--card-2);
+  }
+  .example-row { display: flex; gap: 0; }
+  .example-cell { flex: 1; padding: 10px 12px; min-width: 0; }
+  .example-cell + .example-cell { border-left: 1px solid var(--border-soft); }
+  .example-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-faint); margin-bottom: 6px; }
+  .example-cell code, .example-cell pre { font-family: 'JetBrains Mono', monospace; font-size: 12.5px; white-space: pre-wrap; word-break: break-word; margin: 0; color: var(--text); }
+  .example-arrow { color: var(--accent); font-weight: 700; }
+  .spec-caption { font-size: 11.5px; color: var(--text-faint); margin-top: 10px; line-height: 1.5; }
+  .spec-caption b { color: var(--text-dim); font-weight: 600; }
 
   .concept-box {
     background: var(--card);
@@ -405,8 +464,7 @@
   .tool-btn.active { background: var(--accent); color: #0e1015; border-color: var(--accent); }
   #clarify-sql-btn.active { background: var(--accent); color: #0e1015; border-color: var(--accent); }
   #curveball-card { border: 1px dashed var(--warn); border-radius: 8px; margin: 0 12px 10px; padding: 10px 12px; background: rgba(245,197,66,0.06); }
-  #tool-mic.listening, #chat-mic-btn.listening { background: var(--error); color: #0e1015; }
-  #chat-mic-btn.primary-mic { background: var(--accent); color: #0e1015; border-color: var(--accent); animation: micPulse 2.2s ease-in-out infinite; }
+  #tool-mic.active { background: var(--accent); color: #0e1015; border-color: var(--accent); }
   @keyframes micPulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(124,108,246,0.5); } 50% { box-shadow: 0 0 0 6px rgba(124,108,246,0); } }
   #req-chips-section { margin-top: 14px; }
   #req-chips-section:has(#req-chips:empty) { display: none; }
@@ -869,13 +927,14 @@
 </head>
 <body>
 <div id="topbar">
-  <span class="brand"><span class="logo-mark">PS</span><span class="brand-text">PrepSage</span></span>
+  <a class="brand" href="/dashboard" title="Back to your dashboard"><span class="logo-mark">L↻OP</span><span class="brand-text">The Loop</span></a>
   <span class="tagline">Interview prep that adapts to you, with a tutor watching your back</span>
   <div class="stats">
     <span id="solved-count">0/0 solved</span>
     <div class="bar"><div class="bar-fill" id="solved-bar"></div></div>
   </div>
   <span id="deadline-widget" style="color: var(--text-dim); font-size: 13px; cursor: pointer;" onclick="setInterviewDeadline()" title="Set your interview date — review intervals compress as it approaches"></span>
+  <span id="streak-widget" style="color: var(--text-dim); font-size: 13px;" title="Practice streak (days in a row you've done at least one question)">🔥 <span id="streak-count">0</span>d</span>
   <button class="btn btn-ghost" style="margin-left: 8px;" onclick="startMockLoop()" title="Chain a SQL/Python, design, and tradeoff question into one continuous mock interview">🔁 Mock interview</button>
   <a href="/dashboard" style="color: var(--text-dim); text-decoration: none; font-size: 13px;">📊 Dashboard</a>
 </div>
@@ -901,6 +960,7 @@
           <span id="q-timer"></span>
         </div>
         <div id="prompt"></div>
+        <div id="context-box" style="display:none;"></div>
       </div>
       <div id="req-chips-section">
         <div class="req-chips-label">Confirmed requirements</div>
@@ -909,19 +969,19 @@
       <div id="sample"></div>
       <div id="clarify-gate" style="display:none;"></div>
       <div id="concept-box" class="concept-box"></div>
-      <div id="trace-box" style="display:none; background:var(--card); border:1px solid var(--border); border-radius:var(--radius); padding:2px 18px;">
-        <details id="trace-details">
-          <summary style="cursor:pointer; padding:12px 0; font-size:13px; font-weight:600; color:var(--text-dim);">🧩 Code translation practice — trace it before you code it</summary>
-          <div style="padding-bottom:14px;">
-            <div id="trace-pattern" style="font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:0.04em;color:var(--accent);margin-bottom:8px;"></div>
-            <div id="trace-skeleton" style="margin-bottom:12px;"></div>
-            <div id="trace-steps" style="display:flex;flex-direction:column;gap:8px;"></div>
-            <div style="display:flex; align-items:center; gap:10px; margin-top:10px;">
-              <button id="trace-check-btn" class="btn btn-ghost" onclick="checkTrace()" style="font-size:12px;">Check my trace</button>
-              <span id="trace-summary" style="font-size:12px; color:var(--text-faint);"></span>
-            </div>
+      <div id="trace-box" style="display:none;">
+        <button class="trace-toggle" id="trace-toggle" onclick="toggleTrace()">
+          <span id="trace-toggle-label">💡 Plan a head start</span>
+          <span id="trace-toggle-sub" style="color:var(--text-faint); font-weight:400;"></span>
+          <span class="trace-chevron">▸</span>
+        </button>
+        <div id="trace-body" style="display:none; background:var(--card); border:1px solid var(--border); border-radius:var(--radius); padding:10px 16px 14px; margin-top:8px;">
+          <div id="trace-steps" style="display:flex;flex-direction:column;gap:6px;"></div>
+          <div style="display:flex; align-items:center; gap:10px; margin-top:12px;">
+            <button id="trace-check-btn" class="btn btn-ghost" onclick="checkTrace()" style="font-size:12px;">Check my answers</button>
+            <span id="trace-summary" style="font-size:12px; color:var(--text-faint);"></span>
           </div>
-        </details>
+        </div>
       </div>
       <div id="concept-mapper" style="display:none;">
         <div id="concept-mapper-nodes"></div>
@@ -930,7 +990,32 @@
     </div>
     <div id="main-right">
       <div id="empty-panel">
-        <span class="empty-hint">Pick a question from the sidebar to get started</span>
+        <div id="command-center">
+          <div class="cc-hero">
+            <div class="cc-greeting" id="cc-greeting">Let's get into a loop.</div>
+            <div class="cc-momentum" id="cc-momentum"></div>
+          </div>
+          <button class="btn btn-primary btn-lg cc-start" onclick="startPractice()">▶ Start Practice</button>
+          <div class="cc-lanes">
+            <button class="cc-lane" onclick="startPractice('focused')">
+              <span class="cc-lane-ico">🎯</span>
+              <span class="cc-lane-title">Focused rep</span>
+              <span class="cc-lane-sub">One smart-picked question</span>
+            </button>
+            <button class="cc-lane" onclick="startMockLoop()">
+              <span class="cc-lane-ico">🔁</span>
+              <span class="cc-lane-title">Mock loop</span>
+              <span class="cc-lane-sub">SQL → design → tradeoff</span>
+            </button>
+            <button class="cc-lane" onclick="startPractice('weak')">
+              <span class="cc-lane-ico">🩹</span>
+              <span class="cc-lane-title">Weak-area drill</span>
+              <span class="cc-lane-sub">Your recurring misses</span>
+            </button>
+          </div>
+          <div class="cc-standings" id="cc-standings"></div>
+          <p class="cc-or">or pick any question from the sidebar →</p>
+        </div>
       </div>
       <div id="editor-card" style="display:none;">
         <div class="editor-toolbar">
@@ -980,7 +1065,7 @@
             <button id="tool-box" class="btn btn-ghost tool-btn" onclick="setCanvasTool('box')" title="Add a component box. Select a box + press L to tag its layer, Cmd/Ctrl+D to duplicate.">▭ Box</button>
             <button id="tool-arrow" class="btn btn-ghost tool-btn" onclick="setCanvasTool('arrow')" title="Click a box, then click another to connect. Double-click an arrow to label it.">→ Arrow</button>
             <button id="tool-text" class="btn btn-ghost tool-btn" onclick="setCanvasTool('text')" title="Add a note. Cmd/Ctrl+D to duplicate.">🗒 Note</button>
-            <button id="tool-mic" class="btn btn-ghost tool-btn" onmousedown="startMic('canvas', this)" ontouchstart="event.preventDefault(); startMic('canvas', this)" title="Hold to speak a note">🎤</button>
+            <button id="tool-mic" class="btn btn-ghost tool-btn" onclick="toggleCanvasVoiceNote()" title="Turn on mic, then speak — your words drop onto the canvas as a note">🎤 Voice note</button>
           </div>
           <div class="canvas-tools">
             <button id="canvas-delete-btn" class="btn btn-ghost" onclick="deleteSelected()" disabled title="Delete the selected box/arrow/note (or press Delete)">Delete</button>
@@ -1074,11 +1159,15 @@
       <div id="debrief-row" class="debrief-row" style="display:none">
         <input id="complexity-input" type="text" placeholder="Actual time/space complexity of your code…">
         <input id="edge-input" type="text" placeholder="Edge cases you'd test…">
-        <button id="narration-mic" class="btn btn-ghost" onmousedown="startMic('narration', this)" ontouchstart="event.preventDefault(); startMic('narration', this)" title="Hold to narrate your approach out loud, like you'd explain it to an interviewer">🎤 Narrate</button>
+        <textarea id="narration-input" placeholder="Narrate your approach out loud — or type it. Mic-on types live here." style="flex:1; min-height:38px; resize:vertical; background:var(--card-2); border:1px solid var(--border); border-radius:6px; color:var(--text); padding:8px 10px; font-size:12.5px; font-family:inherit;"></textarea>
         <button id="debrief-btn" class="btn btn-ghost" onclick="submitDebrief()">Debrief</button>
       </div>
       <div id="narration-readout" style="display:none; font-size:12px; color:var(--text-dim); padding:4px 12px;"></div>
       <div id="debrief-feedback"></div>
+      <div id="takeaways-box" style="display:none; margin:8px 12px; padding:12px 14px; border:1px solid var(--border); border-left:3px solid var(--accent); border-radius:8px; background:var(--card-2);">
+        <div style="font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:0.06em; color:var(--accent); margin-bottom:8px;">3 things to remember</div>
+        <ol id="takeaways-list" style="margin:0; padding-left:18px; font-size:13px; line-height:1.55; color:var(--text);"></ol>
+      </div>
       <div id="reversal-panel" style="display:none; background:var(--card); border:1px solid var(--border); border-radius:var(--radius); overflow:hidden;">
         <div style="display:flex; align-items:center; gap:10px; padding:8px 12px; background:var(--card-2); border-bottom:1px solid var(--border);">
           <span style="font-weight:600; font-size:12.5px;">🎭 Reverse interview — you're the interviewer</span>
@@ -1102,7 +1191,7 @@
   <div id="resizer"></div>
   <aside id="chatpanel" style="display:none;">
     <div class="chat-header">
-      <span class="chat-avatar">PS</span>
+      <span class="chat-avatar">L↻</span>
       <div>
         <div class="chat-title">Tutor</div>
         <div class="chat-subtitle">here to help, not to solve it for you</div>
@@ -1144,10 +1233,13 @@
     </div>
     <button id="replay-btn" class="btn btn-ghost" style="display:none; margin:8px 12px 8px;" onclick="startReplay()">🕐 Replay session</button>
     <div id="chatinput">
-      <button id="chat-mic-btn" class="btn btn-ghost btn-icon" onmousedown="startMic('chat', this)" ontouchstart="event.preventDefault(); startMic('chat', this)" title="Hold to talk">🎤</button>
-      <input id="chatbox" placeholder="ask a follow-up…" onkeydown="if(event.key==='Enter') sendMessage()">
+      <label class="mic-toggle" id="mic-toggle" title="Mic on by default — speak and it types live; or just type. Uses your browser's speech recognition (no cost).">
+        <span class="dot"></span><span id="mic-toggle-label">Mic</span>
+      </label>
+      <input id="chatbox" placeholder="ask a follow-up… (or just speak)" onkeydown="if(event.key==='Enter') sendMessage()">
       <button class="btn btn-primary btn-icon" onclick="sendMessage()">➤</button>
     </div>
+    <div id="live-transcript" class="live-transcript"></div>
   </aside>
 </div>
 <script>
@@ -1192,8 +1284,6 @@ let lastClickTime = 0;
 let arrowDraft = null; // {fromId}
 let dragState = null; // {id, offsetX, offsetY} or {id, end:'fromId'|'toId'}
 let lastCanvasClick = {x: 140, y: 100};
-let mediaRecorder = null;
-let audioChunks = [];
 const measureCtx = document.createElement('canvas').getContext('2d');
 measureCtx.font = '12px Inter, sans-serif';
 
@@ -1214,7 +1304,6 @@ function wrapText(text, maxWidth) {
   lines.push(line);
   return lines;
 }
-let micTarget = null;
 let narrationText = '';
 
 function newShapeId() { return 's' + (shapeSeq++); }
@@ -1604,67 +1693,121 @@ function serializeCanvasForLLM() {
   return lines.join('\n');
 }
 
-async function startMic(target, btnEl) {
-  if (mediaRecorder) return;
-  micTarget = target;
-  let stream;
-  try {
-    stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-  } catch (err) {
-    showToast('Microphone access is blocked. Click the lock/site-info icon in the address bar, set Microphone to Allow, then reload the page.');
-    return;
-  }
-  audioChunks = [];
-  const rec = new MediaRecorder(stream);
-  rec.ondataavailable = (e) => { if (e.data.size > 0) audioChunks.push(e.data); };
-  rec.onstop = async () => {
-    stream.getTracks().forEach(t => t.stop());
-    btnEl.classList.remove('listening');
-    mediaRecorder = null;
-    if (!audioChunks.length) return;
-    const blob = new Blob(audioChunks, { type: 'audio/webm' });
-    const form = new FormData();
-    form.append('audio', blob, 'note.webm');
-    btnEl.disabled = true;
-    try {
-      const res = await fetch('/api/transcribe', { method: 'POST', body: form }).then(r => r.json());
-      if (res.error) { showToast('Transcription failed: ' + res.error); return; }
-      const text = (res.text || '').trim();
-      if (!text) return;
-      if (micTarget === 'chat') {
-        const box = document.getElementById('chatbox');
-        box.value = (box.value ? box.value + ' ' : '') + text;
-        if (isDesignQuestion()) {
-          sendMessage();
-        } else {
-          box.focus();
-        }
-      } else if (micTarget === 'narration') {
-        narrationText = (narrationText ? narrationText + ' ' : '') + text;
-        const readout = document.getElementById('narration-readout');
-        readout.style.display = '';
-        readout.textContent = '🎤 ' + narrationText;
-      } else {
-        shapes.push({id: newShapeId(), type: 'text', label: text, x: lastCanvasClick.x - 50, y: lastCanvasClick.y - 20, w: 100, h: 40});
-        renderCanvas();
-        saveCurrentState();
-      }
-    } catch (err) {
-      showToast('Transcription request failed: ' + err.message);
-    } finally {
-      btnEl.disabled = false;
-    }
-  };
-  mediaRecorder = rec;
-  rec.start();
-  btnEl.classList.add('listening');
+// --- Phase: Mic-on by default (Option B) ---
+// Live, zero-cost speech recognition via webkitSpeechRecognition. Routes into whichever
+// text field is active (chat box for design/chat, narration box for SQL/Python debrief)
+// or drops a canvas note when voice-note mode is on. A single "Mic on" toggle controls it.
+// Typing always works — speech is additive. (Whisper /api/transcribe is kept server-side
+// for future high-accuracy recording but is no longer a visible button.)
+let micOn = true; // mic-on by default (Option B): speak and it types live; typing always works
+let liveRecog = null;
+let liveInterim = '';
+
+function liveTargetField() {
+  if (current && current.lang === 'design') return document.getElementById('chatbox');
+  const narr = document.getElementById('narration-input');
+  if (narr && narr.offsetParent !== null) return narr;
+  if (canvasVoiceNote && current && current.lang === 'design') return 'CANVAS_NOTE';
+  return document.getElementById('chatbox');
 }
 
-function stopMic() {
-  if (mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
+let canvasVoiceNote = false;
+function toggleCanvasVoiceNote() {
+  canvasVoiceNote = !canvasVoiceNote;
+  const btn = document.getElementById('tool-mic');
+  btn.classList.toggle('active', canvasVoiceNote);
+  if (canvasVoiceNote && !micOn) setMicOn(true);
+  showToast(canvasVoiceNote ? 'Voice note on — speak, it drops onto the canvas. Click again to stop.' : 'Voice note off.');
 }
-document.addEventListener('mouseup', stopMic);
-document.addEventListener('touchend', stopMic);
+
+function dropCanvasVoiceNote(text) {
+  if (!text) return;
+  const cx = (lastCanvasClick && lastCanvasClick.x ? lastCanvasClick.x : 200) - 70;
+  const cy = (lastCanvasClick && lastCanvasClick.y ? lastCanvasClick.y : 150) - 20;
+  shapes.push({id: newShapeId(), type: 'text', label: text, x: cx, y: cy, w: 140, h: 40});
+  renderCanvas();
+  saveCurrentState();
+}
+
+function startLiveRecog() {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) {
+    showToast('Live speech isn’t supported in this browser — just type instead.');
+    setMicOn(false);
+    return;
+  }
+  if (liveRecog) return;
+  const recog = new SR();
+  recog.continuous = true;
+  recog.interimResults = true;
+  recog.lang = 'en-US';
+  recog.onresult = (e) => {
+    let interim = '';
+    let final = '';
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      const txt = e.results[i][0].transcript;
+      if (e.results[i].isFinal) final += txt; else interim += txt;
+    }
+    liveInterim = interim;
+    const field = liveTargetField();
+    const indicator = document.getElementById('live-transcript');
+    if (indicator) indicator.textContent = interim ? '🎙 ' + interim : '';
+    if (final) {
+      if (field === 'CANVAS_NOTE') {
+        dropCanvasVoiceNote(final.trim());
+      } else {
+        const cur = field.value;
+        field.value = (cur ? cur + ' ' : '') + final.trim();
+        field.dispatchEvent(new Event('input'));
+      }
+      liveInterim = '';
+      if (indicator) indicator.textContent = '';
+    }
+  };
+  recog.onerror = (e) => {
+    if (e.error === 'not-allowed' || e.error === 'service-not-allowed') {
+      showToast('Microphone permission denied — you can still type.');
+      setMicOn(false);
+    }
+    // 'no-speech' / 'aborted' are transient; restart if still on
+    if (micOn && e.error !== 'not-allowed' && e.error !== 'service-not-allowed') {
+      try { recog.start(); } catch (_) {}
+    }
+  };
+  recog.onend = () => {
+    liveRecog = null;
+    if (micOn) { try { recog.start(); } catch (_) {} }  // keep listening while on
+  };
+  liveRecog = recog;
+  try { recog.start(); } catch (_) {}
+}
+
+function stopLiveRecog() {
+  if (liveRecog) { try { liveRecog.stop(); } catch (_) {} liveRecog = null; }
+  const indicator = document.getElementById('live-transcript');
+  if (indicator) indicator.textContent = '';
+}
+
+function setMicOn(on) {
+  micOn = on;
+  const toggle = document.getElementById('mic-toggle');
+  if (toggle) {
+    toggle.classList.toggle('on', on);
+    document.getElementById('mic-toggle-label').textContent = on ? 'Mic on' : 'Mic';
+  }
+  if (on) {
+    navigator.mediaDevices.getUserMedia({ audio: true }).then(() => {
+      startLiveRecog();
+    }).catch(() => {
+      showToast('Microphone access needed for live speech — type instead.');
+      setMicOn(false);
+    });
+  } else {
+    stopLiveRecog();
+  }
+}
+
+document.getElementById('mic-toggle').addEventListener('click', () => setMicOn(!micOn));
 
 const LAYER_CYCLE = ['', 'source', 'processing', 'storage', 'consumer'];
 function duplicateSelected() {
@@ -2146,6 +2289,7 @@ async function rerollNapkin() {
 async function submitDebrief() {
   const complexity = document.getElementById('complexity-input').value.trim();
   const edge_cases = document.getElementById('edge-input').value.trim();
+  const narrationVal = (document.getElementById('narration-input').value.trim() || narrationText).trim();
   const btn = document.getElementById('debrief-btn');
   const fb = document.getElementById('debrief-feedback');
   if (!complexity || !edge_cases) {
@@ -2164,7 +2308,7 @@ async function submitDebrief() {
   fb.appendChild(pendingLine);
   const res = await (await fetch('/api/debrief', {
     method: 'POST', headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({question_id: current.id, code: cm.getValue(), complexity, edge_cases, narration: narrationText})
+    body: JSON.stringify({question_id: current.id, code: cm.getValue(), complexity, edge_cases, narration: narrationVal})
   })).json();
   btn.disabled = false;
   fb.innerHTML = '';
@@ -2182,8 +2326,28 @@ async function submitDebrief() {
     narrationLine.textContent = (res.narration_ok ? '✓' : '✗') + ' narration: ' + res.narration_feedback;
     fb.appendChild(narrationLine);
   }
+  // Phase 2: surface exactly 3 prioritized takeaways from this debrief
+  fetch('/api/takeaways', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({question_id: current.id, complexity_ok: res.complexity_ok, edge_ok: res.edge_ok})
+  }).then(r => r.json()).then(t => renderTakeaways(t.takeaways)).catch(() => {});
   narrationText = '';
+  document.getElementById('narration-input').value = '';
   document.getElementById('narration-readout').style.display = 'none';
+}
+
+function renderTakeaways(items) {
+  const box = document.getElementById('takeaways-box');
+  const list = document.getElementById('takeaways-list');
+  if (!items || !items.length) { box.style.display = 'none'; return; }
+  list.innerHTML = '';
+  items.forEach(it => {
+    const li = document.createElement('li');
+    li.style.marginBottom = '6px';
+    li.innerHTML = `<strong>${it.label}</strong> — ${it.text}`;
+    list.appendChild(li);
+  });
+  box.style.display = '';
 }
 
 function resetIdleTimer() {
@@ -2218,12 +2382,19 @@ async function loadList() {
     if (!items.length) return;
 
     const header = document.createElement('div');
-    header.className = 'q-section-header collapsed ' + lang;
+    // auto-expand a section if it holds any due questions — those are the priority
+    const hasDue = items.some(q => q.due);
+    header.className = 'q-section-header ' + (hasDue ? '' : 'collapsed ') + lang;
     header.innerHTML = `<span class="chevron">▾</span><span class="dot"></span><span>${label}</span><span class="count">${items.length}</span>`;
     header.onclick = () => { header.classList.toggle('collapsed'); applySidebarFilter(); };
     sb.appendChild(header);
 
-    items.forEach(q => {
+    // prioritized section: due reviews + unsolved, sorted due-first, on top of the section
+    const priority = items.filter(q => q.due || !q.solved)
+      .sort((a, b) => (b.due - a.due) || (a.solved - b.solved));
+    const rest = items.filter(q => !q.due && q.solved);
+
+    [...priority, ...rest].forEach(q => {
       const d = document.createElement('div');
       d.className = 'q-item' + (q.solved ? ' solved' : '') + (q.due ? ' due' : '');
       d.dataset.id = q.id;
@@ -2260,6 +2431,12 @@ async function loadList() {
       sb.appendChild(d);
     });
   });
+
+  // hint to browse all when everything's collapsed away
+  const browseHint = document.createElement('div');
+  browseHint.className = 'q-browse-hint';
+  browseHint.innerHTML = 'Sections collapse as you clear them — use the filter above to browse all 202.';
+  sb.appendChild(browseHint);
 
   updateProgress();
   applySidebarFilter();
@@ -2304,6 +2481,28 @@ function selectQuestion(el, id) {
   document.querySelectorAll('.q-item.active').forEach(x => x.classList.remove('active'));
   el.classList.add('active');
   loadQuestion(id);
+  if (current && current.lang === 'design' && !micOn) setMicOn(true);
+}
+
+async function startPractice(lane) {
+  const btn = document.querySelector('.cc-start');
+  if (btn) { btn.disabled = true; btn.textContent = 'Picking…'; }
+  try {
+    const res = await (await fetch('/api/start' + (lane ? '?lane=' + encodeURIComponent(lane) : ''))).json();
+    if (!res.id) {
+      showToast(res.message || 'No questions available — pick one from the sidebar.');
+      return;
+    }
+    const el = document.querySelector(`.q-item[data-id="${res.id}"]`);
+    if (el) { selectQuestion(el, res.id); }
+    else { await loadQuestion(res.id); }
+    const q = QUESTIONS[res.id] || current;
+    if (q && q.lang === 'design' && !micOn) setMicOn(true);
+  } catch (e) {
+    showToast('Could not start practice: ' + e.message);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '▶ Start Practice'; }
+  }
 }
 
 function markSolved(id) {
@@ -2320,21 +2519,36 @@ function updateProgress() {
 }
 
 function renderEmptyState(qs) {
+  const total = qs.length;
   const sqlCount = qs.filter(q => q.lang === 'sql').length;
   const pyCount = qs.length - sqlCount;
   const solved = document.querySelectorAll('.q-item.solved').length;
   const due = qs.filter(q => q.due);
-  document.getElementById('prompt').innerHTML = `
-    <div class="empty-stats">
-      <div class="empty-stat"><span class="n">${qs.length}</span><span class="l">questions</span></div>
-      <div class="empty-stat"><span class="n">${sqlCount}</span><span class="l">SQL</span></div>
-      <div class="empty-stat"><span class="n">${pyCount}</span><span class="l">Python</span></div>
-      <div class="empty-stat"><span class="n">${solved}</span><span class="l">solved</span></div>
-    </div>
-    ${due.length
-      ? `<p class="empty-hint due-hint">↻ ${due.length} question${due.length === 1 ? '' : 's'} due for review —
-         <a href="#" onclick="loadQuestion('${due[0].id}');return false;">jump in</a></p>`
-      : `<p class="empty-hint">Pick a question from the sidebar to get started.</p>`}`;
+  const weak = document.querySelectorAll('.q-item:not(.solved)').length;
+  const greeting = document.getElementById('cc-greeting');
+  const now = new Date();
+  const hour = now.getHours();
+  const hi = hour < 12 ? 'Morning' : hour < 18 ? 'Afternoon' : 'Evening';
+  greeting.textContent = `${hi} — let's get into a loop.`;
+  const streakEl = document.getElementById('streak-count');
+  const streak = streakEl ? streakEl.textContent : '0';
+  const momentum = document.getElementById('cc-momentum');
+  momentum.innerHTML = `<span class="cc-pill">🔥 ${streak}d streak</span>`
+    + (due.length ? `<span class="cc-pill due">↻ ${due.length} due</span>` : '')
+    + (solved ? `<span class="cc-pill">✓ ${solved}/${total} solved</span>` : '');
+  const standings = document.getElementById('cc-standings');
+  const rows = [
+    ['Total questions', total],
+    ['SQL / Python', `${sqlCount} / ${pyCount}`],
+    ['Solved', `${solved} (${total ? Math.round(solved / total * 100) : 0}%)`],
+    ['Still to crack', weak],
+  ];
+  standings.innerHTML = rows.map(([l, v]) =>
+    `<div class="cc-standing"><span class="cc-standing-l">${l}</span><span class="cc-standing-v">${v}</span></div>`
+  ).join('');
+  const panel = document.getElementById('empty-panel');
+  panel.style.display = '';
+  document.getElementById('command-center').style.display = '';
 }
 
 async function loadQuestion(id) {
@@ -2353,6 +2567,7 @@ async function loadQuestion(id) {
   card.classList.add('fade-in');
   document.getElementById('title').textContent = q.title;
   document.getElementById('prompt').textContent = q.prompt;
+  renderQuestionContext(q.context);
   const langBadge = document.getElementById('lang-badge');
   langBadge.className = 'badge ' + q.lang;
   langBadge.textContent = {sql: 'SQL', python: 'PYTHON', design: 'SYSTEM DESIGN', tradeoff: 'TRADEOFF', napkin: 'NAPKIN MATH'}[q.lang];
@@ -2373,7 +2588,6 @@ async function loadQuestion(id) {
   document.getElementById('scaling-btn').style.display = isDesign ? '' : 'none';
   document.getElementById('framework-btn').style.display = isDesign ? '' : 'none';
   document.getElementById('replay-btn').style.display = isDesign ? '' : 'none';
-  document.getElementById('chat-mic-btn').classList.toggle('primary-mic', isDesign);
   document.getElementById('end-drill-btn').style.display = 'none';
   document.getElementById('selfrate-panel').style.display = 'none';
   document.getElementById('refdesign-btn').style.display = 'none';
@@ -2485,10 +2699,15 @@ async function loadQuestion(id) {
     document.getElementById('plan-feedback').outerHTML = '<div id="plan-feedback"></div>';
     document.getElementById('complexity-input').value = '';
     document.getElementById('edge-input').value = '';
+    document.getElementById('narration-input').value = '';
     document.getElementById('debrief-feedback').outerHTML = '<div id="debrief-feedback"></div>';
+    document.getElementById('takeaways-box').style.display = 'none';
   }
   document.getElementById('debrief-row').style.display = isSolved(id) ? 'flex' : 'none';
   narrationText = '';
+  canvasVoiceNote = false;
+  const toolMic = document.getElementById('tool-mic');
+  if (toolMic) toolMic.classList.remove('active');
   document.getElementById('narration-readout').style.display = 'none';
   closeSpotBug();
   closeSqlClarify();
@@ -2526,9 +2745,18 @@ function makeLabeled(label, node) {
 
 function renderSkeleton(skeletonHTML) {
   const el = document.getElementById('trace-skeleton');
+  if (!el) return;
   if (!skeletonHTML) { el.style.display = 'none'; return; }
   el.style.display = 'block';
   el.innerHTML = skeletonHTML;
+}
+
+function toggleTrace() {
+  const body = document.getElementById('trace-body');
+  const chev = document.querySelector('#trace-toggle .trace-chevron');
+  const open = body.style.display !== 'none';
+  body.style.display = open ? 'none' : 'block';
+  if (chev) chev.style.transform = open ? '' : 'rotate(90deg)';
 }
 
 let traceProgress = {}; // qid -> {pattern, skeleton, steps: [{q, a, status: 'open'|'correct'|'revealed', attempts, guess}]}
@@ -2539,8 +2767,8 @@ function renderTraceSteps(qid) {
   const t = traceProgress[qid];
   if (!t || !t.steps.length) { box.style.display = 'none'; return; }
   box.style.display = 'block';
-  document.getElementById('trace-pattern').textContent = t.pattern ? '⚡ Pattern: ' + t.pattern : '';
-  renderSkeleton(t.skeleton || '');
+  const sub = document.getElementById('trace-toggle-sub');
+  sub.textContent = t.pattern ? ` · ${t.pattern} · ${t.steps.length} steps` : ` · ${t.steps.length} steps`;
   stepsEl.innerHTML = '';
   let correctCount = 0;
   t.steps.forEach((s, i) => {
@@ -2555,7 +2783,7 @@ function renderTraceSteps(qid) {
       const ansP = document.createElement('div');
       const isCorrect = s.status === 'correct';
       ansP.style.cssText = 'font-family:JetBrains Mono,monospace;font-size:13px;color:' + (isCorrect ? 'var(--success)' : 'var(--warn)') + ';';
-      ansP.textContent = (isCorrect ? '✓ ' : '→ revealed: ') + s.a;
+      ansP.textContent = (isCorrect ? '✓ ' : '→ ') + s.a;
       card.appendChild(ansP);
     } else {
       const inp = document.createElement('input');
@@ -2563,7 +2791,7 @@ function renderTraceSteps(qid) {
       inp.className = 'trace-input';
       inp.dataset.index = i;
       inp.value = s.guess || '';
-      inp.placeholder = 'Type the code for this step…';
+      inp.placeholder = 'your code…';
       inp.style.cssText = 'width:100%;background:var(--panel);border:1px solid var(--border);border-radius:6px;padding:7px 10px;font-family:JetBrains Mono,monospace;font-size:12.5px;color:var(--text);box-sizing:border-box;';
       card.appendChild(inp);
       if (s.attempts > 0) {
@@ -2684,25 +2912,112 @@ function renderSample(q) {
   el.innerHTML = '';
   if (q.lang === 'sql' && q.sample_tables) {
     el.style.display = 'block';
+    // Section: Schema & sample input
+    const schemaSec = document.createElement('div');
+    schemaSec.className = 'spec-section';
+    schemaSec.innerHTML = '<div class="spec-section-title">Schema &amp; sample input</div>';
+    const tablesWrap = document.createElement('div');
+    tablesWrap.className = 'spec-tables';
     for (const [name, t] of Object.entries(q.sample_tables)) {
-      el.appendChild(makeLabeled(name, makeTable(t.columns, t.rows)));
+      const block = document.createElement('div');
+      block.className = 'spec-table-block';
+      const tname = document.createElement('div');
+      tname.className = 'spec-tname';
+      tname.textContent = name;
+      block.appendChild(tname);
+      block.appendChild(makeTable(t.columns, t.rows));
+      tablesWrap.appendChild(block);
     }
+    schemaSec.appendChild(tablesWrap);
+    el.appendChild(schemaSec);
+    // Section: Example result
     if (q.sample_output) {
-      el.appendChild(makeLabeled('example output', makeTable(q.sample_output.columns, q.sample_output.rows)));
+      const exSec = document.createElement('div');
+      exSec.className = 'spec-section';
+      exSec.innerHTML = '<div class="spec-section-title">Example result</div>';
+      const card = document.createElement('div');
+      card.className = 'example-card';
+      const row = document.createElement('div');
+      row.className = 'example-row';
+      const out = document.createElement('div');
+      out.className = 'example-cell';
+      out.innerHTML = '<div class="example-label">returns</div>';
+      out.appendChild(makeTable(q.sample_output.columns, q.sample_output.rows));
+      row.appendChild(out);
+      card.appendChild(row);
+      exSec.appendChild(card);
+      el.appendChild(exSec);
     }
+    addCaseCaption(el, q.num_cases);
   } else if (q.sample_call) {
     el.style.display = 'block';
-    const callPre = document.createElement('pre');
-    callPre.textContent = q.sample_call;
-    el.appendChild(makeLabeled('example call', callPre));
-    if (q.sample_output) {
-      const outPre = document.createElement('pre');
-      outPre.textContent = q.sample_output;
-      el.appendChild(makeLabeled('example output', outPre));
-    }
+    const exSec = document.createElement('div');
+    exSec.className = 'spec-section';
+    exSec.innerHTML = '<div class="spec-section-title">Example</div>';
+    const card = document.createElement('div');
+    card.className = 'example-card';
+    const row = document.createElement('div');
+    row.className = 'example-row';
+    const inCell = document.createElement('div');
+    inCell.className = 'example-cell';
+    inCell.innerHTML = '<div class="example-label">call</div>';
+    const callCode = document.createElement('code');
+    callCode.textContent = q.sample_call;
+    inCell.appendChild(callCode);
+    const outCell = document.createElement('div');
+    outCell.className = 'example-cell';
+    outCell.innerHTML = '<div class="example-label">returns</div>';
+    const outCode = document.createElement('code');
+    outCode.textContent = (q.sample_output || '').trim();
+    outCell.appendChild(outCode);
+    row.appendChild(inCell);
+    row.appendChild(outCell);
+    card.appendChild(row);
+    exSec.appendChild(card);
+    el.appendChild(exSec);
+    addCaseCaption(el, q.num_cases);
   } else {
     el.style.display = 'none';
   }
+}
+
+function addCaseCaption(el, numCases) {
+  if (!numCases || numCases < 1) return;
+  const cap = document.createElement('div');
+  cap.className = 'spec-caption';
+  const word = numCases === 1 ? 'test case' : 'test cases';
+  cap.innerHTML = `This example shows one sample. Your solution is verified against <b>${numCases} ${word}</b> — get them all right to pass.`;
+  el.appendChild(cap);
+}
+
+function renderQuestionContext(ctx) {
+  const box = document.getElementById('context-box');
+  if (!ctx || (!ctx.scenario && !ctx.why_asked && !(ctx.edge_cases || []).length)) {
+    box.style.display = 'none';
+    box.innerHTML = '';
+    return;
+  }
+  box.innerHTML = '';
+  if (ctx.scenario) {
+    const s = document.createElement('div');
+    s.className = 'ctx-scenario';
+    s.textContent = ctx.scenario;
+    box.appendChild(s);
+  }
+  if (ctx.why_asked) {
+    const w = document.createElement('div');
+    w.className = 'ctx-why';
+    w.innerHTML = `<span class="ctx-why-label">Why it's asked</span> ${ctx.why_asked}`;
+    box.appendChild(w);
+  }
+  if (ctx.edge_cases && ctx.edge_cases.length) {
+    const e = document.createElement('div');
+    e.className = 'ctx-edges';
+    e.innerHTML = '<span class="ctx-why-label">Watch for</span> ' +
+      ctx.edge_cases.map(x => `<span class="ctx-chip">${x}</span>`).join('');
+    box.appendChild(e);
+  }
+  box.style.display = 'block';
 }
 
 function addMsg(role, text) {
@@ -2713,7 +3028,7 @@ function addMsg(role, text) {
   if (role !== 'user' && role !== 'system') {
     const avatar = document.createElement('span');
     avatar.className = 'msg-avatar';
-    avatar.textContent = 'PS';
+    avatar.textContent = 'L↻';
     d.appendChild(avatar);
   }
 
@@ -3177,6 +3492,10 @@ async function requestInterview(body) {
         }
         document.getElementById('refdesign-btn').style.display = '';
         document.getElementById('staffcomp-btn').style.display = '';
+        fetch('/api/takeaways', {
+          method: 'POST', headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({question_id: current.id, missed_concepts: res.missed_concepts || [], rubric_scores: res.rubric_scores || {}})
+        }).then(r => r.json()).then(t => renderTakeaways(t.takeaways)).catch(() => {});
       }
       speakTutor(res.reply);
       extractChips(res.reply);
@@ -3909,6 +4228,13 @@ window.addEventListener('mouseup', () => {
 
 loadList();
 loadDeadline();
+refreshStreak();
+
+function refreshStreak() {
+  fetch('/api/streak').then(r => r.json()).then(s => {
+    document.getElementById('streak-count').textContent = s.streak || 0;
+  }).catch(() => {});
+}
 
 document.getElementById('q-search').addEventListener('input', applySidebarFilter);
 

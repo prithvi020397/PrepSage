@@ -14,6 +14,7 @@ QUESTIONS = {q["id"]: q for q in json.load(open("questions.json"))}
 TRACE_FILE = "traces.json"
 CONCEPT_FILE = "concept_maps.json"
 SOLUTION_FILE = "solutions.json"
+CONTEXT_FILE = "question_contexts.json"
 
 TOPIC_KEYWORDS = [
     ("window function", "window functions"), ("over (partition", "window functions"),
@@ -242,6 +243,46 @@ Respond ONLY strict JSON, no markdown fences:
     return {"nodes": nodes, "details": details, "active_count": 3}
 
 
+def gen_question_context(q):
+    """Expand a bare textbook prompt into a realistic interview framing: a believable
+    business scenario, why an interviewer asks this, and the edge cases to watch. This is
+    the difference between 'write a query' and a question that reads like a real interview.
+    Cached to question_contexts.json so it's served instantly afterwards."""
+    prompt = f"""You are rewriting a coding-interview question so it reads like a real interview prompt, not a textbook exercise.
+
+Bare problem:
+Title: {q['title']}
+Prompt: {q['prompt']}
+The concept this tests (for your judgment only — do NOT copy it verbatim): {q.get('concept', '')}
+
+Produce THREE short fields:
+- "scenario": 1-2 sentences framing this as a realistic task a data engineer / backend engineer would actually be given (a team, a system, a real reason the result is needed). Concrete, not generic. Keep it under 40 words.
+- "why_asked": one sentence on what skill this question actually probes in an interview (the underlying reasoning/communication skill, not the SQL/Python mechanics). Under 25 words.
+- "edge_cases": 2 short bullet-style strings of the non-obvious edge cases a candidate should consider (ties, nulls, empties, duplicates, ordering). Each under 12 words. Return as a list of 2 strings.
+
+Respond ONLY strict JSON, no markdown fences:
+{{"scenario": "...", "why_asked": "...", "edge_cases": ["...", "..."]}}"""
+
+    try:
+        resp = client.chat.completions.create(
+            model=MODEL, messages=[{"role": "user", "content": prompt}],
+            max_tokens=400, temperature=0.3, extra_body={"reasoning": {"enabled": False}},
+        )
+        raw = resp.choices[0].message.content.strip()
+        raw = raw[raw.index("{"):raw.rindex("}") + 1]
+        result = json.loads(raw)
+        scenario = (result.get("scenario") or "").strip()
+        why = (result.get("why_asked") or "").strip()
+        edges = result.get("edge_cases") or []
+        edges = [str(e).strip() for e in edges if str(e).strip()][:2]
+        if not scenario or not why or not edges:
+            raise ValueError("incomplete context")
+        return {"scenario": scenario, "why_asked": why, "edge_cases": edges}
+    except Exception as e:
+        print(f"    context LLM error: {e}")
+        return {"scenario": "", "why_asked": "", "edge_cases": []}
+
+
 def gen_solution(q):
     prompt = f"""Write a correct, clean {q['lang']} solution for this problem.
 
@@ -274,6 +315,7 @@ def main():
     traces = load_existing(TRACE_FILE)
     concepts = load_existing(CONCEPT_FILE)
     solutions = load_existing(SOLUTION_FILE)
+    contexts = load_existing(CONTEXT_FILE)
 
     qids = list(QUESTIONS.keys())
     done = 0
@@ -287,6 +329,12 @@ def main():
             continue
 
         print(f"[{done+1}/{len(qids)}] {qid}: {q['title']}")
+
+        if qid not in contexts:
+            contexts[qid] = gen_question_context(q)
+            save_json(CONTEXT_FILE, contexts)
+        else:
+            print("  context cached")
 
         if qid not in traces:
             traces[qid] = gen_trace(q)
@@ -309,6 +357,7 @@ def main():
         done += 1
 
     print(f"\nDone. {done} questions processed.")
+    print(f"  contexts: {len(contexts)} questions")
     print(f"  traces: {len(traces)} questions")
     print(f"  concept_maps: {len(concepts)} questions")
     print(f"  solutions: {len(solutions)} questions")

@@ -15,7 +15,7 @@ from openai import OpenAI
 load_dotenv()
 
 app = Flask(__name__)
-# prep sage: single-user local interview prep platform
+# The Loop: single-user local interview prep platform
 HEADROOM_ENABLED = os.environ.get("HEADROOM_ENABLED", "").lower() in ("1", "true", "yes")
 API_BASE = "http://localhost:9090/v1" if HEADROOM_ENABLED else "https://openrouter.ai/api/v1"
 client = OpenAI(base_url=API_BASE, api_key=os.environ["OPENROUTER_API_KEY"])
@@ -54,6 +54,7 @@ REPLAY_COMMENTS = json.load(open(REPLAY_COMMENTS_FILE)) if os.path.exists(REPLAY
 PRECOMPUTED_TRACES = json.load(open("traces.json")) if os.path.exists("traces.json") else {}
 PRECOMPUTED_CONCEPTS = json.load(open("concept_maps.json")) if os.path.exists("concept_maps.json") else {}
 PRECOMPUTED_SOLUTIONS = json.load(open("solutions.json")) if os.path.exists("solutions.json") else {}
+PRECOMPUTED_CONTEXTS = json.load(open("question_contexts.json")) if os.path.exists("question_contexts.json") else {}
 
 # ponytail: static keyword map, not an LLM call — topic tagging doesn't need to cost anything.
 PATTERN_SKELETONS = {
@@ -464,6 +465,32 @@ def save_replay_comments():
     _atomic_json(REPLAY_COMMENTS_FILE, REPLAY_COMMENTS)
 
 
+def _gen_question_context(q):
+    """Fallback rich-framing generator — only used if a question is missing from the
+    precomputed question_contexts.json. Mirrors gen_question_context in precompute.py."""
+    prompt = f"""Rewrite this coding-interview question so it reads like a real interview prompt.
+
+Title: {q['title']}
+Prompt: {q['prompt']}
+Concept (judgment only): {q.get('concept', '')}
+
+Respond ONLY strict JSON:
+{{"scenario": "1-2 sentence realistic task framing (under 40 words)", "why_asked": "one sentence on the skill probed (under 25 words)", "edge_cases": ["short edge case 1", "short edge case 2"]}}"""
+    try:
+        resp = client.chat.completions.create(
+            model=MODEL, messages=[{"role": "user", "content": prompt}],
+            max_tokens=400, temperature=0.3, extra_body={"reasoning": {"enabled": False}},
+        )
+        raw = resp.choices[0].message.content.strip()
+        raw = raw[raw.index("{"):raw.rindex("}") + 1]
+        result = json.loads(raw)
+        return {"scenario": result.get("scenario", "").strip(),
+                "why_asked": result.get("why_asked", "").strip(),
+                "edge_cases": [str(e).strip() for e in (result.get("edge_cases") or []) if str(e).strip()][:2]}
+    except Exception:
+        return {"scenario": "", "why_asked": "", "edge_cases": []}
+
+
 def split_wrap_up_reply(reply, taxonomy=CONCEPT_TAXONOMY):
     """Split an interview wrap-up reply into (prose, missed_concepts, rushed_to_design,
     communication_score, communication_note, rubric_scores) — the trailing ```json fence is a grading
@@ -818,16 +845,32 @@ def get_question(qid):
     p = PROGRESS.get(qid, {})
     saved_code = p.get("code", "") if isinstance(p, dict) else ""
     resp = {"id": q["id"], "lang": q["lang"], "title": q["title"], "prompt": q["prompt"],
-            "starter_code": q["starter_code"], "code": saved_code, "concept": q["concept"]}
+            "starter_code": q["starter_code"], "code": saved_code, "concept": q["concept"],
+            "num_cases": len(q["test_cases"])}
     if q["lang"] == "sql":
         resp["sample_tables"] = get_sample_tables(first_case["schema_sql"])
         resp["sample_output"] = {"columns": first_case["expected_columns"], "rows": first_case["expected"]}
     else:
-        # ponytail: show only the call line, not helper defs (build_list/build_tree etc.)
-        # that would hand the user the exact traversal/construction idiom they're being tested on
+        # ponytail: show the example as a paired call -> output, parsing the harness's final
+        # `print(solve(...))` line into `solve(args)` so the user sees a clean input->output pair
+        # instead of a bare `print(...)` statement. Helper defs (build_list/build_tree etc.) are
+        # deliberately excluded — they'd hand over the exact idiom being tested.
         harness_lines = [l for l in first_case.get("harness", "").strip().split("\n") if l.strip()]
-        resp["sample_call"] = harness_lines[-1] if harness_lines else ""
+        last = harness_lines[-1] if harness_lines else ""
+        call = last
+        m = re.match(r"^print\((.*)\)$", last.strip())
+        if m:
+            call = m.group(1)
+        resp["sample_call"] = call
         resp["sample_output"] = first_case.get("expected_stdout")
+    # ponytail: richer question framing (scenario / why_asked / edge_cases) is precomputed once
+    # into question_contexts.json — served instantly, no per-request LLM call.
+    ctx = PRECOMPUTED_CONTEXTS.get(qid)
+    if not ctx:
+        ctx = _gen_question_context(q)
+        if ctx.get("scenario"):
+            PRECOMPUTED_CONTEXTS[qid] = ctx
+    resp["context"] = ctx
     return jsonify(resp)
 
 
@@ -2673,6 +2716,67 @@ def napkin_grade():
                      "assumption_feedback": assumption_feedback})
 
 
+@app.route("/api/start")
+def smart_start():
+    """Phase 1: one-tap entry. Picks the single most useful question to do right now:
+    a due review > a weak-area unsolved > otherwise the next unsolved one.
+    Accepts ?lane=focused|weak|mock to bias the pick (the practice command-center lanes)."""
+    lane = (request.args.get("lane") or "").strip().lower()
+
+    # the default "focused rep" path: due review first, then weak-area, then next unsolved
+    due = [qid for qid, q in QUESTIONS.items() if is_due(qid) and not is_solved(qid)]
+    if not lane or lane == "focused":
+        if due:
+            return jsonify({"id": due[0], "reason": "due_review"})
+
+    # weak-area bias: use recent miss topics to pick an unsolved question in a weak topic
+    weak = {t for t, _ in recurring_missed_topics()}
+    unsolved = [(qid, q) for qid, q in QUESTIONS.items() if not is_solved(qid)]
+    weak_hits = [(qid, q) for qid, q in unsolved if topic_for(q) in weak and q["lang"] in ("sql", "python")]
+    if lane == "weak":
+        if weak_hits:
+            return jsonify({"id": weak_hits[0][0], "reason": "weak_area"})
+        if due:
+            return jsonify({"id": due[0], "reason": "due_review"})
+
+    if (not lane or lane == "focused") and weak_hits:
+        return jsonify({"id": weak_hits[0][0], "reason": "weak_area"})
+
+    pool = [qid for qid, q in unsolved if q["lang"] in ("sql", "python")]
+    if pool:
+        return jsonify({"id": random.choice(pool), "reason": "next_unsolved"})
+    design_unsolved = [qid for qid, q in QUESTIONS.items() if not is_solved(qid)]
+    if design_unsolved:
+        return jsonify({"id": random.choice(design_unsolved), "reason": "any"})
+    return jsonify({"id": None, "reason": "none", "message": "All questions solved — pick any to review."})
+
+
+@app.route("/api/streak", methods=["GET"])
+def streak():
+    """Phase 10: streak tracking — days with at least one practice event, plus today's count."""
+    days = {}
+    for h in HISTORY:
+        ts = h.get("ts")
+        if not ts:
+            continue
+        day = ts[:10]
+        days[day] = days.get(day, 0) + 1
+    today = datetime.now().strftime("%Y-%m-%d")
+    # compute consecutive-day streak ending today (or yesterday if nothing today yet)
+    streak_count = 0
+    cursor = datetime.now().date()
+    if today not in days:
+        cursor = cursor - timedelta(days=1)
+    while cursor.strftime("%Y-%m-%d") in days:
+        streak_count += 1
+        cursor = cursor - timedelta(days=1)
+    return jsonify({
+        "streak": streak_count,
+        "today_count": days.get(today, 0),
+        "last_active": max(days) if days else None,
+    })
+
+
 @app.route("/api/transcribe", methods=["POST"])
 def transcribe():
     if whisper_client is None:
@@ -2687,6 +2791,52 @@ def transcribe():
     except Exception as e:
         return jsonify({"error": str(e)}), 502
     return jsonify({"text": result.text})
+
+
+@app.route("/api/takeaways", methods=["POST"])
+def takeaways():
+    """Phase 2: distill a finished question/debrief into exactly 3 prioritized takeaways so
+    the candidate leaves each session with a short, memorable list instead of a wall of text.
+    Reuses the signals the debrief already computes (missed concepts, rubric gaps, weak topic)."""
+    data = request.json or {}
+    q = QUESTIONS.get(data.get("question_id", ""))
+    if not q:
+        return jsonify({"error": "not found"}), 404
+
+    items = []
+    if q["lang"] == "design":
+        missed = data.get("missed_concepts") or []
+        rubric_scores = data.get("rubric_scores") or {}
+        phase_maxes = {"phase1": 8, "phase2": 10, "phase3": 6, "phase4": 8, "phase5": 6, "phase6": 6}
+        weakest = sorted(((p, rubric_scores.get(p, phase_maxes[p])) for p in phase_maxes),
+                         key=lambda kv: kv[1])[:2]
+        for c in missed[:2]:
+            items.append({"kind": "concept", "label": c.replace("_", " "),
+                          "text": "Concept to go read up on — it was missing or shallow in your debrief."})
+        for p, score in weakest:
+            if score < phase_maxes[p]:
+                items.append({"kind": "rubric", "label": p.replace("phase", "Phase "),
+                              "text": f"Your weakest scored area ({score}/{phase_maxes[p]})."})
+    else:
+        topic = topic_for(q)
+        items.append({"kind": "topic", "label": topic, "text": "Topic to revisit — this is where your recent misses cluster."})
+        if data.get("complexity_ok") is False:
+            items.append({"kind": "complexity", "label": "Complexity", "text": "State the time/space complexity of your solution out loud."})
+        if data.get("edge_ok") is False:
+            items.append({"kind": "edge", "label": "Edge cases", "text": "Name the non-trivial edge cases you'd test before submitting."})
+
+    # pad/fill to exactly 3 from a generic fallback if short
+    fallbacks = [
+        {"kind": "review", "label": "Spaced review", "text": "This question is now scheduled for a spaced-review pass — come back to it soon."},
+        {"kind": "explain", "label": "Teach it back", "text": "Explain your solution to an imaginary interviewer — verbalizing catches gaps."},
+        {"kind": "next", "label": "One more", "text": "Do one more question in a weak area before stopping."},
+    ]
+    for f in fallbacks:
+        if len(items) >= 3:
+            break
+        if f["label"] not in [i["label"] for i in items]:
+            items.append(f)
+    return jsonify({"takeaways": items[:3]})
 
 
 @app.route("/api/review", methods=["POST"])

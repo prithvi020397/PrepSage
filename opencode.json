@@ -1,4 +1,4 @@
 {
   "$schema": "https://opencode.ai/config.json",
-  "plugin": ["@dietrichgeber/ponytail"]
+  "plugin": ["@dietrichgeber/ponytail", "opencode-agent-memory", "opencode-handoff"]
 }
