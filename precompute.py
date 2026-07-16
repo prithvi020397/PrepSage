@@ -1,0 +1,318 @@
+import json
+import os
+import sys
+from openai import OpenAI
+from dotenv import load_dotenv
+
+load_dotenv()
+
+client = OpenAI(base_url="https://openrouter.ai/api/v1", api_key=os.environ["OPENROUTER_API_KEY"])
+MODEL = "deepseek/deepseek-v4-flash"
+
+QUESTIONS = {q["id"]: q for q in json.load(open("questions.json"))}
+
+TRACE_FILE = "traces.json"
+CONCEPT_FILE = "concept_maps.json"
+SOLUTION_FILE = "solutions.json"
+
+TOPIC_KEYWORDS = [
+    ("window function", "window functions"), ("over (partition", "window functions"),
+    ("rank", "window functions"), ("running total", "window functions"),
+    ("group by", "group by / aggregation"), ("having", "group by / aggregation"),
+    ("join", "joins"), ("subquery", "subqueries"), ("self join", "joins"),
+    ("recursion", "recursion"), ("recursive", "recursion"),
+    ("dynamic programming", "dynamic programming"), ("dp", "dynamic programming"),
+    ("graph", "graphs / BFS-DFS"), ("bfs", "graphs / BFS-DFS"), ("dfs", "graphs / BFS-DFS"),
+    ("tree", "trees"), ("binary search tree", "trees"),
+    ("linked list", "linked lists"),
+    ("two pointer", "two pointers"), ("sliding window", "sliding window"),
+    ("hash", "hashing"), ("dictionary", "hashing"), ("hashmap", "hashing"),
+    ("sort", "sorting"), ("heap", "heaps"), ("priority queue", "heaps"),
+    ("backtrack", "backtracking"), ("greedi", "greedy"), ("fibonacci", "dynamic programming"),
+    ("kadane", "dynamic programming"), ("memo", "dynamic programming"),
+    ("string", "string manipulation"), ("palindrome", "string manipulation"),
+    ("interval", "intervals"), ("matrix", "matrices"), ("bit", "bit manipulation"),
+    ("stack", "stacks / queues"), ("queue", "stacks / queues"),
+    ("date", "date / time"), ("null", "NULL handling"),
+]
+
+PATTERN_MAP = {
+    "dynamic programming": "dynamic programming", "graphs / BFS-DFS": "graphs / BFS-DFS",
+    "trees": "trees", "linked lists": "linked lists",
+    "two pointers": "two pointers", "sliding window": "sliding window",
+    "hashing": "hashing", "sorting": "sorting",
+    "heaps": "heaps", "backtracking": "backtracking",
+    "greedy": "greedy", "string manipulation": "string manipulation",
+    "intervals": "intervals", "matrices": "matrices",
+    "stacks / queues": "stacks / queues", "bit manipulation": "hashing",
+    "recursion": "recursion",
+}
+
+PATTERN_SKELETONS = {
+    "two pointers": ("Two-pointer", "left, right = 0, len(arr) - 1"),
+    "sliding window": ("Sliding Window", "window_start, window_sum = 0, 0"),
+    "hashing": ("Hashmap", "seen = {}"),
+    "stacks / queues": ("Stack", "stack = []"),
+    "dynamic programming": ("Dynamic Programming", "dp = [0] * (n + 1)"),
+    "backtracking": ("Backtracking", "def backtrack(path, remaining):"),
+    "graphs / BFS-DFS": ("BFS/DFS", "from collections import deque"),
+    "trees": ("Tree Traversal", "def dfs(node):"),
+    "linked lists": ("Linked List", "prev, curr = None, head"),
+    "sorting": ("Sorting", "arr.sort()"),
+    "greedy": ("Greedy", "items.sort(key=fn)"),
+    "heaps": ("Heap", "import heapq"),
+    "string manipulation": ("String", "result = []"),
+    "intervals": ("Intervals", "intervals.sort(key=lambda x: x[0])"),
+    "matrices": ("Matrix", "rows, cols = len(matrix), len(matrix[0])"),
+    "recursion": ("Recursion", "def solve(state):"),
+    "_default": ("General Problem-Solving", "for item in input:"),
+}
+
+SQL_PATTERN_SKELETONS = {
+    "window functions": ("Window Function", "SELECT col, RANK() OVER (...)"),
+    "group by / aggregation": ("Group By / Aggregation", "SELECT group_col, AGG_FUNC(value_col)"),
+    "joins": ("Join", "SELECT a.col, b.col FROM table_a a JOIN table_b b"),
+    "subqueries": ("Subquery", "SELECT col FROM table WHERE col = (SELECT ...)"),
+    "_default": ("Query Structure", "SELECT col FROM table WHERE condition"),
+}
+
+def topic_for(q):
+    text = (q["title"] + " " + q["prompt"] + " " + q.get("concept", "")).lower()
+    for keyword, topic in TOPIC_KEYWORDS:
+        if keyword in text:
+            return topic
+    return "other-" + q["lang"]
+
+def pattern_for(q):
+    t = topic_for(q)
+    if q["lang"] == "sql":
+        return SQL_PATTERN_SKELETONS.get(t, SQL_PATTERN_SKELETONS["_default"])
+    key = PATTERN_MAP.get(t, "_default")
+    return PATTERN_SKELETONS.get(key, PATTERN_SKELETONS["_default"])
+
+def load_existing(path):
+    if os.path.exists(path):
+        with open(path) as f:
+            return json.load(f)
+    return {}
+
+def save_json(path, data):
+    with open(path, "w") as f:
+        json.dump(data, f, indent=2)
+    print(f"  saved {path}")
+
+
+def gen_trace(q):
+    pattern_info = pattern_for(q)
+    tc = q["test_cases"][0]
+    sample_data = tc.get("harness", "") if q["lang"] == "python" else tc.get("schema_sql", "")
+    sample_output = tc.get("expected_stdout", "") if q["lang"] == "python" else json.dumps(tc.get("expected", []))
+
+    if q["lang"] == "sql":
+        example = """Example of a good full trace for 'Second Highest Salary':
+[
+  {"q": "What keyword removes duplicate salaries before ranking?", "a": "SELECT DISTINCT salary"},
+  {"q": "How do you sort salaries from highest to lowest?", "a": "ORDER BY salary DESC"},
+  {"q": "How do you skip the first row and limit to one row to land on the second highest?", "a": "LIMIT 1 OFFSET 1"}
+]"""
+        prompt = f"""You are a coding tutor that teaches CODE TRANSLATION. The student knows the theory but struggles to write specific code lines. Generate trace steps that teach them WHICH CODE to write.
+
+Problem: {q['title']}
+{q['prompt']}
+Concept: {q['concept']}
+Pattern skeleton: {pattern_info[1] if pattern_info[1] else 'N/A'}
+
+Sample call/harness: {sample_data}
+Expected output: {sample_output}
+Starter code: {q.get("starter_code", "")}
+
+Generate 3-5 steps. Each step must ask about a SPECIFIC, DISTINCT line or code construct the student needs to write, in SQL. The answer is the ACTUAL CODE (not a description).
+
+Do NOT add a final "put it all together" step.
+
+Bad (conceptual): Q: "What do we do after filtering?" A: "Compare the string to its reverse."
+
+Good (code-focused): Q: "What SQL keyword removes duplicates?" A: "SELECT DISTINCT salary"
+
+{example}
+
+Respond with ONLY JSON:
+{{"steps": [{{"q": "what line of code to write?", "a": "the actual code"}}]}}"""
+    else:
+        prompt = f"""You are a coding tutor that teaches CODE TRANSLATION through SCAFFOLDED CODE CONSTRUCTION. The student knows the theory but struggles to write specific code lines.
+
+Problem: {q['title']}
+{q['prompt']}
+Concept: {q['concept']}
+Pattern skeleton: {pattern_info[1] if pattern_info[1] else 'N/A'}
+
+Sample call/harness: {sample_data}
+Expected output: {sample_output}
+Starter code: {q.get("starter_code", "")}
+
+Generate 4-7 steps. Each step asks for ONE specific code line the student needs to write, in the ORDER those lines appear in the function body.
+
+Rules:
+- Step 1 asks for the first substantive line after initialization
+- Each later step asks for the NEXT line
+- Do NOT combine multiple lines
+- Do NOT add a "write the full function" final step
+- The answer for each step is the ACTUAL CODE LINE
+
+Example for 'Two Sum':
+[
+  {{"q": "What line initializes the hashmap to store seen numbers?", "a": "seen = {{}}"}},
+  {{"q": "What line starts the loop over the array with index and value?", "a": "for i, n in enumerate(nums):"}},
+  {{"q": "What line calculates the complement needed to reach target?", "a": "complement = target - n"}},
+  {{"q": "What line checks if the complement is already in the hashmap?", "a": "if complement in seen:"}},
+  {{"q": "What line returns the indices when a match is found?", "a": "return [seen[complement], i]"}},
+  {{"q": "What line stores the current number's index in the hashmap?", "a": "seen[n] = i"}}
+]
+
+Respond with ONLY JSON:
+{{"steps": [{{"q": "what line to write?", "a": "the actual Python code line"}}]}}"""
+
+    try:
+        resp = client.chat.completions.create(
+            model=MODEL, messages=[{"role": "user", "content": prompt}],
+            max_tokens=2000, temperature=0, extra_body={"reasoning": {"enabled": False}},
+        )
+        raw = resp.choices[0].message.content.strip()
+        if "```" in raw:
+            raw = raw.split("```")[1]
+            if raw.startswith("json"):
+                raw = raw[4:]
+        start = raw.find("{")
+        end = raw.rfind("}")
+        raw = raw[start:end+1]
+        result = json.loads(raw)
+        steps = result.get("steps", [])
+    except Exception as e:
+        print(f"    trace LLM error: {e}")
+        steps = [{"q": "What's the first step?", "a": "Identify the core operation."}]
+
+    return {"trace": steps, "pattern": pattern_info[0], "skeleton": pattern_info[1]}
+
+
+def gen_concept_map(q):
+    prompt = f"""You are a coding tutor. For this problem, generate concise one-liner explanations for each concept-map stage.
+
+Problem: {q['title']}
+{q['prompt']}
+Concept: {q['concept']}
+
+For each node provide:
+- "why": one-liner on why this stage matters
+- "what_if": one-liner on what goes wrong if this stage is skipped or wrong
+- "intuition": one-liner intuitive connection to the actual code
+
+Respond ONLY strict JSON, no markdown fences:
+{{"details": {{
+  "Problem": {{"why": "...", "what_if": "...", "intuition": "..."}},
+  "Approach": {{"why": "...", "what_if": "...", "intuition": "..."}},
+  "Pattern": {{"why": "...", "what_if": "...", "intuition": "..."}},
+  "Skeleton": {{"why": "...", "what_if": "...", "intuition": "..."}},
+  "Solution": {{"why": "...", "what_if": "...", "intuition": "..."}}
+}}}}"""
+
+    try:
+        resp = client.chat.completions.create(
+            model=MODEL, messages=[{"role": "user", "content": prompt}],
+            max_tokens=700, temperature=0, extra_body={"reasoning": {"enabled": False}},
+        )
+        raw = resp.choices[0].message.content.strip()
+        if "```" in raw:
+            raw = raw.split("```")[1]
+            if raw.startswith("json"):
+                raw = raw[4:]
+        start = raw.find("{")
+        end = raw.rfind("}")
+        raw = raw[start:end+1]
+        result = json.loads(raw)
+        details = result.get("details", {})
+    except Exception as e:
+        print(f"    concept-map LLM error: {e}")
+        details = {}
+
+    nodes = ["Problem", "Approach", "Pattern", "Skeleton", "Solution"]
+    for n in nodes:
+        if n not in details:
+            details[n] = {"why": "", "what_if": "", "intuition": ""}
+
+    return {"nodes": nodes, "details": details, "active_count": 3}
+
+
+def gen_solution(q):
+    prompt = f"""Write a correct, clean {q['lang']} solution for this problem.
+
+Problem: {q['title']}
+{q['prompt']}
+Concept: {q['concept']}
+
+Respond ONLY with the code, no markdown fences, no commentary."""
+
+    try:
+        resp = client.chat.completions.create(
+            model=MODEL, messages=[{"role": "user", "content": prompt}],
+            max_tokens=500, temperature=0, extra_body={"reasoning": {"enabled": False}},
+        )
+        solution = resp.choices[0].message.content.strip()
+        if "```" in solution:
+            for part in solution.split("```"):
+                if q["lang"] in part or (not part.startswith("{") and not part.startswith("<") and not part.startswith("[")):
+                    solution = part
+                    if solution.startswith(q["lang"]):
+                        solution = solution[len(q["lang"]):].strip()
+                    break
+        return solution.strip()
+    except Exception as e:
+        print(f"    solution LLM error: {e}")
+        return ""
+
+
+def main():
+    traces = load_existing(TRACE_FILE)
+    concepts = load_existing(CONCEPT_FILE)
+    solutions = load_existing(SOLUTION_FILE)
+
+    qids = list(QUESTIONS.keys())
+    done = 0
+    errors = 0
+
+    print(f"Pre-computing for {len(qids)} questions...")
+
+    for qid in qids:
+        q = QUESTIONS[qid]
+        if q["lang"] not in ("sql", "python"):
+            continue
+
+        print(f"[{done+1}/{len(qids)}] {qid}: {q['title']}")
+
+        if qid not in traces:
+            traces[qid] = gen_trace(q)
+            save_json(TRACE_FILE, traces)
+        else:
+            print("  trace cached")
+
+        if qid not in concepts:
+            concepts[qid] = gen_concept_map(q)
+            save_json(CONCEPT_FILE, concepts)
+        else:
+            print("  concept-map cached")
+
+        if qid not in solutions:
+            solutions[qid] = gen_solution(q)
+            save_json(SOLUTION_FILE, solutions)
+        else:
+            print("  solution cached")
+
+        done += 1
+
+    print(f"\nDone. {done} questions processed.")
+    print(f"  traces: {len(traces)} questions")
+    print(f"  concept_maps: {len(concepts)} questions")
+    print(f"  solutions: {len(solutions)} questions")
+
+
+if __name__ == "__main__":
+    main()

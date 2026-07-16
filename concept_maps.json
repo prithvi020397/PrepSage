@@ -1,0 +1,2292 @@
+{
+  "sql-1": {
+    "nodes": [
+      "Problem",
+      "Approach",
+      "Pattern",
+      "Skeleton",
+      "Solution"
+    ],
+    "details": {
+      "Problem": {
+        "why": "Defines the goal: retrieve the second highest distinct salary from the employees table.",
+        "what_if": "Without a clear problem statement, you might misinterpret requirements and return incorrect results.",
+        "intuition": "We need the salary that is less than the maximum but greater than all others."
+      },
+      "Approach": {
+        "why": "Identifies that naive ORDER BY + LIMIT/OFFSET fails with ties because it skips rows, not distinct values.",
+        "what_if": "Skipping this analysis leads to queries that work for unique salaries but break when duplicates exist.",
+        "intuition": "We must handle duplicates by either deduplicating first or excluding the max value."
+      },
+      "Pattern": {
+        "why": "Establishes two correct patterns: use DISTINCT before OFFSET, or exclude MAX() and take the max of the remainder.",
+        "what_if": "Without a pattern, you might write ad-hoc queries that are error-prone or inefficient.",
+        "intuition": "Think of it as 'find the highest salary, then find the highest salary that is less than that'."
+      },
+      "Skeleton": {
+        "why": "Provides a reusable query structure: SELECT MAX(salary) FROM employees WHERE salary < (SELECT MAX(salary) FROM employees).",
+        "what_if": "Missing a skeleton makes it harder to adapt the solution to similar problems like nth highest salary.",
+        "intuition": "It's like a two-step filter: first get the top, then get the next best below it."
+      },
+      "Solution": {
+        "why": "Implements the correct query that returns the second highest distinct salary reliably.",
+        "what_if": "An incorrect solution might return the second row instead of the second distinct value, causing wrong results.",
+        "intuition": "The final query is the concrete code that solves the problem exactly."
+      }
+    },
+    "active_count": 3
+  },
+  "sql-2": {
+    "nodes": [
+      "Problem",
+      "Approach",
+      "Pattern",
+      "Skeleton",
+      "Solution"
+    ],
+    "details": {
+      "Problem": {
+        "why": "Defines the input table and the goal of finding duplicate emails.",
+        "what_if": "Misunderstanding the problem could lead to returning unique emails instead of duplicates.",
+        "intuition": "We need to count how many times each email appears and keep only those with a count greater than one."
+      },
+      "Approach": {
+        "why": "GROUP BY groups rows by email, and HAVING filters groups based on aggregate conditions.",
+        "what_if": "Using WHERE instead of HAVING would filter rows before grouping, preventing access to the count.",
+        "intuition": "First cluster identical emails, then check which clusters have more than one member."
+      },
+      "Pattern": {
+        "why": "The 'GROUP BY with HAVING' pattern is the standard SQL way to filter groups after aggregation.",
+        "what_if": "Using COUNT(*) = 2 would miss emails appearing three or more times, producing incomplete results.",
+        "intuition": "Think of it as 'find all groups that are not singletons'."
+      },
+      "Skeleton": {
+        "why": "Provides the minimal SQL structure: SELECT email, GROUP BY email, HAVING COUNT(*) > 1.",
+        "what_if": "Omitting GROUP BY would aggregate the entire table into one row, losing per-email counts.",
+        "intuition": "This is the template that turns the problem into executable code."
+      },
+      "Solution": {
+        "why": "The final query correctly returns all emails that appear more than once.",
+        "what_if": "Using COUNT(*) = 2 would silently fail for emails with three or more occurrences.",
+        "intuition": "The query says: 'For each email, count its rows; keep only those with count > 1'."
+      }
+    },
+    "active_count": 3
+  },
+  "sql-3": {
+    "nodes": [
+      "Problem",
+      "Approach",
+      "Pattern",
+      "Skeleton",
+      "Solution"
+    ],
+    "details": {
+      "Problem": {
+        "why": "Defines the exact output needed: each order_date paired with a cumulative sum of amounts up to that date.",
+        "what_if": "Without a clear problem statement, you might return the wrong columns or miss the running total requirement.",
+        "intuition": "Think of a ledger where each day's total is added to all previous days' totals."
+      },
+      "Approach": {
+        "why": "Choosing between a window function (efficient) and a correlated subquery (naive) sets the performance and complexity direction.",
+        "what_if": "Picking the wrong approach could lead to O(n^2) runtime or overly complex code that fails on large datasets.",
+        "intuition": "Window functions let each row 'see' a sorted window of previous rows without a self-join."
+      },
+      "Pattern": {
+        "why": "The running total pattern is a classic use of SUM() with OVER(ORDER BY) to compute cumulative aggregates.",
+        "what_if": "Missing this pattern might lead to reinventing the wheel with inefficient loops or subqueries.",
+        "intuition": "Like a conveyor belt where each new item adds its weight to the total already on the belt."
+      },
+      "Skeleton": {
+        "why": "A minimal query structure (SELECT, FROM, ORDER BY) ensures you have the correct columns and ordering before adding the window function.",
+        "what_if": "Without a skeleton, you might forget the ORDER BY clause inside OVER, breaking the cumulative logic.",
+        "intuition": "First build the frame of the house, then install the window."
+      },
+      "Solution": {
+        "why": "The final query with SUM(amount) OVER (ORDER BY order_date) delivers the correct running total in one efficient pass.",
+        "what_if": "An incorrect solution might sum all amounts or use wrong partitioning, giving flat totals instead of cumulative ones.",
+        "intuition": "Each row's total is the sum of all previous rows' amounts plus its own, like stacking coins day by day."
+      }
+    },
+    "active_count": 3
+  },
+  "py-1": {
+    "nodes": [
+      "Problem",
+      "Approach",
+      "Pattern",
+      "Skeleton",
+      "Solution"
+    ],
+    "details": {
+      "Problem": {
+        "why": "Defines the exact input/output contract and the O(n) time constraint.",
+        "what_if": "Misunderstanding the problem leads to wrong output format or inefficient solutions.",
+        "intuition": "We need to find two numbers that sum to target, like finding the missing piece of a puzzle."
+      },
+      "Approach": {
+        "why": "Using a hashmap allows O(1) lookups, enabling a single pass through the array.",
+        "what_if": "A brute-force double loop would be O(n^2), too slow for large inputs.",
+        "intuition": "As we walk through the list, we remember numbers we've seen so we can instantly check if the needed complement exists."
+      },
+      "Pattern": {
+        "why": "Checking for complement before inserting avoids using the same element twice (false self-match).",
+        "what_if": "Inserting first then checking would incorrectly match an element with itself when target is twice its value.",
+        "intuition": "We look for the partner before adding the current number to the map, like checking if a dance partner is waiting before joining the floor."
+      },
+      "Skeleton": {
+        "why": "A hashmap from value to index and a loop over the array provide the structure for the single-pass algorithm.",
+        "what_if": "Missing the map or loop would break the ability to track seen elements or iterate through input.",
+        "intuition": "The map is our memory, the loop is our steps through the list."
+      },
+      "Solution": {
+        "why": "Returning indices immediately upon finding a complement ensures O(n) time and correct output.",
+        "what_if": "Returning wrong indices or failing to return anything would violate the problem requirements.",
+        "intuition": "Once we find the pair, we stop and hand over the answer."
+      }
+    },
+    "active_count": 3
+  },
+  "py-2": {
+    "nodes": [
+      "Problem",
+      "Approach",
+      "Pattern",
+      "Skeleton",
+      "Solution"
+    ],
+    "details": {
+      "Problem": {
+        "why": "Defines the exact goal: find the maximum sum among all contiguous subarrays of fixed length k.",
+        "what_if": "Without a clear problem statement, you might solve a different variant (e.g., non\u2011contiguous or variable length).",
+        "intuition": "We need to slide a fixed\u2011size window across the array and track the best sum seen."
+      },
+      "Approach": {
+        "why": "Sliding window avoids recomputing the sum from scratch each time, reducing complexity from O(n*k) to O(n).",
+        "what_if": "If you recompute the sum for every window, you get O(n*k) which is too slow for large inputs.",
+        "intuition": "Instead of adding k numbers per window, just add the new element and subtract the one that left."
+      },
+      "Pattern": {
+        "why": "The sliding window pattern is ideal for problems involving contiguous subarrays of fixed size.",
+        "what_if": "Using a different pattern (e.g., two pointers for variable length) would not directly solve the fixed\u2011size requirement.",
+        "intuition": "Think of a window that moves one step at a time, updating the sum incrementally."
+      },
+      "Skeleton": {
+        "why": "A skeleton provides the structure: initialize window sum, compute first window, then slide and track max.",
+        "what_if": "Without a skeleton, you might forget to handle the first window separately or miss updating the max correctly.",
+        "intuition": "Start with the sum of the first k elements, then for each step update sum and compare with the current maximum."
+      },
+      "Solution": {
+        "why": "The final code implements the sliding window logic efficiently in O(n) time and O(1) extra space.",
+        "what_if": "If the code incorrectly updates the sum (e.g., wrong indices), the result will be wrong for edge cases.",
+        "intuition": "Loop from index k to n-1, adding nums[i] and subtracting nums[i-k], keeping track of the maximum sum encountered."
+      }
+    },
+    "active_count": 3
+  },
+  "sql-4": {
+    "nodes": [
+      "Problem",
+      "Approach",
+      "Pattern",
+      "Skeleton",
+      "Solution"
+    ],
+    "details": {
+      "Problem": {
+        "why": "Defines the requirement to include all persons even without addresses.",
+        "what_if": "Missing this would lead to an incomplete understanding of the join type needed.",
+        "intuition": "We need every person, not just those with an address."
+      },
+      "Approach": {
+        "why": "Identifies that a LEFT JOIN is the correct operation to preserve all rows from Person.",
+        "what_if": "Using INNER JOIN would exclude persons without addresses, violating the problem.",
+        "intuition": "LEFT JOIN keeps the left table whole and fills missing right side with NULL."
+      },
+      "Pattern": {
+        "why": "Recognizes this as a classic 'left table with optional right table' pattern.",
+        "what_if": "Not recognizing the pattern might lead to using a wrong join type or complex subqueries.",
+        "intuition": "It's like a mailing list where some people have no address on file."
+      },
+      "Skeleton": {
+        "why": "Provides the basic SELECT and FROM structure before adding the join.",
+        "what_if": "Skipping this could result in missing columns or incorrect table references.",
+        "intuition": "Start with what you want to see and where it comes from."
+      },
+      "Solution": {
+        "why": "Executes the LEFT JOIN on personId and selects the required columns.",
+        "what_if": "Omitting the join condition would produce a Cartesian product, ruining the result.",
+        "intuition": "The final query is just a LEFT JOIN with a simple ON clause."
+      }
+    },
+    "active_count": 3
+  },
+  "sql-5": {
+    "nodes": [
+      "Problem",
+      "Approach",
+      "Pattern",
+      "Skeleton",
+      "Solution"
+    ],
+    "details": {
+      "Problem": {
+        "why": "Defines the requirement to find the second highest distinct salary, returning NULL when missing.",
+        "what_if": "Skipping the problem definition leads to queries that return duplicates or error on missing second salary.",
+        "intuition": "It's about isolating a single, unique rank-2 value from a sorted list of distinct salaries."
+      },
+      "Approach": {
+        "why": "Uses DISTINCT to eliminate duplicates, ORDER BY DESC to prioritize high salaries, and OFFSET 1 to skip the top.",
+        "what_if": "Without DISTINCT, ties would cause multiple rows at the second position, breaking the 'distinct salary' requirement.",
+        "intuition": "You sort unique salaries descending and take the one after the first."
+      },
+      "Pattern": {
+        "why": "Scalar subquery pattern (SELECT ...) naturally yields NULL when no row exists, avoiding errors.",
+        "what_if": "Using LIMIT/OFFSET outside a subquery might return an empty set instead of NULL, requiring extra handling.",
+        "intuition": "A subquery that returns a single value automatically becomes NULL when nothing matches."
+      },
+      "Skeleton": {
+        "why": "Outer query wraps the subquery to ensure a single scalar result, even when the subquery returns nothing.",
+        "what_if": "Without the outer SELECT, the query would output no row at all, breaking the expected output format.",
+        "intuition": "The skeleton is `SELECT (subquery)` to guarantee one row with NULL if missing."
+      },
+      "Solution": "SELECT (SELECT DISTINCT salary FROM Employee ORDER BY salary DESC LIMIT 1 OFFSET 1) AS SecondHighestSalary;"
+    },
+    "active_count": 3
+  },
+  "sql-6": {
+    "nodes": [
+      "Problem",
+      "Approach",
+      "Pattern",
+      "Skeleton",
+      "Solution"
+    ],
+    "details": {
+      "Problem": {
+        "why": "Defines the exact requirement: find the 3rd highest distinct salary or NULL if fewer than 3 distinct salaries exist.",
+        "what_if": "Misunderstanding the problem could lead to returning a tied salary or no result when NULL is expected.",
+        "intuition": "We need the third unique salary from the top, like picking the third-highest rung on a ladder."
+      },
+      "Approach": {
+        "why": "Use DISTINCT to get unique salaries, ORDER BY DESC, then OFFSET 2 to skip the top two distinct values.",
+        "what_if": "Omitting DISTINCT would count duplicates as separate positions, potentially returning a wrong salary.",
+        "intuition": "We sort unique salaries descending and skip the first two to land on the third."
+      },
+      "Pattern": {
+        "why": "Generalizes the second-highest pattern: OFFSET N-1 for the Nth highest distinct value.",
+        "what_if": "Using OFFSET N instead of N-1 would skip the target value and return the next one.",
+        "intuition": "Offset by (N-1) to skip the top N-1 distinct salaries and get the Nth."
+      },
+      "Skeleton": {
+        "why": "Provides the query structure: SELECT DISTINCT salary FROM employees ORDER BY salary DESC LIMIT 1 OFFSET 2.",
+        "what_if": "Forgetting LIMIT 1 would return all salaries after the offset, not just the third highest.",
+        "intuition": "The skeleton is a SELECT with DISTINCT, ORDER BY DESC, LIMIT 1, and OFFSET 2."
+      },
+      "Solution": {
+        "why": "Wraps the query in a subquery to ensure NULL is returned when fewer than 3 distinct salaries exist.",
+        "what_if": "Without the subquery, the query would return an empty set instead of NULL.",
+        "intuition": "The outer SELECT returns the result of the inner query, which is NULL if no row is found."
+      }
+    },
+    "active_count": 3
+  },
+  "sql-7": {
+    "nodes": [
+      "Problem",
+      "Approach",
+      "Pattern",
+      "Skeleton",
+      "Solution"
+    ],
+    "details": {
+      "Problem": {
+        "why": "Defines the input table and the required output format (score + dense rank).",
+        "what_if": "Without a clear problem statement, you might implement the wrong ranking logic (e.g., competition ranking).",
+        "intuition": "We need to assign a rank to each score, where equal scores get the same rank and ranks are consecutive integers."
+      },
+      "Approach": {
+        "why": "Selects DENSE_RANK() as the correct window function to produce gapless ranks for ties.",
+        "what_if": "Using RANK() would create gaps after ties, violating the 'no gap' requirement.",
+        "intuition": "DENSE_RANK() numbers rows consecutively even when values are equal, like 1,2,3 instead of 1,1,3."
+      },
+      "Pattern": {
+        "why": "Establishes the standard SQL pattern: SELECT columns, DENSE_RANK() OVER (ORDER BY score DESC) AS rank FROM Scores.",
+        "what_if": "Omitting the ORDER BY clause would rank rows arbitrarily, not by descending score.",
+        "intuition": "The window function runs over the entire result set, ordering by score descending to assign ranks."
+      },
+      "Skeleton": {
+        "why": "Provides the minimal query structure: SELECT id, score, DENSE_RANK() OVER (ORDER BY score DESC) AS rank FROM Scores;",
+        "what_if": "Forgetting the alias 'rank' would leave the column unnamed, causing ambiguity in the output.",
+        "intuition": "This skeleton is the complete solution; just fill in the table and column names."
+      },
+      "Solution": {
+        "why": "Executes the final query that returns each score with its dense rank in descending order.",
+        "what_if": "If the query is incorrect (e.g., missing DESC), ranks would be ascending, reversing the required order.",
+        "intuition": "The solution is a single SELECT with DENSE_RANK() \u2014 no joins, no subqueries, just a window function."
+      }
+    },
+    "active_count": 3
+  },
+  "sql-8": {
+    "nodes": [
+      "Problem",
+      "Approach",
+      "Pattern",
+      "Skeleton",
+      "Solution"
+    ],
+    "details": {
+      "Problem": {
+        "why": "Defines the exact requirement: find numbers that appear in at least three consecutive rows.",
+        "what_if": "Without a clear problem statement, you might solve a different condition (e.g., any three occurrences, not necessarily consecutive).",
+        "intuition": "We need to detect runs of identical values in a sequence ordered by id."
+      },
+      "Approach": {
+        "why": "Self-joining the table three times with offset ids directly enforces the consecutive-row constraint.",
+        "what_if": "If you skip the self-join, you lose the ability to compare rows at specific offsets, making it impossible to guarantee consecutiveness.",
+        "intuition": "Think of aligning three copies of the table side by side, each shifted by one row, so matching values across all three means three in a row."
+      },
+      "Pattern": {
+        "why": "This is the classic 'consecutive rows' pattern using self-joins, a reliable alternative to window functions.",
+        "what_if": "If you use a different pattern (e.g., GROUP BY without ordering), you might count total occurrences instead of consecutive ones.",
+        "intuition": "Joining on id = id, id = id+1, id = id+2 creates a sliding window of three rows."
+      },
+      "Skeleton": {
+        "why": "Provides the structural outline: SELECT DISTINCT ... FROM Logs a JOIN Logs b JOIN Logs c ON ... WHERE a.num = b.num = c.num.",
+        "what_if": "Missing the DISTINCT would return duplicate values if the same number appears in multiple triplets.",
+        "intuition": "The skeleton is the blueprint: three aliases, join conditions on id, and a filter on equal num."
+      },
+      "Solution": {
+        "why": "The final query implements the pattern correctly, returning distinct numbers that appear consecutively at least three times.",
+        "what_if": "If the join conditions are off (e.g., using id+1 and id+2 incorrectly), you might get non-consecutive rows or miss valid ones.",
+        "intuition": "The solution is the skeleton filled in: SELECT DISTINCT a.num FROM Logs a JOIN Logs b ON a.id = b.id-1 JOIN Logs c ON a.id = c.id-2 WHERE a.num = b.num AND b.num = c.num;"
+      }
+    },
+    "active_count": 3
+  },
+  "sql-9": {
+    "nodes": [
+      "Problem",
+      "Approach",
+      "Pattern",
+      "Skeleton",
+      "Solution"
+    ],
+    "details": {
+      "Problem": {
+        "why": "Defines the requirement to compare each employee's salary with their manager's salary.",
+        "what_if": "Without understanding the problem, you might join on the wrong columns or miss the comparison entirely.",
+        "intuition": "We need to find employees whose salary is greater than their direct manager's salary."
+      },
+      "Approach": {
+        "why": "Self-join allows us to pair each employee row with the manager row using managerId = manager.id.",
+        "what_if": "Skipping self-join would require a separate table or subquery, making the query more complex and less efficient.",
+        "intuition": "Think of the Employee table as two copies: one for employees and one for managers, linked by managerId."
+      },
+      "Pattern": {
+        "why": "Self-join is the standard pattern for comparing rows within the same hierarchical table.",
+        "what_if": "Using a different pattern (e.g., correlated subquery) might work but is often less readable and slower.",
+        "intuition": "It's like looking at a family tree where each person has a parent, and you compare child and parent attributes."
+      },
+      "Skeleton": {
+        "why": "The skeleton provides the basic structure: SELECT ... FROM Employee e1 JOIN Employee e2 ON e1.managerId = e2.id WHERE e1.salary > e2.salary.",
+        "what_if": "Missing the join condition or the WHERE clause would either produce a Cartesian product or fail to filter correctly.",
+        "intuition": "Start with the join to pair employees with their managers, then filter for higher salary."
+      },
+      "Solution": {
+        "why": "The final query returns the names of employees who earn more than their managers, solving the problem.",
+        "what_if": "An incorrect solution might return wrong names or no results due to wrong join or filter logic.",
+        "intuition": "The query reads like: 'Give me the names of employees whose salary is greater than their manager's salary.'"
+      }
+    },
+    "active_count": 3
+  },
+  "sql-10": {
+    "nodes": [
+      "Problem",
+      "Approach",
+      "Pattern",
+      "Skeleton",
+      "Solution"
+    ],
+    "details": {
+      "Problem": {
+        "why": "Defines the goal: find emails that appear more than once in the Person table.",
+        "what_if": "Without a clear problem statement, you might write a query that returns all emails or counts instead of duplicates.",
+        "intuition": "We need to group identical emails and count how many times each appears."
+      },
+      "Approach": {
+        "why": "GROUP BY email groups rows by email, then HAVING COUNT(*) > 1 filters groups with multiple rows.",
+        "what_if": "Using WHERE instead of HAVING would filter rows before grouping, so you cannot check the count after aggregation.",
+        "intuition": "First pile up same emails, then keep only piles with more than one email."
+      },
+      "Pattern": {
+        "why": "This is the classic 'find duplicates' pattern using GROUP BY and HAVING with an aggregate condition.",
+        "what_if": "Skipping GROUP BY would treat all rows as one group, giving a single count for all emails.",
+        "intuition": "Like sorting emails into buckets and only keeping buckets with at least two emails."
+      },
+      "Skeleton": {
+        "why": "SELECT email FROM Person GROUP BY email HAVING COUNT(*) > 1 provides the minimal correct structure.",
+        "what_if": "Omitting HAVING would return all emails without filtering duplicates.",
+        "intuition": "The skeleton is the query shell that groups and then filters on the group count."
+      },
+      "Solution": {
+        "why": "The final query returns exactly the emails that appear more than once, solving the problem.",
+        "what_if": "Writing SELECT * instead of SELECT email would return extra columns or cause errors with non-grouped columns.",
+        "intuition": "The solution is the skeleton filled in with the correct column and condition."
+      }
+    },
+    "active_count": 3
+  },
+  "sql-11": {
+    "nodes": [
+      "Problem",
+      "Approach",
+      "Pattern",
+      "Skeleton",
+      "Solution"
+    ],
+    "details": {
+      "Problem": {
+        "why": "Defines the input tables and the desired output.",
+        "what_if": "If misunderstood, you might query joined tables and miss the 'never ordered' condition.",
+        "intuition": "Think 'find all customers except those who have an order record'."
+      },
+      "Approach": {
+        "why": "Establishes the need to compare each customer against existing orders.",
+        "what_if": "Without a clear approach, you may attempt an incorrect join that only returns matched customers.",
+        "intuition": "We need a way to filter customers that are not present in the Orders table."
+      },
+      "Pattern": {
+        "why": "NOT IN or LEFT JOIN with NULL check are the standard patterns for missing rows.",
+        "what_if": "Ignoring NULL pitfalls in NOT IN could cause the query to silently return zero rows.",
+        "intuition": "Both patterns express 'find rows in table A that have no match in table B'."
+      },
+      "Skeleton": {
+        "why": "Provides the basic structure: SELECT columns, FROM one table, with a subquery or join on the other.",
+        "what_if": "A flawed skeleton (e.g., missing WHERE clause) would return all customers instead of non-orderers.",
+        "intuition": "Start with Customers, then exclude those whose id appears in Orders."
+      },
+      "Solution": {
+        "why": "Executes the pattern correctly to return only customers with no orders.",
+        "what_if": "An incorrect solution might include NULL subquery results or use a join that keeps matched rows.",
+        "intuition": "Final code selects customer names where the order lookup fails."
+      }
+    },
+    "active_count": 3
+  },
+  "sql-12": {
+    "nodes": [
+      "Problem",
+      "Approach",
+      "Pattern",
+      "Skeleton",
+      "Solution"
+    ],
+    "details": {
+      "Problem": {
+        "why": "Defines the exact output needed: department name, employee name, and salary for all employees tied for the highest salary in their department.",
+        "what_if": "Without this clarity, you might return only one employee per department or miss ties.",
+        "intuition": "Think of it as 'show me the top earner(s) in each department, including all who share the top salary.'"
+      },
+      "Approach": {
+        "why": "Using a correlated subquery to compute each department's max salary and filtering the outer query with that value preserves all tied employees.",
+        "what_if": "Using GROUP BY with MAX would collapse each department to a single row, losing the names of employees who earn that max.",
+        "intuition": "For each employee, ask 'is my salary equal to the highest in my department?' and keep only those who answer yes."
+      },
+      "Pattern": {
+        "why": "The 'correlated subquery in WHERE' pattern lets you compare each row against a per-group aggregate without losing row-level detail.",
+        "what_if": "Skipping the correlation would compute a global max instead of per-department, giving wrong results.",
+        "intuition": "It's like having a helper that looks up the department's top salary for each employee you check."
+      },
+      "Skeleton": {
+        "why": "A SELECT with JOIN between Employee and Department, plus a WHERE clause filtering on salary = (subquery that gets MAX(salary) for that department).",
+        "what_if": "Omitting the JOIN would leave you without department names; omitting the subquery would not filter correctly.",
+        "intuition": "Start with all employees and their department names, then cut down to only those whose salary matches their department's peak."
+      },
+      "Solution": {
+        "why": "The final query correctly returns each department's name, employee name, and salary for all employees earning the department's maximum salary, including ties.",
+        "what_if": "Any deviation (e.g., using GROUP BY, missing correlation, or wrong join) would either lose ties or produce incorrect department associations.",
+        "intuition": "The query reads like: 'For each employee, if their salary equals the highest in their department, show department name, employee name, and salary.'"
+      }
+    },
+    "active_count": 3
+  },
+  "sql-13": {
+    "nodes": [
+      "Problem",
+      "Approach",
+      "Pattern",
+      "Skeleton",
+      "Solution"
+    ],
+    "details": {
+      "Problem": {
+        "why": "Defines the exact requirement: find IDs where today's temperature exceeds yesterday's.",
+        "what_if": "Misinterpreting 'previous calendar day' could lead to using row order or ID differences, missing gaps.",
+        "intuition": "We need to compare each day's temperature with the temperature of the day just before it in calendar order."
+      },
+      "Approach": {
+        "why": "Self-join the Weather table to pair each record with the record from the previous calendar day.",
+        "what_if": "Without a self-join, there is no way to compare two rows from the same table in a single query.",
+        "intuition": "Join each day to the day that came immediately before in time."
+      },
+      "Pattern": {
+        "why": "Use date arithmetic (`DATEADD(day, -1, current.recordDate)`) instead of row number or ID difference to correctly handle missing dates.",
+        "what_if": "Using ID difference or row number would skip gaps and produce wrong results when dates are missing.",
+        "intuition": "We rely on calendar dates, not row order, so that a missing day doesn't break the comparison."
+      },
+      "Skeleton": {
+        "why": "Start with `SELECT w1.id FROM Weather w1 JOIN Weather w2 ON ...` and a `WHERE` clause for temperature comparison.",
+        "what_if": "Missing the correct join condition would either produce a Cartesian product or no matching rows.",
+        "intuition": "The skeleton is the standard self-join structure: pick IDs where today is hotter than yesterday."
+      },
+      "Solution": {
+        "why": "Final query: `SELECT w1.id FROM Weather w1 JOIN Weather w2 ON w1.recordDate = DATEADD(day, 1, w2.recordDate) WHERE w1.temperature > w2.temperature;`",
+        "what_if": "Ignoring date arithmetic leads to incorrect joins when dates are not consecutive IDs.",
+        "intuition": "Each day's temperature is compared with the previous day's by joining on the date offset."
+      }
+    },
+    "active_count": 3
+  },
+  "sql-14": {
+    "nodes": [
+      "Problem",
+      "Approach",
+      "Pattern",
+      "Skeleton",
+      "Solution"
+    ],
+    "details": {
+      "Problem": {
+        "why": "Defines the exact data and goal: find the earliest event_date per player_id.",
+        "what_if": "Without a clear problem statement, you might select wrong columns or miss the grouping requirement.",
+        "intuition": "We need the first login date for each player, like finding the earliest timestamp in a log per user."
+      },
+      "Approach": {
+        "why": "Using MIN() with GROUP BY directly computes the earliest date per player without extra joins.",
+        "what_if": "Skipping GROUP BY would return one row for the entire table, losing per-player granularity.",
+        "intuition": "Group players together, then pick the smallest date from each group."
+      },
+      "Pattern": {
+        "why": "This is the classic 'earliest per group' pattern using aggregate MIN() and GROUP BY.",
+        "what_if": "Using a self-join or subquery would be overcomplicated and less efficient for this simple case.",
+        "intuition": "Like finding the first purchase date per customer in a sales table."
+      },
+      "Skeleton": {
+        "why": "SELECT player_id, MIN(event_date) FROM Activity GROUP BY player_id gives the correct structure.",
+        "what_if": "Omitting GROUP BY would cause a syntax error or return a single aggregate across all players.",
+        "intuition": "The skeleton is the minimal query that groups and aggregates correctly."
+      },
+      "Solution": {
+        "why": "The final query returns each player_id with their first login date, solving the problem exactly.",
+        "what_if": "Adding unnecessary columns without grouping them would break the query or produce wrong results.",
+        "intuition": "The solution is the skeleton executed, giving a clean list of players and their earliest dates."
+      }
+    },
+    "active_count": 3
+  },
+  "sql-15": {
+    "nodes": [
+      "Problem",
+      "Approach",
+      "Pattern",
+      "Skeleton",
+      "Solution"
+    ],
+    "details": {
+      "Problem": {
+        "why": "Defines the exact metric (fraction of players with day-two retention) and the table schema.",
+        "what_if": "Misunderstanding the metric could lead to counting wrong events or using wrong date logic.",
+        "intuition": "We need to find players who came back exactly one day after their first login."
+      },
+      "Approach": {
+        "why": "Breaks the problem into two steps: find first login per player, then check for activity the next day.",
+        "what_if": "Without this separation, you might incorrectly compare dates across different players or miss the first-login context.",
+        "intuition": "First find each player's starting point, then see if they returned the next day."
+      },
+      "Pattern": {
+        "why": "Identifies the common SQL pattern: first-value per group (first login) followed by a self-join or EXISTS check.",
+        "what_if": "Ignoring the pattern could lead to inefficient or incorrect queries, like using GROUP BY without proper date arithmetic.",
+        "intuition": "This is a classic 'first event then subsequent event' pattern, often solved with a CTE and a LEFT JOIN."
+      },
+      "Skeleton": {
+        "why": "Provides the query structure: CTE for first login, then a conditional count divided by total distinct players.",
+        "what_if": "Skipping the skeleton might cause missing the division by total players or incorrect rounding.",
+        "intuition": "The skeleton ensures we count both the numerator (players with next-day activity) and denominator (all players)."
+      },
+      "Solution": {
+        "why": "Implements the exact SQL query with correct date difference, distinct counts, and rounding.",
+        "what_if": "A wrong solution might use COUNT without DISTINCT, or compare dates incorrectly, or forget to round to 2 decimals.",
+        "intuition": "The final query joins first-login dates to activity dates and computes the ratio."
+      }
+    },
+    "active_count": 3
+  },
+  "sql-16": {
+    "nodes": [
+      "Problem",
+      "Approach",
+      "Pattern",
+      "Skeleton",
+      "Solution"
+    ],
+    "details": {
+      "Problem": {
+        "why": "Defines the requirement: find manager names where the count of direct reports is at least 5.",
+        "what_if": "Without a clear problem, you might join incorrectly or filter on the wrong column.",
+        "intuition": "We need to count reports per manager and then filter those with count >= 5."
+      },
+      "Approach": {
+        "why": "First group by managerId to count employees per manager, then filter groups having count >= 5, then join back to Employee to get names.",
+        "what_if": "Skipping the group-by step would lose the per-manager count, leading to wrong results.",
+        "intuition": "We are essentially creating a summary table of manager IDs with report counts, then linking back to names."
+      },
+      "Pattern": {
+        "why": "This is a self-join with aggregation: use GROUP BY on foreign key, HAVING, then INNER JOIN to retrieve names.",
+        "what_if": "Missing HAVING would return all managers, even those with few reports; missing JOIN would yield only IDs, not names.",
+        "intuition": "Think of it as 'find popular managers' by counting their direct reports via the foreign key."
+      },
+      "Skeleton": {
+        "why": "Structure: SELECT name FROM Employee WHERE id IN (subquery that selects managerId with count >= 5).",
+        "what_if": "Wrong skeleton might attempt to filter before grouping, causing logical errors.",
+        "intuition": "The subquery finds manager IDs, and the outer query fetches corresponding names."
+      },
+      "Solution": {
+        "why": "Final query: SELECT e.name FROM Employee e JOIN (SELECT managerId, COUNT(*) as cnt FROM Employee GROUP BY managerId HAVING cnt >= 5) m ON e.id = m.managerId;",
+        "what_if": "Omitting JOIN condition or using wrong column would return unrelated rows or no results.",
+        "intuition": "The subquery builds a list of qualified manager IDs, and the join maps them to their names."
+      }
+    },
+    "active_count": 3
+  },
+  "sql-17": {
+    "nodes": [
+      "Problem",
+      "Approach",
+      "Pattern",
+      "Skeleton",
+      "Solution"
+    ],
+    "details": {
+      "Problem": {
+        "why": "Defines the data tables and the exact condition for inclusion (bonus < 1000 or no bonus row).",
+        "what_if": "Misreading the requirement would cause missing employees with no bonus row.",
+        "intuition": "We need all employees, even those without a bonus record."
+      },
+      "Approach": {
+        "why": "LEFT JOIN ensures every employee appears, and NULL bonus indicates missing row.",
+        "what_if": "Using INNER JOIN would drop employees without a bonus row entirely.",
+        "intuition": "Keep the left table whole, attach bonus info where it exists."
+      },
+      "Pattern": {
+        "why": "Filter with `bonus < 1000 OR bonus IS NULL` to include NULLs explicitly.",
+        "what_if": "Using only `bonus < 1000` would silently exclude NULLs, losing employees with no bonus.",
+        "intuition": "NULL is not a value, so comparisons fail; we must check for it separately."
+      },
+      "Skeleton": {
+        "why": "Starts with SELECT ... FROM Employee LEFT JOIN Bonus ON ... WHERE ...",
+        "what_if": "Omitting LEFT JOIN or the OR condition breaks the logic.",
+        "intuition": "The query structure mirrors the problem's two-part condition."
+      },
+      "Solution": {
+        "why": "Final query returns exactly the required rows: name and bonus for eligible employees.",
+        "what_if": "Any deviation (e.g., wrong join type, missing NULL check) yields incorrect results.",
+        "intuition": "The code directly implements the concept map: join, then filter with OR."
+      }
+    },
+    "active_count": 3
+  },
+  "sql-18": {
+    "nodes": [
+      "Problem",
+      "Approach",
+      "Pattern",
+      "Skeleton",
+      "Solution"
+    ],
+    "details": {
+      "Problem": {
+        "why": "Defines the exact requirement: find customers not referred by id=2, including those with no referrer.",
+        "what_if": "Misreading the problem leads to excluding NULL referee_id rows, giving incomplete results.",
+        "intuition": "We need all customers except those explicitly referred by person 2."
+      },
+      "Approach": {
+        "why": "Highlights that NULL is not a value and cannot be compared with <>; it must be handled separately.",
+        "what_if": "Using only referee_id <> 2 silently drops customers with NULL referee_id, causing missing names.",
+        "intuition": "NULL means 'unknown referrer', so we must treat it as a valid case to include."
+      },
+      "Pattern": {
+        "why": "Establishes the standard SQL pattern for excluding a value while preserving NULLs: condition OR IS NULL.",
+        "what_if": "Forgetting the OR IS NULL clause yields a common bug that is hard to spot without testing.",
+        "intuition": "Think of it as 'not equal to 2 OR unknown' to cover all non-2 cases."
+      },
+      "Skeleton": {
+        "why": "Provides the basic SELECT-FROM-WHERE structure to build the final query.",
+        "what_if": "Missing the WHERE clause would return all customers, ignoring the referral filter.",
+        "intuition": "Start with selecting names from Customer, then apply the correct filter."
+      },
+      "Solution": {
+        "why": "Combines the pattern into a correct query: SELECT name FROM Customer WHERE referee_id <> 2 OR referee_id IS NULL;",
+        "what_if": "Writing referee_id != 2 alone would still drop NULLs, producing wrong output.",
+        "intuition": "The final code explicitly includes both conditions to get the right set of customers."
+      }
+    },
+    "active_count": 3
+  },
+  "sql-19": {
+    "nodes": [
+      "Problem",
+      "Approach",
+      "Pattern",
+      "Skeleton",
+      "Solution"
+    ],
+    "details": {
+      "Problem": {
+        "why": "Defines the table structure and the two independent filtering conditions (shared tiv_2015, unique location).",
+        "what_if": "Without clear problem definition, you might mix up the conditions or miss the requirement for both to hold simultaneously.",
+        "intuition": "We need to find policyholders who are 'average' in one dimension (tiv_2015) but 'unique' in another (location)."
+      },
+      "Approach": {
+        "why": "Two separate group-and-count subqueries allow independent verification of each condition before combining results.",
+        "what_if": "If you try to do both checks in one pass, you might incorrectly require the same group to satisfy both, which is not the problem.",
+        "intuition": "First find who shares tiv_2015, then find who has a unique location, then intersect."
+      },
+      "Pattern": {
+        "why": "Using row-value syntax (lat, lon) IN (...) ensures both coordinates are matched together, avoiding false matches from independent lat/lon checks.",
+        "what_if": "Without row-value syntax, you could match a policyholder with the same lat but different lon, or same lon but different lat, giving wrong results.",
+        "intuition": "Think of (lat, lon) as a single 'address' \u2014 you need the exact pair, not just matching parts."
+      },
+      "Skeleton": {
+        "why": "Provides the structural outline: SELECT SUM(tiv_2016) FROM Insurance WHERE tiv_2015 IN (...) AND (lat, lon) IN (...).",
+        "what_if": "Missing the skeleton leads to disorganized code that may forget to nest subqueries or apply both filters correctly.",
+        "intuition": "The skeleton is like a recipe: first filter by shared tiv_2015, then filter by unique location, then sum."
+      },
+      "Solution": {
+        "why": "The final query correctly computes the sum by combining the two subqueries with AND, using GROUP BY and HAVING COUNT(*) > 1 for tiv_2015 and GROUP BY and HAVING COUNT(*) = 1 for (lat, lon).",
+        "what_if": "If the solution is wrong, you might sum tiv_2016 for the wrong set of policyholders, e.g., including those with duplicate locations or excluding those with shared tiv_2015.",
+        "intuition": "The solution is the intersection of two sets: 'popular tiv_2015' and 'lonely location'."
+      }
+    },
+    "active_count": 3
+  },
+  "sql-20": {
+    "nodes": [
+      "Problem",
+      "Approach",
+      "Pattern",
+      "Skeleton",
+      "Solution"
+    ],
+    "details": {
+      "Problem": {
+        "why": "Defines the goal: find the customer with the maximum number of orders.",
+        "what_if": "Without a clear problem statement, you might solve the wrong question or miss constraints.",
+        "intuition": "We need to count orders per customer and pick the top one."
+      },
+      "Approach": {
+        "why": "Group orders by customer, count them, then sort descending and take the first row.",
+        "what_if": "Skipping grouping would give a total count across all customers, not per customer.",
+        "intuition": "Like tallying votes per candidate and announcing the winner."
+      },
+      "Pattern": {
+        "why": "GROUP BY + ORDER BY COUNT(*) DESC + LIMIT 1 is the standard 'most of something' pattern.",
+        "what_if": "Using HAVING instead of ORDER BY would require knowing the max count in advance, which is less direct.",
+        "intuition": "Sort the list of counts from highest to lowest and grab the top entry."
+      },
+      "Skeleton": {
+        "why": "Provides the structural query: SELECT customer_number, COUNT(*) FROM Orders GROUP BY customer_number ORDER BY COUNT(*) DESC LIMIT 1;",
+        "what_if": "Missing LIMIT would return all customers sorted, not just the top one.",
+        "intuition": "This is the recipe: group, count, sort, take first."
+      },
+      "Solution": {
+        "why": "Executes the skeleton to return exactly the customer_number with the most orders.",
+        "what_if": "If multiple customers tie for most orders, LIMIT 1 arbitrarily picks one; a tie-handling clause might be needed.",
+        "intuition": "The final query that answers the problem correctly."
+      }
+    },
+    "active_count": 3
+  },
+  "sql-21": {
+    "nodes": [
+      "Problem",
+      "Approach",
+      "Pattern",
+      "Skeleton",
+      "Solution"
+    ],
+    "details": {
+      "Problem": {
+        "why": "Defines the exact columns and conditions needed to answer the question.",
+        "what_if": "Misreading the OR condition leads to using AND, which excludes valid large countries.",
+        "intuition": "We need countries that are big in area OR big in population."
+      },
+      "Approach": {
+        "why": "Selects the required columns and applies the OR filter to include either condition.",
+        "what_if": "Using AND instead of OR would return only countries that are both huge in area and population.",
+        "intuition": "Think of two separate lists merged together: big area countries plus big population countries."
+      },
+      "Pattern": {
+        "why": "The OR pattern is the simplest way to combine two independent filters.",
+        "what_if": "Forgetting OR and using AND is the classic mistake that narrows results too much.",
+        "intuition": "OR means 'at least one of these is true'."
+      },
+      "Skeleton": {
+        "why": "Provides the basic SELECT-FROM-WHERE structure to build the query.",
+        "what_if": "Omitting WHERE would return all rows, ignoring the size thresholds.",
+        "intuition": "Start with selecting columns, then filter rows with WHERE."
+      },
+      "Solution": {
+        "why": "Executes the correct query with OR to satisfy the problem exactly.",
+        "what_if": "Writing AND would produce wrong results, missing countries that meet only one criterion.",
+        "intuition": "SELECT name, population, area FROM World WHERE area >= 3000000 OR population >= 25000000;"
+      }
+    },
+    "active_count": 3
+  },
+  "sql-22": {
+    "nodes": [
+      "Problem",
+      "Approach",
+      "Pattern",
+      "Skeleton",
+      "Solution"
+    ],
+    "details": {
+      "Problem": {
+        "why": "Defines the goal: find classes with at least 5 students from a table of enrollments.",
+        "what_if": "Without a clear problem statement, you might write a query that returns students instead of classes.",
+        "intuition": "We need to count how many students are in each class and keep only the big ones."
+      },
+      "Approach": {
+        "why": "Group rows by class and count students per group, then filter groups with count >= 5.",
+        "what_if": "If you skip grouping, you can't count per class; if you use WHERE instead of HAVING, you can't filter on the count.",
+        "intuition": "First pile up all enrollments by class, then measure each pile's size, then discard small piles."
+      },
+      "Pattern": {
+        "why": "GROUP BY + HAVING is the standard pattern for filtering groups based on aggregate conditions.",
+        "what_if": "Using WHERE on the count would fail because WHERE runs before grouping, so the count doesn't exist yet.",
+        "intuition": "HAVING is like WHERE but for groups, not individual rows."
+      },
+      "Skeleton": {
+        "why": "SELECT class FROM Courses GROUP BY class HAVING COUNT(*) >= 5 \u2014 the minimal structure.",
+        "what_if": "Omitting GROUP BY would treat the whole table as one group; omitting HAVING would return all classes regardless of size.",
+        "intuition": "The skeleton is just: pick class, group by it, count rows, keep groups with count >= 5."
+      },
+      "Solution": {
+        "why": "Executes the exact query that returns only classes with 5 or more students.",
+        "what_if": "A wrong solution might use DISTINCT incorrectly or forget to count properly, giving wrong results.",
+        "intuition": "The final query is the skeleton filled in: SELECT class FROM Courses GROUP BY class HAVING COUNT(*) >= 5;"
+      }
+    },
+    "active_count": 3
+  },
+  "sql-23": {
+    "nodes": [
+      "Problem",
+      "Approach",
+      "Pattern",
+      "Skeleton",
+      "Solution"
+    ],
+    "details": {
+      "Problem": {
+        "why": "Identifies the core requirement: find the person with the highest total number of friends from both sides of accepted requests.",
+        "what_if": "If misunderstood, you might count only one side (e.g., only requester_id) and miss friends from the accepter role.",
+        "intuition": "Each accepted request creates a friendship for both people, so we need to count all appearances of a person in either column."
+      },
+      "Approach": {
+        "why": "Unions requester_id and accepter_id into a single column so each friend appearance is a separate row, then groups by id to count total friends.",
+        "what_if": "Without union, grouping separately on requester_id and accepter_id would require a join or subquery, complicating the count and risking double-counting.",
+        "intuition": "Stack all friend appearances into one list, then count how many times each person appears."
+      },
+      "Pattern": {
+        "why": "This is a 'union then group by count' pattern, useful when an entity appears in multiple columns of a relationship table.",
+        "what_if": "Skipping the union and trying to count directly from the original table would miss friends from the other role, giving an incomplete count.",
+        "intuition": "Like combining two guest lists into one to count how many events each person attended."
+      },
+      "Skeleton": {
+        "why": "Provides the structural outline: SELECT id, COUNT(*) AS num FROM (SELECT requester_id AS id FROM RequestAccepted UNION ALL SELECT accepter_id FROM RequestAccepted) GROUP BY id ORDER BY num DESC LIMIT 1.",
+        "what_if": "If the skeleton is wrong (e.g., using UNION instead of UNION ALL), duplicate friendships might be lost, undercounting friends.",
+        "intuition": "The skeleton is the recipe: combine all IDs, tally them, sort descending, and take the top."
+      },
+      "Solution": {
+        "why": "Executes the skeleton with correct syntax, ensuring the person with the most friends is returned with their friend count.",
+        "what_if": "If the solution omits LIMIT 1 or uses wrong ordering, you might get multiple rows or the wrong person.",
+        "intuition": "The final query is the exact code that solves the problem as described."
+      }
+    },
+    "active_count": 3
+  },
+  "sql-24": {
+    "nodes": [
+      "Problem",
+      "Approach",
+      "Pattern",
+      "Skeleton",
+      "Solution"
+    ],
+    "details": {
+      "Problem": {
+        "why": "Defines the input table and the goal: remove duplicate emails keeping the row with the smallest Id per email, ordered by Id.",
+        "what_if": "Without understanding the problem, you might delete all duplicates or keep the wrong row.",
+        "intuition": "Think of each email as a group; we want the first (smallest Id) member of each group."
+      },
+      "Approach": {
+        "why": "Grouping by email and selecting MIN(Id) identifies the survivor row for each email.",
+        "what_if": "If you don't group by email, you can't isolate per-email minimums and might delete all rows with duplicates.",
+        "intuition": "Like picking the oldest (smallest Id) representative from each email club."
+      },
+      "Pattern": {
+        "why": "The pattern is 'group-wise minimum' \u2014 a classic SQL technique to keep one row per group based on an aggregate.",
+        "what_if": "Using a naive self-join without proper correlation can accidentally delete all duplicates instead of extras.",
+        "intuition": "It's the SQL equivalent of 'for each email, keep the one with the lowest Id'."
+      },
+      "Skeleton": {
+        "why": "The skeleton is: SELECT * FROM Person WHERE Id IN (SELECT MIN(Id) FROM Person GROUP BY Email) ORDER BY Id.",
+        "what_if": "Omitting the subquery or mis-scoping it leads to deleting rows incorrectly or keeping duplicates.",
+        "intuition": "The subquery builds a list of survivors; the outer query selects only those."
+      },
+      "Solution": {
+        "why": "Executes the plan: delete rows not in the survivor list, or select survivors directly.",
+        "what_if": "If you delete without the subquery, you might remove all rows with duplicate emails.",
+        "intuition": "The final query is the clean, correct implementation of the group-wise minimum pattern."
+      }
+    },
+    "active_count": 3
+  },
+  "sql-25": {
+    "nodes": [
+      "Problem",
+      "Approach",
+      "Pattern",
+      "Skeleton",
+      "Solution"
+    ],
+    "details": {
+      "Problem": {
+        "why": "Defines the exact output needed: salesperson names with zero orders to 'RED'.",
+        "what_if": "You might return names of salespeople who have orders to other companies but not 'RED', missing those with no orders at all.",
+        "intuition": "We need a list of salespeople who never appear in any order linked to the 'RED' company."
+      },
+      "Approach": {
+        "why": "Using NOT IN with a subquery that finds all sales_ids who ordered from 'RED' ensures we include salespeople with zero total orders.",
+        "what_if": "Using a LEFT JOIN and filtering WHERE company != 'RED' would drop salespeople with no orders because they have NULL company, not 'RED'.",
+        "intuition": "We want everyone except those who have a proven connection to 'RED'."
+      },
+      "Pattern": {
+        "why": "The 'anti-join' pattern (NOT IN / NOT EXISTS) is the correct way to exclude a set while preserving rows with no matches.",
+        "what_if": "A regular join would only keep rows that have a match, eliminating salespeople with zero orders entirely.",
+        "intuition": "Think of it as 'show me all salespeople, then remove those who appear in the RED order list'."
+      },
+      "Skeleton": {
+        "why": "Start with SELECT name FROM SalesPerson, then add a WHERE clause that filters out sales_ids found in a subquery of Orders joined to Company for 'RED'.",
+        "what_if": "Omitting the subquery would leave no filtering, returning all salespeople regardless of orders.",
+        "intuition": "The skeleton is: pick names, then exclude those who are in the 'bad' list."
+      },
+      "Solution": {
+        "why": "The final query uses NOT IN (SELECT sales_id FROM Orders JOIN Company ON Orders.com_id = Company.com_id WHERE Company.name = 'RED') and orders by name.",
+        "what_if": "Forgetting ORDER BY would return correct names but in arbitrary order, failing the specification.",
+        "intuition": "The code directly implements the anti-join: select all salespeople minus those who ordered from RED, then sort."
+      }
+    },
+    "active_count": 3
+  },
+  "sql-26": {
+    "nodes": [
+      "Problem",
+      "Approach",
+      "Pattern",
+      "Skeleton",
+      "Solution"
+    ],
+    "details": {
+      "Problem": {
+        "why": "Defines the input table and the required output (id and type) for tree node classification.",
+        "what_if": "Without a clear problem statement, you might misinterpret what 'Leaf' or 'Inner' means.",
+        "intuition": "Think of a family tree: each node has a parent, and we label it as root, leaf, or inner."
+      },
+      "Approach": {
+        "why": "Establishes the logical order: first identify roots via NULL p_id, then leaves by absence as parent, else inner.",
+        "what_if": "If you check leaf before root, a single-node tree would be mislabeled as leaf instead of root.",
+        "intuition": "Like sorting mail: first find the top boss (root), then find employees with no reports (leaves)."
+      },
+      "Pattern": {
+        "why": "Uses a CASE expression with a subquery or LEFT JOIN to check if a node's id appears as a parent.",
+        "what_if": "Without this pattern, you'd have no way to know which nodes have children, leading to wrong leaf/inner labels.",
+        "intuition": "It's like checking a directory: a folder is a leaf if no other folder lists it as parent."
+      },
+      "Skeleton": {
+        "why": "Provides the basic SQL structure: SELECT id, CASE ... END AS type FROM Tree ORDER BY id.",
+        "what_if": "Missing ORDER BY would return rows in arbitrary order, violating the problem requirement.",
+        "intuition": "The skeleton is the empty house; we just need to fill in the CASE logic."
+      },
+      "Solution": {
+        "why": "Implements the exact CASE logic: WHEN p_id IS NULL THEN 'Root' WHEN id NOT IN (SELECT p_id FROM Tree WHERE p_id IS NOT NULL) THEN 'Leaf' ELSE 'Inner' END.",
+        "what_if": "If you omit the subquery filter for non-null p_id, NULL in the subquery could cause unexpected results.",
+        "intuition": "The final code is the recipe: first check for root, then check for leaf by seeing if the id is ever a parent, otherwise it's inner."
+      }
+    },
+    "active_count": 3
+  },
+  "sql-27": {
+    "nodes": [
+      "Problem",
+      "Approach",
+      "Pattern",
+      "Skeleton",
+      "Solution"
+    ],
+    "details": {
+      "Problem": {
+        "why": "Defines the input (three side lengths per row) and the output (a 'Yes'/'No' column indicating triangle validity).",
+        "what_if": "Without a clear problem statement, you might check the wrong condition or return the wrong columns.",
+        "intuition": "We need to decide for each row whether three given numbers can form a triangle."
+      },
+      "Approach": {
+        "why": "Establishes that we must verify all three triangle inequalities: x+y>z, x+z>y, y+z>x.",
+        "what_if": "If you only check one pair (e.g., the two smallest), you might incorrectly mark a degenerate or invalid triangle as valid.",
+        "intuition": "Think of three sticks: each pair must be longer than the remaining stick to form a closed shape."
+      },
+      "Pattern": {
+        "why": "This is a straightforward conditional check per row, often implemented with a CASE WHEN or IF statement in SQL.",
+        "what_if": "Using a wrong pattern (e.g., checking only one inequality) would produce incorrect results.",
+        "intuition": "For each row, just apply the three conditions and output 'Yes' if all hold, else 'No'."
+      },
+      "Skeleton": {
+        "why": "Provides the basic structure: SELECT x, y, z, and a computed column from the table.",
+        "what_if": "Missing the skeleton could lead to forgetting to include all three original columns or misplacing the condition.",
+        "intuition": "Start with SELECT x, y, z, then add a CASE that checks the three inequalities."
+      },
+      "Solution": {
+        "why": "Implements the exact condition: CASE WHEN x+y>z AND x+z>y AND y+z>x THEN 'Yes' ELSE 'No' END.",
+        "what_if": "If the condition is written incorrectly (e.g., using OR instead of AND), the logic fails.",
+        "intuition": "All three pairwise sums must be greater than the third side; that's the complete test."
+      }
+    },
+    "active_count": 3
+  },
+  "sql-28": {
+    "nodes": [
+      "Problem",
+      "Approach",
+      "Pattern",
+      "Skeleton",
+      "Solution"
+    ],
+    "details": {
+      "Problem": {
+        "why": "Defines the goal: find the largest number that appears exactly once, or null if none.",
+        "what_if": "Without understanding the uniqueness condition, you might just return the max of all numbers, ignoring duplicates.",
+        "intuition": "We need to filter out numbers that appear more than once before taking the maximum."
+      },
+      "Approach": {
+        "why": "Use GROUP BY and HAVING to isolate numbers with count 1, then MAX to get the largest.",
+        "what_if": "If you skip GROUP BY, you can't distinguish single occurrences from duplicates.",
+        "intuition": "First find the lonely numbers, then pick the biggest among them."
+      },
+      "Pattern": {
+        "why": "This is a 'group and filter then aggregate' pattern, common for per-group uniqueness checks.",
+        "what_if": "Using a direct MAX with a WHERE clause on count would require a subquery anyway, making the pattern unavoidable.",
+        "intuition": "Like finding the tallest person in a room of only singletons."
+      },
+      "Skeleton": {
+        "why": "A subquery with GROUP BY and HAVING, wrapped in an outer SELECT MAX, ensures null on empty result.",
+        "what_if": "Without the subquery, a direct MAX on the raw table would include duplicates and never return null.",
+        "intuition": "The inner query builds a list of unique numbers, the outer query picks the top one."
+      },
+      "Solution": {
+        "why": "SELECT MAX(num) FROM (SELECT num FROM MyNumbers GROUP BY num HAVING COUNT(*) = 1) AS t;",
+        "what_if": "Omitting the subquery or using MAX(num) directly on the table would give wrong results or errors.",
+        "intuition": "The inner query filters to singles, the outer MAX handles the null case automatically."
+      }
+    },
+    "active_count": 3
+  },
+  "sql-29": {
+    "nodes": [
+      "Problem",
+      "Approach",
+      "Pattern",
+      "Skeleton",
+      "Solution"
+    ],
+    "details": {
+      "Problem": {
+        "why": "Defines the exact filtering and sorting criteria to avoid returning wrong rows.",
+        "what_if": "Misinterpretation leads to including even ids or boring descriptions.",
+        "intuition": "Think of it as a recipe: odd id, description not 'boring', descending rating."
+      },
+      "Approach": {
+        "why": "Clarifies that filtering conditions are independent and must be combined with AND.",
+        "what_if": "Omitting either condition yields incorrect or incomplete results.",
+        "intuition": "Two sieves: one for odd ids, one for non-boring descriptions, then sort."
+      },
+      "Pattern": {
+        "why": "Establishes the canonical SQL WHERE clause pattern with boolean and comparison operators.",
+        "what_if": "Using wrong operator (e.g., '!= null' or incorrect negation) misses the intended rows.",
+        "intuition": "WHERE id % 2 = 1 AND description <> 'boring' is the exact filter."
+      },
+      "Skeleton": {
+        "why": "Provides the basic query structure to build upon without forgetting any required clause.",
+        "what_if": "Missing ORDER BY will not deliver the expected descending rating order.",
+        "intuition": "Start with SELECT * FROM Cinema WHERE ... ORDER BY rating DESC."
+      },
+      "Solution": {
+        "why": "Delivers the final, correct SQL that meets all problem requirements.",
+        "what_if": "Writing a synonym like 'description != 'boring'' works, but forgetting modulo or ordering breaks it.",
+        "intuition": "The actual query that solves the puzzle in one go."
+      }
+    },
+    "active_count": 3
+  },
+  "sql-30": {
+    "nodes": [
+      "Problem",
+      "Approach",
+      "Pattern",
+      "Skeleton",
+      "Solution"
+    ],
+    "details": {
+      "Problem": {
+        "why": "Defines the input table and the required output transformation.",
+        "what_if": "Without a clear problem statement, you might swap the wrong columns or miss the odd-row rule.",
+        "intuition": "We need to reassign student names to new seat IDs based on adjacency."
+      },
+      "Approach": {
+        "why": "Swapping IDs instead of names simplifies the logic and avoids mutating the original data.",
+        "what_if": "If you try to swap student values directly, you risk complex self-joins or incorrect updates.",
+        "intuition": "Think of it as reassigning seat numbers: odd seats move to even, even to odd, except the last odd if total is odd."
+      },
+      "Pattern": {
+        "why": "Identifies the conditional mapping for odd/even IDs and the special case for the last row.",
+        "what_if": "Missing the special case for an unpaired last odd ID would incorrectly swap it with a non-existent seat.",
+        "intuition": "Use CASE: if id is odd and not max, id+1; if even, id-1; else keep id."
+      },
+      "Skeleton": {
+        "why": "Provides the structure of the SQL query: SELECT, CASE, FROM, ORDER BY.",
+        "what_if": "Without ORDER BY id, the result rows might be in arbitrary order, violating the requirement.",
+        "intuition": "Start with SELECT id, student FROM Seat, then apply the CASE to compute new_id, and order by that new_id."
+      },
+      "Solution": {
+        "why": "Implements the complete correct SQL query that produces the desired output.",
+        "what_if": "A wrong solution could produce swapped names for the last odd row or misorder the results.",
+        "intuition": "The final query: SELECT IF(id % 2 = 1, IF(id = (SELECT MAX(id) FROM Seat), id, id+1), id-1) AS id, student FROM Seat ORDER BY id;"
+      }
+    },
+    "active_count": 3
+  },
+  "sql-31": {
+    "nodes": [
+      "Problem",
+      "Approach",
+      "Pattern",
+      "Skeleton",
+      "Solution"
+    ],
+    "details": {
+      "Problem": {
+        "why": "Defines the exact transformation needed: flip each row's sex value in one atomic operation.",
+        "what_if": "Misreading the requirement could lead to a two-step update that corrupts all rows to the same sex.",
+        "intuition": "Think of toggling a light switch per row, not painting the whole room twice."
+      },
+      "Approach": {
+        "why": "A single CASE expression ensures each row is evaluated independently and flipped correctly.",
+        "what_if": "Using two separate UPDATE statements would cause all rows to end up as 'f' after the second pass.",
+        "intuition": "Like a coin flip: each coin gets turned over once, not flipped twice."
+      },
+      "Pattern": {
+        "why": "The CASE WHEN sex = 'm' THEN 'f' ELSE 'm' END pattern is the standard SQL idiom for binary value inversion.",
+        "what_if": "Using IF or DECODE without proper handling might not be portable or could miss the ELSE branch.",
+        "intuition": "It's a simple if-else: if it's one, make it the other; otherwise, make it the first."
+      },
+      "Skeleton": {
+        "why": "SELECT id, name, CASE ... END AS sex, salary FROM Salary ORDER BY id provides the required output structure.",
+        "what_if": "Omitting ORDER BY id would return rows in an unspecified order, failing the requirement.",
+        "intuition": "Build the result row by row, keeping all original columns except the flipped sex."
+      },
+      "Solution": {
+        "why": "The final query executes the flip in one pass, preserving all rows and ordering them by id.",
+        "what_if": "Writing a two-step UPDATE would destroy data integrity; this SELECT is read-only and correct.",
+        "intuition": "One CASE expression does the job of two hypothetical updates, safely and efficiently."
+      }
+    },
+    "active_count": 3
+  },
+  "sql-32": {
+    "nodes": [
+      "Problem",
+      "Approach",
+      "Pattern",
+      "Skeleton",
+      "Solution"
+    ],
+    "details": {
+      "Problem": {
+        "why": "Defines the exact requirement: find customers who have purchased every product in the Product table.",
+        "what_if": "Misunderstanding the requirement could lead to returning customers who bought only some products or duplicates.",
+        "intuition": "We need to match each customer's set of purchased products against the full set of all products."
+      },
+      "Approach": {
+        "why": "Use COUNT(DISTINCT product_key) per customer and compare to total product count to verify full coverage.",
+        "what_if": "Using COUNT(product_key) without DISTINCT would count duplicate purchases, falsely inflating coverage.",
+        "intuition": "Count how many distinct products each customer bought and see if it equals the total number of products."
+      },
+      "Pattern": {
+        "why": "This is a classic 'set equality' pattern using GROUP BY and HAVING with a subquery for total count.",
+        "what_if": "Skipping the subquery for total count would leave no baseline to compare against.",
+        "intuition": "HAVING COUNT(DISTINCT product_key) = (SELECT COUNT(*) FROM Product) ensures exact match."
+      },
+      "Skeleton": {
+        "why": "Structure: SELECT customer_id, GROUP BY customer_id, HAVING condition, ORDER BY customer_id.",
+        "what_if": "Missing GROUP BY would aggregate all rows into one, losing per-customer results.",
+        "intuition": "Group customers, count their distinct products, filter those with full coverage, then sort."
+      },
+      "Solution": {
+        "why": "Final query: SELECT customer_id FROM Customer GROUP BY customer_id HAVING COUNT(DISTINCT product_key) = (SELECT COUNT(*) FROM Product) ORDER BY customer_id;",
+        "what_if": "Omitting ORDER BY would return correct customers but not in the required sorted order.",
+        "intuition": "The query directly implements the set-coverage check with a single HAVING clause."
+      }
+    },
+    "active_count": 3
+  },
+  "sql-33": {
+    "nodes": [
+      "Problem",
+      "Approach",
+      "Pattern",
+      "Skeleton",
+      "Solution"
+    ],
+    "details": {
+      "Problem": {
+        "why": "Defines the exact output needed: pairs of actor_id and director_id that appear together in at least three rows.",
+        "what_if": "Without a clear problem statement, you might return individual counts or miss the pair condition entirely.",
+        "intuition": "We need to count how many times each specific actor-director duo worked together."
+      },
+      "Approach": {
+        "why": "Grouping by both actor_id and director_id together ensures we count per pair, not per individual.",
+        "what_if": "Grouping by only one column would count total films for that actor or director, not the pair's collaborations.",
+        "intuition": "Think of each pair as a unique key; we count rows for that key."
+      },
+      "Pattern": {
+        "why": "The GROUP BY + HAVING pattern is the standard SQL way to filter groups based on aggregate conditions.",
+        "what_if": "Using WHERE instead of HAVING would filter rows before grouping, missing the count condition.",
+        "intuition": "First group the rows into pairs, then keep only those with count >= 3."
+      },
+      "Skeleton": {
+        "why": "Provides the minimal structure: SELECT columns, FROM table, GROUP BY pair, HAVING count condition.",
+        "what_if": "Omitting GROUP BY would return all rows individually; omitting HAVING would return all pairs regardless of count.",
+        "intuition": "The skeleton is the blueprint: select, from, group, having."
+      },
+      "Solution": {
+        "why": "The final query correctly returns only the pairs that cooperated at least three times.",
+        "what_if": "A wrong solution might return incorrect pairs or miss the threshold due to grouping errors.",
+        "intuition": "The code counts rows per pair and filters to those with count >= 3."
+      }
+    },
+    "active_count": 3
+  },
+  "sql-34": {
+    "nodes": [
+      "Problem",
+      "Approach",
+      "Pattern",
+      "Skeleton",
+      "Solution"
+    ],
+    "details": {
+      "Problem": {
+        "why": "Defines the input tables and the required output columns.",
+        "what_if": "Misunderstanding the schema leads to selecting wrong columns or missing data.",
+        "intuition": "We need to combine sale records with their product names."
+      },
+      "Approach": {
+        "why": "An inner join on product_id links each sale to its product name.",
+        "what_if": "Using a left join would keep orphan sales with NULL names, violating the problem's guarantee.",
+        "intuition": "Every sale has a product, so joining is safe and efficient."
+      },
+      "Pattern": {
+        "why": "Denormalization via join is the standard pattern for enriching fact tables with dimension attributes.",
+        "what_if": "Skipping the join would leave product_name missing from the output.",
+        "intuition": "We flatten the relationship into a single result set."
+      },
+      "Skeleton": {
+        "why": "SELECT product_name, year, price FROM Sales JOIN Product ON ...",
+        "what_if": "Omitting the ON clause causes a Cartesian product, duplicating rows incorrectly.",
+        "intuition": "The join condition is the glue that matches each sale to its product."
+      },
+      "Solution": {
+        "why": "The final query returns exactly the three required columns for every sale.",
+        "what_if": "Forgetting to select year or price would produce an incomplete result.",
+        "intuition": "The query directly translates the problem statement into SQL."
+      }
+    },
+    "active_count": 3
+  },
+  "sql-35": {
+    "nodes": [
+      "Problem",
+      "Approach",
+      "Pattern",
+      "Skeleton",
+      "Solution"
+    ],
+    "details": {
+      "Problem": {
+        "why": "Defines the goal: retrieve each product's first sale year along with that specific row's quantity and price.",
+        "what_if": "Without a clear problem statement, you might incorrectly aggregate across all years instead of isolating the first year's data.",
+        "intuition": "We need the earliest sale record per product, not just the minimum year."
+      },
+      "Approach": {
+        "why": "Use GROUP BY to find each product's minimum year, then join back to Sales to get the exact row for that year.",
+        "what_if": "If you skip the join and try to select quantity/price directly in the GROUP BY, you'll get values from arbitrary rows, not the first year's.",
+        "intuition": "First find the 'first year' per product, then look up the full record for that year."
+      },
+      "Pattern": {
+        "why": "This is a classic 'group-wise maximum/minimum' pattern solved by a subquery or self-join.",
+        "what_if": "Without this pattern, you might attempt a simple GROUP BY with MIN on all columns, which mixes data from different rows.",
+        "intuition": "Find the key (product_id, min_year) then fetch the associated row."
+      },
+      "Skeleton": {
+        "why": "Write a subquery that selects product_id and MIN(year) grouped by product_id, then join Sales on both product_id and year.",
+        "what_if": "If you omit the join condition on year, you'll get all rows for each product, not just the first year.",
+        "intuition": "The subquery gives the 'address' (product_id, first_year), the join retrieves the 'package' (quantity, price)."
+      },
+      "Solution": {
+        "why": "The final query returns product_id, first_year, quantity, and price from the first sale year for each product.",
+        "what_if": "If you use a wrong join type (e.g., LEFT JOIN without handling NULLs), you might include products with no sales or duplicate rows.",
+        "intuition": "The solution is a self-join that pairs each product with its earliest sale record."
+      }
+    },
+    "active_count": 3
+  },
+  "sql-36": {
+    "nodes": [
+      "Problem",
+      "Approach",
+      "Pattern",
+      "Skeleton",
+      "Solution"
+    ],
+    "details": {
+      "Problem": {
+        "why": "Defines the goal: compute average experience per project from two related tables.",
+        "what_if": "Without understanding the problem, you might compute per-employee averages instead of per-project.",
+        "intuition": "We need to combine employee experience with project assignments, then group by project."
+      },
+      "Approach": {
+        "why": "Joins Project to Employee to attach experience_years to each assignment row.",
+        "what_if": "Skipping the join leaves experience_years unavailable, making the average impossible.",
+        "intuition": "Think of gluing each employee's experience onto their project row."
+      },
+      "Pattern": {
+        "why": "GROUP BY project_id with AVG aggregates the joined rows into one average per project.",
+        "what_if": "Without GROUP BY, you'd get a single overall average instead of per-project results.",
+        "intuition": "Like sorting all assignments by project and then averaging each pile."
+      },
+      "Skeleton": {
+        "why": "ROUND the AVG result to 2 decimals to match the required output format.",
+        "what_if": "Applying ROUND to individual experience_years before averaging would distort the aggregate.",
+        "intuition": "Wrap the average in ROUND as the final polish, not a per-row operation."
+      },
+      "Solution": {
+        "why": "Combines JOIN, GROUP BY, AVG, and ROUND in correct order to produce the exact result.",
+        "what_if": "Wrong order (e.g., ROUND inside AVG) yields incorrect or unrounded averages.",
+        "intuition": "The final query is a pipeline: join \u2192 group \u2192 average \u2192 round."
+      }
+    },
+    "active_count": 3
+  },
+  "sql-37": {
+    "nodes": [
+      "Problem",
+      "Approach",
+      "Pattern",
+      "Skeleton",
+      "Solution"
+    ],
+    "details": {
+      "Problem": {
+        "why": "Defines the required condition: every sale of a product must be within a specific date range.",
+        "what_if": "Misreading 'every sale' as 'any sale' leads to including products that also sold outside the range.",
+        "intuition": "We need to guarantee that no sale for a product falls outside the window."
+      },
+      "Approach": {
+        "why": "Group sales by product so we can examine all sale dates per product as a set.",
+        "what_if": "Without grouping, we cannot evaluate conditions across multiple rows per product.",
+        "intuition": "Think of each product's sales as a timeline: we check the earliest and latest sale."
+      },
+      "Pattern": {
+        "why": "Use HAVING MIN(sale_date) \u2265 start AND MAX(sale_date) \u2264 end to enforce the all-sales-in-range constraint.",
+        "what_if": "Using WHERE on sale_date alone would only filter rows, not ensure every sale of that product is in range.",
+        "intuition": "This pattern checks the entire range of sale dates for a product fits inside the target window."
+      },
+      "Skeleton": {
+        "why": "Start with SELECT product_id FROM Sales GROUP BY product_id HAVING ... then JOIN Product to get names.",
+        "what_if": "Skipping the GROUP BY or HAVING yields no way to aggregate and verify the all-sales condition.",
+        "intuition": "First identify eligible product IDs, then fetch their names from the Product table."
+      },
+      "Solution": {
+        "why": "Combine the grouped subquery with a JOIN to output the required product_id and product_name.",
+        "what_if": "Forgetting the JOIN would leave out product_name, which is required by the problem.",
+        "intuition": "The final query is a cleanup step that attaches the readable names to the qualifying IDs."
+      }
+    },
+    "active_count": 3
+  },
+  "sql-38": {
+    "nodes": [
+      "Problem",
+      "Approach",
+      "Pattern",
+      "Skeleton",
+      "Solution"
+    ],
+    "details": {
+      "Problem": {
+        "why": "Defines the exact output needed: daily distinct user counts for a specific date range.",
+        "what_if": "Without this, you might return wrong dates or count users incorrectly.",
+        "intuition": "We need one row per day with at least one activity, showing how many different users were active."
+      },
+      "Approach": {
+        "why": "Filter rows to the date range, group by activity_date, and count distinct user_id.",
+        "what_if": "Skipping the filter includes irrelevant dates; skipping distinct count overcounts users with multiple activities.",
+        "intuition": "Think of it as: for each day in the window, count unique users who did anything."
+      },
+      "Pattern": {
+        "why": "This is a classic 'daily active users' aggregation using GROUP BY and COUNT(DISTINCT).",
+        "what_if": "Using COUNT(*) instead would count each session, not each user, inflating numbers.",
+        "intuition": "It's like taking attendance each day and listing only the names that appear at least once."
+      },
+      "Skeleton": {
+        "why": "Provides the SQL structure: SELECT, FROM, WHERE, GROUP BY, ORDER BY.",
+        "what_if": "Missing ORDER BY would return days in arbitrary order; missing GROUP BY would not aggregate per day.",
+        "intuition": "The skeleton is the recipe: pick the days, group them, count unique users, then sort."
+      },
+      "Solution": {
+        "why": "Executes the plan: SELECT activity_date AS day, COUNT(DISTINCT user_id) AS active_users FROM Activity WHERE activity_date BETWEEN '2021-01-01' AND '2021-01-30' GROUP BY activity_date ORDER BY day.",
+        "what_if": "Omitting DISTINCT would count a user multiple times per day; wrong date range would miss or include extra days.",
+        "intuition": "This is the final query that directly answers the problem."
+      }
+    },
+    "active_count": 3
+  },
+  "sql-39": {
+    "nodes": [
+      "Problem",
+      "Approach",
+      "Pattern",
+      "Skeleton",
+      "Solution"
+    ],
+    "details": {
+      "Problem": {
+        "why": "Defines the exact output needed: distinct author IDs who viewed their own articles, sorted.",
+        "what_if": "Without a clear problem statement, you might return duplicates, wrong columns, or unsorted results.",
+        "intuition": "We need to find rows where the author and viewer are the same person."
+      },
+      "Approach": {
+        "why": "A row-level filter (WHERE author_id = viewer_id) is the simplest and most efficient way to isolate self-views.",
+        "what_if": "Using a self-join would be overcomplicated and slower, risking incorrect logic or performance issues.",
+        "intuition": "Since both IDs are on the same row, we just check if they match."
+      },
+      "Pattern": {
+        "why": "This is a classic 'filter on same-row equality' pattern, not a join or aggregation.",
+        "what_if": "Mistaking it for a join could lead to Cartesian products or missing the simple filter.",
+        "intuition": "It's like checking if a person's name appears twice in the same line of a spreadsheet."
+      },
+      "Skeleton": {
+        "why": "Provides the structural SQL template: SELECT DISTINCT ... FROM Views WHERE ... ORDER BY ...",
+        "what_if": "Omitting DISTINCT would return duplicate author IDs; missing ORDER BY would violate the problem's sorting requirement.",
+        "intuition": "Start with the table, filter rows, pick unique IDs, then sort."
+      },
+      "Solution": {
+        "why": "The final query SELECT DISTINCT author_id AS id FROM Views WHERE author_id = viewer_id ORDER BY author_id; directly solves the problem.",
+        "what_if": "Any deviation (e.g., using JOIN, missing DISTINCT, wrong column alias) would produce incorrect output.",
+        "intuition": "Just filter for self-views, deduplicate, and sort."
+      }
+    },
+    "active_count": 3
+  },
+  "sql-40": {
+    "nodes": [
+      "Problem",
+      "Approach",
+      "Pattern",
+      "Skeleton",
+      "Solution"
+    ],
+    "details": {
+      "Problem": {
+        "why": "Defines the exact output needed: every user's buyer_id, join_date, and count of 2019 orders.",
+        "what_if": "Without clear problem definition, you might miss users with zero orders or misalign columns.",
+        "intuition": "Think of a report card that must list every student even if they took zero tests in 2019."
+      },
+      "Approach": {
+        "why": "LEFT JOIN ensures all users appear, and filtering by year in the JOIN condition prevents dropping users with no 2019 orders.",
+        "what_if": "Using WHERE for year filter would turn LEFT JOIN into INNER JOIN, losing users with zero 2019 orders.",
+        "intuition": "It's like keeping everyone on the roster while only counting games played in 2019."
+      },
+      "Pattern": {
+        "why": "LEFT JOIN with condition in ON clause is the standard pattern for counting occurrences while preserving all rows from the left table.",
+        "what_if": "Skipping this pattern leads to incorrect counts or missing rows for users with no matches.",
+        "intuition": "This pattern is the 'zero-friendly counter' \u2014 it never erases a user just because they have no orders."
+      },
+      "Skeleton": {
+        "why": "Provides the structural query: SELECT, FROM Users LEFT JOIN Orders ON ... AND YEAR(order_date)=2019, GROUP BY, ORDER BY.",
+        "what_if": "Without GROUP BY, COUNT would aggregate all rows into one; without ORDER BY, output order is undefined.",
+        "intuition": "The skeleton is the recipe: start with all users, attach only 2019 orders, then count per user and sort."
+      },
+      "Solution": {
+        "why": "Executes the skeleton with COUNT(o.order_id) to count only matched orders, yielding 0 for unmatched users.",
+        "what_if": "Using COUNT(*) would count the NULL row as 1, giving 1 instead of 0 for users with no orders.",
+        "intuition": "COUNT(o.order_id) counts only real order IDs, so NULLs become zero automatically."
+      }
+    },
+    "active_count": 3
+  },
+  "sql-41": {
+    "nodes": [
+      "Problem",
+      "Approach",
+      "Pattern",
+      "Skeleton",
+      "Solution"
+    ],
+    "details": {
+      "Problem": {
+        "why": "Defines the exact output needed: each product's price on 2019-08-16, defaulting to 10 if no prior change.",
+        "what_if": "Without a clear problem statement, you might miss the default price or the date cutoff, leading to incorrect results.",
+        "intuition": "Think of it as 'find the latest price before or on the target date, or use 10 if none exists'."
+      },
+      "Approach": {
+        "why": "Splitting into two halves (products with and without a qualifying change) simplifies handling the default vs. actual price logic.",
+        "what_if": "If you don't split, you risk mixing default and real prices or missing products entirely.",
+        "intuition": "Separate the 'no change' products to give them 10, then find the latest change for the rest."
+      },
+      "Pattern": {
+        "why": "Using a subquery to get each product's MAX(change_date) on or before the target date isolates the single relevant row per product.",
+        "what_if": "Without this pattern, you might pick any random change or multiple rows, breaking the 'most recent' requirement.",
+        "intuition": "It's like 'for each product, grab the row with the latest date that is still <= target'."
+      },
+      "Skeleton": {
+        "why": "The skeleton (UNION of two SELECTs) provides the structure: one part for defaults, one part for actual prices.",
+        "what_if": "Skipping the skeleton leads to messy code that either misses products or duplicates rows.",
+        "intuition": "Think of it as 'first handle the easy case (no changes), then handle the hard case (latest change)'."
+      },
+      "Solution": {
+        "why": "The final SQL combines the two halves correctly, ensuring every product appears exactly once with the right price.",
+        "what_if": "If the solution is wrong, you might get NULLs, wrong prices, or missing products.",
+        "intuition": "The solution is just the skeleton filled with the correct subqueries and default logic."
+      }
+    },
+    "active_count": 3
+  },
+  "sql-42": {
+    "nodes": [
+      "Problem",
+      "Approach",
+      "Pattern",
+      "Skeleton",
+      "Solution"
+    ],
+    "details": {
+      "Problem": {
+        "why": "Defines the exact business question: immediate percentage for first orders only.",
+        "what_if": "Without this, you might compute the percentage over all orders, which includes non-first orders and yields an incorrect result.",
+        "intuition": "We only care about each customer's first order, not their later ones."
+      },
+      "Approach": {
+        "why": "Isolate each customer's first order using a subquery that finds the minimum order_date per customer.",
+        "what_if": "If you skip this, you'll include multiple orders per customer and the percentage will be diluted by later orders.",
+        "intuition": "First find the earliest order for each customer, then check if it was immediate."
+      },
+      "Pattern": {
+        "why": "Use a subquery to filter to first orders, then compute the average of a boolean condition (immediate = 1, else 0).",
+        "what_if": "Without this pattern, you'd have to manually join and aggregate, risking double-counting or missing customers.",
+        "intuition": "Filter first, then average the immediate flag over that filtered set."
+      },
+      "Skeleton": {
+        "why": "Provides the structure: SELECT ROUND(AVG(immediate_flag)*100, 2) FROM (first orders subquery).",
+        "what_if": "Missing the ROUND or the *100 would give a decimal fraction instead of a percentage, or wrong precision.",
+        "intuition": "The outer query computes the percentage from the inner query's filtered rows."
+      },
+      "Solution": {
+        "why": "Executes the exact SQL: subquery gets first orders with immediate flag, outer query averages and rounds.",
+        "what_if": "If the subquery is wrong (e.g., not using MIN or grouping incorrectly), the result will be incorrect.",
+        "intuition": "The final query is just a clean two-step: first orders \u2192 percentage."
+      }
+    },
+    "active_count": 3
+  },
+  "sql-43": {
+    "nodes": [
+      "Problem",
+      "Approach",
+      "Pattern",
+      "Skeleton",
+      "Solution"
+    ],
+    "details": {
+      "Problem": {
+        "why": "Defines the input table structure and the desired output format.",
+        "what_if": "Without a clear problem statement, you might pivot incorrectly or miss required columns.",
+        "intuition": "We have one row per department per month and want one row per department with 12 monthly revenue columns."
+      },
+      "Approach": {
+        "why": "Uses conditional aggregation to transform rows into columns.",
+        "what_if": "Skipping this approach leads to complex self-joins or manual column creation.",
+        "intuition": "For each month, we pick the revenue only when the month matches, then group by id."
+      },
+      "Pattern": {
+        "why": "The classic 'long-to-wide' pivot pattern with SUM(CASE WHEN ...) and GROUP BY.",
+        "what_if": "Without GROUP BY, you get one row per id-month pair instead of one row per id.",
+        "intuition": "SUM over a CASE that matches at most one row per group passes that value through."
+      },
+      "Skeleton": {
+        "why": "Provides the structural SQL: SELECT id, SUM(CASE ...) AS Jan_Revenue, ... FROM Department GROUP BY id.",
+        "what_if": "Missing GROUP BY or CASE clauses results in incorrect aggregation or missing columns.",
+        "intuition": "The skeleton is the template that you fill with month names and revenue aliases."
+      },
+      "Solution": {
+        "why": "Executes the pivot correctly, producing one row per id with 12 month-revenue columns.",
+        "what_if": "If the CASE conditions are wrong (e.g., wrong month abbreviation), columns will be NULL or misnamed.",
+        "intuition": "The final query is the skeleton with all 12 months spelled out, giving the exact desired output."
+      }
+    },
+    "active_count": 3
+  },
+  "sql-44": {
+    "nodes": [
+      "Problem",
+      "Approach",
+      "Pattern",
+      "Skeleton",
+      "Solution"
+    ],
+    "details": {
+      "Problem": {
+        "why": "Defines the input table and the exact output columns needed.",
+        "what_if": "Without a clear problem statement you might miss required fields or misinterpret the grouping.",
+        "intuition": "It's the recipe: we have a list of transactions and need a monthly per\u2011country summary."
+      },
+      "Approach": {
+        "why": "Using strftime to extract month and conditional aggregation to compute approved counts/sums in one pass.",
+        "what_if": "A naive approach might filter then re\u2011join, causing extra complexity and slower performance.",
+        "intuition": "We slice dates into month buckets and count only the approved rows inside the same GROUP BY."
+      },
+      "Pattern": {
+        "why": "This is a classic 'group by time period with conditional aggregates' pattern.",
+        "what_if": "Ignoring the pattern could lead to writing a suboptimal query that doesn't scale.",
+        "intuition": "Like grouping sales by month and counting only the ones that were successful."
+      },
+      "Skeleton": {
+        "why": "Provides the structural SQL: SELECT, strftime, GROUP BY, and the two conditional SUMs.",
+        "what_if": "Missing the GROUP BY would collapse all rows into one row, losing per\u2011country/month detail.",
+        "intuition": "The skeleton is the empty house; we just fill in the column names and conditions."
+      },
+      "Solution": {
+        "why": "The final query that correctly returns month, country, total count, approved count, total amount, approved amount.",
+        "what_if": "A wrong solution might use COUNT(approved) instead of conditional SUM, giving incorrect approved counts.",
+        "intuition": "The solution is the skeleton with the right CASE WHEN logic and aliases."
+      }
+    },
+    "active_count": 3
+  },
+  "sql-45": {
+    "nodes": [
+      "Problem",
+      "Approach",
+      "Pattern",
+      "Skeleton",
+      "Solution"
+    ],
+    "details": {
+      "Problem": {
+        "why": "Defines the exact scenario and constraints (boarding order, weight limit) that the query must solve.",
+        "what_if": "Misunderstanding the problem leads to an incorrect query that may return the wrong person or exceed the weight limit.",
+        "intuition": "We need to find the last person whose cumulative weight (including themselves) is \u2264 1000."
+      },
+      "Approach": {
+        "why": "Using a running total ordered by turn directly models the boarding process and cumulative weight check.",
+        "what_if": "Without a running total, you cannot know the cumulative weight at each boarding step, making it impossible to enforce the limit.",
+        "intuition": "Think of a conveyor belt: each person adds their weight to the total as they board, and we stop when adding the next would exceed 1000."
+      },
+      "Pattern": {
+        "why": "SUM(...) OVER (ORDER BY ...) is the standard SQL pattern for cumulative sums, perfectly matching the need for sequential accumulation.",
+        "what_if": "Using a self-join or subquery instead would be more complex, slower, and error-prone for this sequential problem.",
+        "intuition": "It's like keeping a running tally while reading a list in order."
+      },
+      "Skeleton": {
+        "why": "A subquery to compute cumulative weight, then an outer filter and ordering to pick the last qualifying person, forms a clear, modular structure.",
+        "what_if": "Skipping the subquery forces mixing aggregation and filtering in one level, which can cause logical errors or performance issues.",
+        "intuition": "First compute the running total for everyone, then pick the last one that still fits."
+      },
+      "Solution": {
+        "why": "The final query correctly returns the name of the last person whose cumulative weight \u2264 1000, satisfying the problem exactly.",
+        "what_if": "An off-by-one error in the filter or ordering could return the next person who would exceed the limit, giving a wrong answer.",
+        "intuition": "We want the person with the highest cumulative weight that is still \u2264 1000."
+      }
+    },
+    "active_count": 3
+  },
+  "sql-46": {
+    "nodes": [
+      "Problem",
+      "Approach",
+      "Pattern",
+      "Skeleton",
+      "Solution"
+    ],
+    "details": {
+      "Problem": {
+        "why": "Defines the exact metrics to compute: per-query average of rating/position and percentage of rows with rating < 5.",
+        "what_if": "Misunderstanding the metrics leads to wrong aggregation (e.g., using AVG(rating)/AVG(position)).",
+        "intuition": "We need to compute two separate aggregates per query_name from the same table."
+      },
+      "Approach": {
+        "why": "Group by query_name, then compute quality as AVG(rating/position) and poor_query_percentage as AVG(CASE WHEN rating < 5 THEN 100 ELSE 0 END).",
+        "what_if": "Without grouping, we'd get overall numbers instead of per-query results.",
+        "intuition": "Grouping isolates each query's rows, then we apply row-level calculations before averaging."
+      },
+      "Pattern": {
+        "why": "This is a 'group-by with row-level arithmetic' pattern, common in SQL for custom per-group metrics.",
+        "what_if": "Using AVG(rating)/AVG(position) instead of AVG(rating/position) would compute a different, incorrect ratio.",
+        "intuition": "We compute a derived value per row first, then average those values within each group."
+      },
+      "Skeleton": {
+        "why": "Provides the structure: SELECT query_name, ROUND(AVG(rating/position),2) AS quality, ROUND(AVG(CASE WHEN rating<5 THEN 100 ELSE 0 END),2) AS poor_query_percentage FROM Queries GROUP BY query_name.",
+        "what_if": "Missing ROUND or wrong CASE logic would produce unrounded or incorrect percentages.",
+        "intuition": "The skeleton is the SQL query template with placeholders for rounding and conditional aggregation."
+      },
+      "Solution": {
+        "why": "Executes the skeleton with correct syntax, ensuring quality and poor_query_percentage are computed per query_name and rounded to two decimals.",
+        "what_if": "Omitting GROUP BY or misplacing parentheses would cause syntax errors or wrong results.",
+        "intuition": "The final query is the skeleton filled in with exact column names and rounding functions."
+      }
+    },
+    "active_count": 3
+  },
+  "sql-47": {
+    "nodes": [
+      "Problem",
+      "Approach",
+      "Pattern",
+      "Skeleton",
+      "Solution"
+    ],
+    "details": {
+      "Problem": {
+        "why": "Defines the exact input tables and the required output metric.",
+        "what_if": "Misunderstanding the tables or required rounding leads to wrong join logic or formatting.",
+        "intuition": "We need to compute per product the average selling price using only units sold during a valid price period."
+      },
+      "Approach": {
+        "why": "Joins Prices and UnitsSold on product_id and purchase_date within the price window.",
+        "what_if": "Without the date-range condition, we would multiply units by wrong prices or include invalid sales.",
+        "intuition": "Only count revenue from units that were sold when the price was active."
+      },
+      "Pattern": {
+        "why": "Uses a LEFT JOIN to keep all products, then aggregates with a safe division.",
+        "what_if": "An INNER JOIN would drop products with no matching sales, and missing NULLIF would cause divide-by-zero errors.",
+        "intuition": "Keep every product, sum revenue and units, then divide safely handling zeros."
+      },
+      "Skeleton": {
+        "why": "Provides the structural SQL template: SELECT, FROM, JOIN, GROUP BY, and COALESCE wrappers.",
+        "what_if": "Skipping GROUP BY would aggregate incorrectly; missing COALESCE/ROUND would break output formatting.",
+        "intuition": "Outline the query before filling in the join condition and aggregation logic."
+      },
+      "Solution": {
+        "why": "Implements the exact query: LEFT JOIN with date range, SUM revenue, NULLIF sum(units), COALESCE, ROUND.",
+        "what_if": "Omitting NULLIF(SUM(units),0) would cause division by zero; wrong rounding truncates the answer.",
+        "intuition": "Compute revenue per matched sale, divide by matched units, and return 0 for unsold products."
+      }
+    },
+    "active_count": 3
+  },
+  "sql-48": {
+    "nodes": [
+      "Problem",
+      "Approach",
+      "Pattern",
+      "Skeleton",
+      "Solution"
+    ],
+    "details": {
+      "Problem": {
+        "why": "Defines the goal: return every student-subject pair with exam count, including zeros.",
+        "what_if": "Without this clarity, you might miss the requirement to include pairs with zero attendance.",
+        "intuition": "The problem is about generating a complete matrix of students and subjects."
+      },
+      "Approach": {
+        "why": "CROSS JOIN creates all possible student-subject pairs, then LEFT JOIN and COUNT fill in exam counts.",
+        "what_if": "Starting from Examinations would omit students who never attended a subject's exam.",
+        "intuition": "First build the full grid, then fill in the data."
+      },
+      "Pattern": {
+        "why": "This is a classic 'fill missing combinations' pattern using CROSS JOIN and aggregation.",
+        "what_if": "Skipping CROSS JOIN leads to missing rows for zero-attendance pairs.",
+        "intuition": "Think of it as a Cartesian product followed by a lookup."
+      },
+      "Skeleton": {
+        "why": "Outline: SELECT columns, FROM Students CROSS JOIN Subjects, LEFT JOIN Examinations, GROUP BY, ORDER BY.",
+        "what_if": "Without this structure, the query would lack the necessary joins and grouping.",
+        "intuition": "The skeleton is the blueprint for the SQL query."
+      },
+      "Solution": {
+        "why": "Final query: SELECT s.student_id, s.student_name, sub.subject_name, COUNT(e.subject_name) AS attended_exams FROM Students s CROSS JOIN Subjects sub LEFT JOIN Examinations e ON s.student_id = e.student_id AND sub.subject_name = e.subject_name GROUP BY s.student_id, s.student_name, sub.subject_name ORDER BY s.student_id, sub.subject_name;",
+        "what_if": "Omitting the CROSS JOIN or using INNER JOIN would drop zero-attendance pairs.",
+        "intuition": "The solution directly implements the approach: cross join, left join, count, group, order."
+      }
+    },
+    "active_count": 3
+  },
+  "sql-49": {
+    "nodes": [
+      "Problem",
+      "Approach",
+      "Pattern",
+      "Skeleton",
+      "Solution"
+    ],
+    "details": {
+      "Problem": {
+        "why": "Defines the exact input and output requirements for the moving average calculation.",
+        "what_if": "Without a clear problem statement, you might compute the average over calendar days instead of distinct visited_on dates.",
+        "intuition": "We need to aggregate daily totals first, then apply a 7-day sliding window over those totals."
+      },
+      "Approach": {
+        "why": "Aggregate per day to get daily totals, then use a window function to compute the 7-day sum and average.",
+        "what_if": "Skipping the daily aggregation would cause multiple rows per day and break the window logic.",
+        "intuition": "First collapse the table to one row per date, then slide a 7-day window over those rows."
+      },
+      "Pattern": {
+        "why": "Window SUM with ROWS BETWEEN 6 PRECEDING AND CURRENT ROW directly gives the trailing 7-day sum.",
+        "what_if": "Using RANGE instead of ROWS would include ties incorrectly and might not respect the exact 7-row window.",
+        "intuition": "Think of a moving total that adds today's amount and the previous 6 days' amounts."
+      },
+      "Skeleton": {
+        "why": "A subquery or CTE first computes daily totals, then the outer query applies the window function and filters for complete windows.",
+        "what_if": "Without the subquery, you cannot apply the window function over aggregated daily data.",
+        "intuition": "Nest the daily aggregation inside a query that adds the window and filters out incomplete weeks."
+      },
+      "Solution": {
+        "why": "The final query returns visited_on, 7-day sum, and rounded average, ordered by date, for rows where ROW_NUMBER >= 7.",
+        "what_if": "Omitting the ROW_NUMBER filter would include the first 6 days with incomplete 7-day windows.",
+        "intuition": "Only show results for dates that have a full 7 days of history behind them."
+      }
+    },
+    "active_count": 3
+  },
+  "sql-50": {
+    "nodes": [
+      "Problem",
+      "Approach",
+      "Pattern",
+      "Skeleton",
+      "Solution"
+    ],
+    "details": {
+      "Problem": {
+        "why": "Defines the tables and the required output, setting the scope of the query.",
+        "what_if": "Without a clear problem statement, you might join incorrectly or miss the date and volume constraints.",
+        "intuition": "It's like reading the exam question before writing the answer."
+      },
+      "Approach": {
+        "why": "Filters orders to February 2020 first, then groups by product and sums units, then keeps only products with total >= 100.",
+        "what_if": "If you filter after grouping, you'd include irrelevant orders in the sum, or if you use WHERE on the sum, you'd get an error.",
+        "intuition": "First narrow down the data, then aggregate, then cut off low totals."
+      },
+      "Pattern": {
+        "why": "This is a classic 'filter before aggregate, then HAVING' pattern for date-range and threshold queries.",
+        "what_if": "Skipping the date filter would sum units from all time, and skipping HAVING would return all products regardless of volume.",
+        "intuition": "WHERE removes rows before counting, HAVING removes groups after counting."
+      },
+      "Skeleton": {
+        "why": "Provides the structural SQL: SELECT, FROM, JOIN, WHERE, GROUP BY, HAVING, ORDER BY (if needed).",
+        "what_if": "Missing GROUP BY would collapse all rows into one sum, and missing HAVING would not enforce the 100-unit minimum.",
+        "intuition": "It's the empty template you fill with specific columns and conditions."
+      },
+      "Solution": {
+        "why": "The final query that correctly returns product names and their February 2020 unit totals for products with at least 100 units.",
+        "what_if": "An incorrect solution might include products with zero units in February or sum units from other months.",
+        "intuition": "The finished code that passes the test cases."
+      }
+    },
+    "active_count": 3
+  },
+  "sql-51": {
+    "nodes": [
+      "Problem",
+      "Approach",
+      "Pattern",
+      "Skeleton",
+      "Solution"
+    ],
+    "details": {
+      "Problem": {
+        "why": "Identifies two separate ranking tasks that must be solved independently.",
+        "what_if": "Mixing both into one query would produce incorrect or ambiguous results.",
+        "intuition": "Think of it as two separate contests: one for most active user, one for top movie."
+      },
+      "Approach": {
+        "why": "Breaks the problem into two independent subqueries that each produce one row.",
+        "what_if": "Without separation, you cannot correctly apply different grouping and filtering.",
+        "intuition": "Each subquery is like a mini-report; UNION ALL stacks them into one column."
+      },
+      "Pattern": {
+        "why": "Uses UNION ALL to combine two single-row results into a single-column output.",
+        "what_if": "Using UNION instead would remove duplicates, but here rows are distinct anyway.",
+        "intuition": "It's like gluing two sticky notes onto one page."
+      },
+      "Skeleton": {
+        "why": "Provides the structure: two SELECTs with ORDER BY and LIMIT 1, joined by UNION ALL.",
+        "what_if": "Missing ORDER BY and LIMIT would return all users/movies instead of the top one.",
+        "intuition": "Each SELECT is a race: sort the contestants and pick the winner."
+      },
+      "Solution": {
+        "why": "Implements the exact SQL: count ratings per user, average ratings per movie in Feb 2020, then pick top by tiebreaker.",
+        "what_if": "Wrong tiebreaker or date filter would give the wrong winner.",
+        "intuition": "The code is just the skeleton filled with the correct columns and conditions."
+      }
+    },
+    "active_count": 3
+  },
+  "sql-52": {
+    "nodes": [
+      "Problem",
+      "Approach",
+      "Pattern",
+      "Skeleton",
+      "Solution"
+    ],
+    "details": {
+      "Problem": {
+        "why": "Defines the goal: map every employee to their unique_id, filling nulls for missing ones.",
+        "what_if": "Without understanding the requirement, you might drop employees without a unique_id.",
+        "intuition": "We need a complete employee list, even if some IDs are missing."
+      },
+      "Approach": {
+        "why": "LEFT JOIN ensures all employees from the left table are retained.",
+        "what_if": "Using INNER JOIN would exclude employees without a matching unique_id.",
+        "intuition": "Think of it as a left-side master list that can have blanks on the right."
+      },
+      "Pattern": {
+        "why": "LEFT JOIN with NULL fallback is the standard pattern for optional relationships.",
+        "what_if": "Skipping this pattern leads to incorrect data loss or complex workarounds.",
+        "intuition": "It's like a school roster where some students haven't received their ID badges yet."
+      },
+      "Skeleton": {
+        "why": "Provides the query structure: SELECT, FROM, LEFT JOIN, ORDER BY.",
+        "what_if": "Missing ORDER BY would produce arbitrary row order, failing the specification.",
+        "intuition": "The skeleton is the blueprint: pick columns, join tables, then sort."
+      },
+      "Solution": {
+        "why": "Executes the correct SQL: SELECT unique_id, name FROM Employees LEFT JOIN EmployeeUNI USING(id) ORDER BY id.",
+        "what_if": "Any deviation (e.g., wrong join type or missing order) breaks the expected output.",
+        "intuition": "The final query is just filling in the skeleton with the right table and column names."
+      }
+    },
+    "active_count": 3
+  },
+  "sql-53": {
+    "nodes": [
+      "Problem",
+      "Approach",
+      "Pattern",
+      "Skeleton",
+      "Solution"
+    ],
+    "details": {
+      "Problem": {
+        "why": "Defines the input table and the required output: per-stock net gain/loss ordered by stock name.",
+        "what_if": "Misunderstanding the operation types or the ordering requirement would produce wrong results or wrong order.",
+        "intuition": "We need to turn each stock's buy and sell rows into a single profit number."
+      },
+      "Approach": {
+        "why": "Uses a single conditional SUM to compute net gain/loss in one pass, avoiding separate buy/sell aggregations.",
+        "what_if": "Using two separate SUMs and subtracting them would work but be less efficient and more verbose.",
+        "intuition": "Treat 'Buy' as negative cost and 'Sell' as positive revenue, then sum them all."
+      },
+      "Pattern": {
+        "why": "Conditional aggregation (CASE inside SUM) is the key pattern to handle opposite signs in one group.",
+        "what_if": "Omitting the CASE would sum all prices regardless of operation, giving meaningless totals.",
+        "intuition": "We flip the sign of price based on operation type before summing."
+      },
+      "Skeleton": {
+        "why": "SELECT stock_name, SUM(CASE WHEN operation='Buy' THEN -price ELSE price END) AS capital_gain_loss FROM Stocks GROUP BY stock_name ORDER BY stock_name.",
+        "what_if": "Missing GROUP BY would collapse all stocks into one row; missing ORDER BY would not guarantee output order.",
+        "intuition": "Group by stock, apply conditional sign, sum, and sort."
+      },
+      "Solution": {
+        "why": "Executes the skeleton query to produce the correct per-stock capital gain/loss.",
+        "what_if": "Using wrong sign (e.g., + for Buy, - for Sell) would invert the gain/loss.",
+        "intuition": "The query directly translates the concept into SQL syntax."
+      }
+    },
+    "active_count": 3
+  },
+  "sql-54": {
+    "nodes": [
+      "Problem",
+      "Approach",
+      "Pattern",
+      "Skeleton",
+      "Solution"
+    ],
+    "details": {
+      "Problem": {
+        "why": "Defines the exact output needed: user name and total distance, with zero for no rides, sorted by distance descending then name ascending.",
+        "what_if": "Without a clear problem statement, you might miss the requirement to include users with zero rides or the specific sort order.",
+        "intuition": "The problem asks for a report of each user's total travel distance, treating missing rides as zero."
+      },
+      "Approach": {
+        "why": "LEFT JOIN ensures all users appear even without rides, and GROUP BY aggregates distances per user.",
+        "what_if": "Using INNER JOIN would drop users with no rides, violating the requirement to show them with distance 0.",
+        "intuition": "We need to keep every user, then sum their ride distances, handling missing rides as zero."
+      },
+      "Pattern": {
+        "why": "This is a classic 'LEFT JOIN with aggregation and COALESCE' pattern for including entities with zero contributions.",
+        "what_if": "Omitting COALESCE would yield NULL for users with no rides, which is not the requested explicit 0.",
+        "intuition": "The pattern ensures all users appear and null sums become zero."
+      },
+      "Skeleton": {
+        "why": "Provides the structural SQL: SELECT, FROM Users LEFT JOIN Rides, GROUP BY, ORDER BY.",
+        "what_if": "Missing GROUP BY would cause aggregation errors or incorrect per-user totals.",
+        "intuition": "The skeleton is the query framework that we fill with specific columns and conditions."
+      },
+      "Solution": {
+        "why": "Final query: SELECT u.name, COALESCE(SUM(r.distance),0) AS travelled_distance FROM Users u LEFT JOIN Rides r ON u.id = r.user_id GROUP BY u.id, u.name ORDER BY travelled_distance DESC, u.name ASC.",
+        "what_if": "Any deviation (e.g., wrong join type, missing COALESCE, wrong sort) would produce incorrect results.",
+        "intuition": "The solution directly implements the approach and pattern into executable SQL."
+      }
+    },
+    "active_count": 3
+  },
+  "sql-55": {
+    "nodes": [
+      "Problem",
+      "Approach",
+      "Pattern",
+      "Skeleton",
+      "Solution"
+    ],
+    "details": {
+      "Problem": {
+        "why": "Defines the exact output needed: per date, count distinct products and list them sorted and comma-separated.",
+        "what_if": "Without a clear problem statement, you might miss the requirement for distinct products or alphabetical ordering.",
+        "intuition": "Think of a daily sales log where you need a summary row for each date showing how many different items were sold and which ones."
+      },
+      "Approach": {
+        "why": "Separates the numeric count from the string list, using DISTINCT for both but handling the list with a subquery to enforce sorting.",
+        "what_if": "If you try GROUP_CONCAT directly on the raw products, you'll get duplicates and unsorted output.",
+        "intuition": "First get the unique products per date in order, then glue them together with commas."
+      },
+      "Pattern": {
+        "why": "Correlated subquery with DISTINCT and ORDER BY inside GROUP_CONCAT solves SQLite's limitation of no ORDER BY in aggregate functions.",
+        "what_if": "Without this pattern, you'd have to post-process the concatenated string or use a different DBMS feature.",
+        "intuition": "It's like preparing a sorted list of items before packing them into a single string."
+      },
+      "Skeleton": {
+        "why": "Provides the structural query: outer SELECT with GROUP BY date, COUNT(DISTINCT product), and a subquery for the product list.",
+        "what_if": "Missing the GROUP BY would give one row for all dates; missing the subquery would give unsorted duplicates.",
+        "intuition": "The outer query groups by date, the inner query fetches and sorts distinct products for that date."
+      },
+      "Solution": {
+        "why": "Final query that correctly returns sell_date, num_sold, and products sorted alphabetically, comma-separated, ordered by date.",
+        "what_if": "If the subquery doesn't filter by outer sell_date, you'll get all products for every date, breaking the grouping.",
+        "intuition": "The subquery acts like a per-date helper that builds the sorted product list on the fly."
+      }
+    },
+    "active_count": 3
+  },
+  "sql-56": {
+    "nodes": [
+      "Problem",
+      "Approach",
+      "Pattern",
+      "Skeleton",
+      "Solution"
+    ],
+    "details": {
+      "Problem": {
+        "why": "Identifies the exact requirement: find patients with a condition code starting with 'DIAB1' at a word boundary.",
+        "what_if": "Without this, you might incorrectly match codes like 'XDIAB100' where 'DIAB1' appears mid-word.",
+        "intuition": "We need to check the start of the string or after a space, not just anywhere."
+      },
+      "Approach": {
+        "why": "Uses SQL LIKE patterns to enforce word boundaries: 'DIAB1%' for start, '% DIAB1%' for after space.",
+        "what_if": "A single '%DIAB1%' would match any substring, leading to false positives.",
+        "intuition": "Two LIKE conditions combined with OR ensure we only match at the beginning of a code."
+      },
+      "Pattern": {
+        "why": "The pattern 'DIAB1%' or '% DIAB1%' precisely captures codes that start with the prefix.",
+        "what_if": "Omitting the space before 'DIAB1' in the second pattern would still allow mid-word matches.",
+        "intuition": "Think of it as checking the first word or any word after a space."
+      },
+      "Skeleton": {
+        "why": "Provides the basic SQL structure: SELECT patient_id, patient_name FROM Patients WHERE conditions LIKE ... OR conditions LIKE ...",
+        "what_if": "Without the skeleton, you might forget the OR or misplace the conditions.",
+        "intuition": "Start with a simple SELECT and add the two LIKE clauses."
+      },
+      "Solution": {
+        "why": "Executes the correct query to return only patients with at least one 'DIAB1' prefix code.",
+        "what_if": "A wrong solution could return all patients with 'DIAB1' anywhere, breaking the requirement.",
+        "intuition": "The final query filters rows where conditions starts with 'DIAB1' or has ' DIAB1'."
+      }
+    },
+    "active_count": 3
+  },
+  "sql-57": {
+    "nodes": [
+      "Problem",
+      "Approach",
+      "Pattern",
+      "Skeleton",
+      "Solution"
+    ],
+    "details": {
+      "Problem": {
+        "why": "Defines the exact output needed: customer IDs and count of visits with no transaction, ordered by customer.",
+        "what_if": "Without a clear problem statement, you might return wrong columns or miss the ordering requirement.",
+        "intuition": "We need to find visits that have no matching transaction row."
+      },
+      "Approach": {
+        "why": "LEFT JOIN ensures all visits are kept, then filtering NULL transaction_id isolates visits without transactions.",
+        "what_if": "Using INNER JOIN would only keep visits that have transactions, missing the target visits entirely.",
+        "intuition": "Think of it as 'give me all visits, then remove those that have a transaction'."
+      },
+      "Pattern": {
+        "why": "This is the classic 'anti-join' pattern: find rows in one table that have no match in another.",
+        "what_if": "Skipping the pattern might lead to using NOT IN or NOT EXISTS inefficiently or incorrectly.",
+        "intuition": "It's like checking a guest list: find people who came but didn't buy anything."
+      },
+      "Skeleton": {
+        "why": "Provides the structural SQL: SELECT, FROM, LEFT JOIN, WHERE, GROUP BY, ORDER BY.",
+        "what_if": "Missing GROUP BY would give one row per visit instead of per customer; missing ORDER BY would break the spec.",
+        "intuition": "The skeleton is the recipe: join, filter, group, count, sort."
+      },
+      "Solution": {
+        "why": "Final query that correctly counts visits with no transaction per customer and orders results.",
+        "what_if": "An incorrect solution might count all visits or include customers with zero such visits.",
+        "intuition": "The code translates the concept into a working SQL statement."
+      }
+    },
+    "active_count": 3
+  },
+  "sql-58": {
+    "nodes": [
+      "Problem",
+      "Approach",
+      "Pattern",
+      "Skeleton",
+      "Solution"
+    ],
+    "details": {
+      "Problem": {
+        "why": "Defines the goal: find accounts with balance > 10000.",
+        "what_if": "Without a clear problem, you might join incorrectly or miss the threshold.",
+        "intuition": "We need each account's total money, then keep only the rich ones."
+      },
+      "Approach": {
+        "why": "Use SUM(amount) to compute net balance per account, then filter with HAVING.",
+        "what_if": "If you filter before aggregation (WHERE), you'd lose deposits/withdrawals needed for the sum.",
+        "intuition": "First add up all transactions per account, then check if the total is over 10000."
+      },
+      "Pattern": {
+        "why": "GROUP BY account + HAVING SUM(amount) > 10000 is the standard aggregation-filter pattern.",
+        "what_if": "Skipping GROUP BY would sum all transactions into one number, losing per-account info.",
+        "intuition": "Group by account, sum amounts, and keep only groups that pass the threshold."
+      },
+      "Skeleton": {
+        "why": "SELECT u.name, SUM(t.amount) AS balance FROM Users u JOIN Transactions t ON u.account = t.account GROUP BY u.account, u.name HAVING balance > 10000;",
+        "what_if": "Omitting JOIN would miss user names; omitting GROUP BY would break per-account sums.",
+        "intuition": "Join users to transactions, group by account, sum amounts, and filter by balance."
+      },
+      "Solution": {
+        "why": "Executes the query to return names and balances for accounts exceeding 10000.",
+        "what_if": "If you forget HAVING, you'd get all accounts; if you use WHERE, you'd get wrong results.",
+        "intuition": "The final query that solves the problem exactly as described."
+      }
+    },
+    "active_count": 3
+  },
+  "sql-59": {
+    "nodes": [
+      "Problem",
+      "Approach",
+      "Pattern",
+      "Skeleton",
+      "Solution"
+    ],
+    "details": {
+      "Problem": {
+        "why": "Defines the goal: compute per-contest registration percentage relative to all users.",
+        "what_if": "Misreading the denominator would lead to incorrect percentages (e.g., using per-contest counts).",
+        "intuition": "We need the fraction of all users who signed up for each contest."
+      },
+      "Approach": {
+        "why": "Establishes that the denominator is a constant: total number of users from the Users table.",
+        "what_if": "Using a dynamic denominator from Register would make each contest's percentage relative only to its own registrants.",
+        "intuition": "Think of the total user count as a fixed baseline, like a school's total enrollment."
+      },
+      "Pattern": {
+        "why": "Identifies the need for a scalar subquery to get the constant total user count.",
+        "what_if": "Omitting the subquery would force a per-group division, breaking the required percentage calculation.",
+        "intuition": "The subquery acts like a global constant that every contest's count is divided by."
+      },
+      "Skeleton": {
+        "why": "Outlines the SELECT, FROM, GROUP BY, and ORDER BY clauses needed for the final query.",
+        "what_if": "Missing GROUP BY would aggregate all registrations into one row, losing per-contest breakdown.",
+        "intuition": "The skeleton is the query's backbone: count per contest, divide by total, then sort."
+      },
+      "Solution": {
+        "why": "Implements the exact SQL: COUNT(Register.user_id) / (SELECT COUNT(*) FROM Users) * 100, rounded to 2 decimals.",
+        "what_if": "Forgetting ROUND would produce unformatted decimals, failing the rounding requirement.",
+        "intuition": "The final query is just the skeleton filled with the correct arithmetic and ordering."
+      }
+    },
+    "active_count": 3
+  },
+  "sql-60": {
+    "nodes": [
+      "Problem",
+      "Approach",
+      "Pattern",
+      "Skeleton",
+      "Solution"
+    ],
+    "details": {
+      "Problem": {
+        "why": "Understand the input table and required output (machine_id, avg processing time rounded to 3 decimals).",
+        "what_if": "Jumping to SQL without fully understanding the schema leads to incorrect joins or aggregations.",
+        "intuition": "Each process has a start and end row; we need to pair them per process to compute duration."
+      },
+      "Approach": {
+        "why": "Pivot start/end timestamps into one row per process to easily compute duration via subtraction.",
+        "what_if": "Without pivoting, subtracting start from end across separate rows is not possible with simple SQL.",
+        "intuition": "Use conditional MAX with GROUP BY (machine_id, process_id) to create two timestamp columns in one row."
+      },
+      "Pattern": {
+        "why": "Realize that this is a 'self-join-to-make-pairs' problem solvable via conditional aggregation.",
+        "what_if": "Using a self-join on (machine_id, process_id, activity_type) works but is more verbose and error-prone.",
+        "intuition": "MAX(CASE WHEN activity_type='start' THEN timestamp END) gives start time in a separate column."
+      },
+      "Skeleton": {
+        "why": "Write the outer query that groups by machine_id and averages the per-process durations.",
+        "what_if": "Averaging over raw timestamps instead of per-process durations produces meaningless results.",
+        "intuition": "First compute each process's duration in a subquery, then AVG() and ROUND() in the outer GROUP BY."
+      },
+      "Solution": {
+        "why": "Combine subquery and outer query to get final machine_id and processing_time with correct rounding.",
+        "what_if": "Forgetting ROUND() violates the problem's precision requirement of 3 decimal places.",
+        "intuition": "The final code: SELECT machine_id, ROUND(AVG(end_time - start_time), 3) FROM (...) GROUP BY machine_id."
+      }
+    },
+    "active_count": 3
+  }
+}

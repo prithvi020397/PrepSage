@@ -1,0 +1,1440 @@
+{
+  "sql-1": {
+    "trace": [
+      {
+        "q": "What SQL keyword removes duplicate salaries before ranking?",
+        "a": "SELECT DISTINCT salary"
+      },
+      {
+        "q": "How do you sort salaries from highest to lowest?",
+        "a": "ORDER BY salary DESC"
+      },
+      {
+        "q": "How do you skip the first row and limit to one row to land on the second highest?",
+        "a": "LIMIT 1 OFFSET 1"
+      }
+    ],
+    "pattern": "Query Structure",
+    "skeleton": "SELECT col FROM table WHERE condition"
+  },
+  "sql-2": {
+    "trace": [
+      {
+        "q": "What SQL clause groups rows by email so we can count duplicates?",
+        "a": "GROUP BY email"
+      },
+      {
+        "q": "What aggregate function counts how many times each email appears?",
+        "a": "COUNT(*)"
+      },
+      {
+        "q": "What clause filters groups to only those with a count greater than 1?",
+        "a": "HAVING COUNT(*) > 1"
+      },
+      {
+        "q": "What column do you select to return the duplicate emails?",
+        "a": "SELECT email"
+      }
+    ],
+    "pattern": "Group By / Aggregation",
+    "skeleton": "SELECT group_col, AGG_FUNC(value_col)"
+  },
+  "sql-3": {
+    "trace": [
+      {
+        "q": "What window function and column do you use to compute the running total of amount, ordered by order_date?",
+        "a": "SUM(amount) OVER (ORDER BY order_date) AS running_total"
+      },
+      {
+        "q": "How do you ensure the result rows are sorted by order_date?",
+        "a": "ORDER BY order_date"
+      },
+      {
+        "q": "What clause do you add to the SELECT to include the order_date column from the table?",
+        "a": "SELECT order_date"
+      }
+    ],
+    "pattern": "Window Function",
+    "skeleton": "SELECT col, RANK() OVER (...)"
+  },
+  "py-1": {
+    "trace": [
+      {
+        "q": "What line initializes the hashmap to store seen numbers?",
+        "a": "seen = {}"
+      },
+      {
+        "q": "What line starts the loop over the array with index and value?",
+        "a": "for i, n in enumerate(nums):"
+      },
+      {
+        "q": "What line calculates the complement needed to reach target?",
+        "a": "complement = target - n"
+      },
+      {
+        "q": "What line checks if the complement is already in the hashmap?",
+        "a": "if complement in seen:"
+      },
+      {
+        "q": "What line returns the indices when a match is found?",
+        "a": "return [seen[complement], i]"
+      },
+      {
+        "q": "What line stores the current number's index in the hashmap?",
+        "a": "seen[n] = i"
+      }
+    ],
+    "pattern": "Hashmap",
+    "skeleton": "seen = {}"
+  },
+  "py-2": {
+    "trace": [
+      {
+        "q": "What line initializes the maximum sum variable to negative infinity?",
+        "a": "max_sum = float('-inf')"
+      },
+      {
+        "q": "What line starts the loop over the array indices?",
+        "a": "for i in range(len(nums)):"
+      },
+      {
+        "q": "What line adds the current element to the window sum?",
+        "a": "window_sum += nums[i]"
+      },
+      {
+        "q": "What line checks if the window has reached size k?",
+        "a": "if i >= k - 1:"
+      },
+      {
+        "q": "What line updates the maximum sum with the current window sum?",
+        "a": "max_sum = max(max_sum, window_sum)"
+      },
+      {
+        "q": "What line subtracts the outgoing element from the window sum?",
+        "a": "window_sum -= nums[i - (k - 1)]"
+      },
+      {
+        "q": "What line returns the maximum sum after the loop?",
+        "a": "return max_sum"
+      }
+    ],
+    "pattern": "Sliding Window",
+    "skeleton": "window_start, window_sum = 0, 0"
+  },
+  "sql-4": {
+    "trace": [
+      {
+        "q": "What SQL keyword do you use to keep all rows from the Person table even when there is no matching Address row?",
+        "a": "LEFT JOIN"
+      },
+      {
+        "q": "How do you alias the Person table as 'p' and the Address table as 'a' in the FROM clause?",
+        "a": "FROM Person p LEFT JOIN Address a"
+      },
+      {
+        "q": "What condition links the two tables on the personId column?",
+        "a": "ON p.personId = a.personId"
+      },
+      {
+        "q": "How do you select the columns firstName, lastName, city, and state from the aliased tables?",
+        "a": "SELECT p.firstName, p.lastName, a.city, a.state"
+      }
+    ],
+    "pattern": "Join",
+    "skeleton": "SELECT a.col, b.col FROM table_a a JOIN table_b b"
+  },
+  "sql-5": {
+    "trace": [
+      {
+        "q": "What SQL keyword removes duplicate salaries before ranking?",
+        "a": "SELECT DISTINCT salary"
+      },
+      {
+        "q": "How do you sort salaries from highest to lowest?",
+        "a": "ORDER BY salary DESC"
+      },
+      {
+        "q": "How do you skip the first row and limit to one row to land on the second highest?",
+        "a": "LIMIT 1 OFFSET 1"
+      },
+      {
+        "q": "How do you wrap the above query as a scalar subquery to return NULL when no second highest exists?",
+        "a": "(SELECT DISTINCT salary FROM Employee ORDER BY salary DESC LIMIT 1 OFFSET 1)"
+      },
+      {
+        "q": "What is the outer query that selects the second highest salary from the subquery?",
+        "a": "SELECT (SELECT DISTINCT salary FROM Employee ORDER BY salary DESC LIMIT 1 OFFSET 1) AS SecondHighestSalary"
+      }
+    ],
+    "pattern": "Subquery",
+    "skeleton": "SELECT col FROM table WHERE col = (SELECT ...)"
+  },
+  "sql-6": {
+    "trace": [
+      {
+        "q": "What SQL keyword removes duplicate salaries before ranking?",
+        "a": "SELECT DISTINCT salary"
+      },
+      {
+        "q": "How do you sort the distinct salaries from highest to lowest?",
+        "a": "ORDER BY salary DESC"
+      },
+      {
+        "q": "How do you skip the top 2 distinct salaries and return only the next one (the 3rd highest)?",
+        "a": "LIMIT 1 OFFSET 2"
+      },
+      {
+        "q": "How do you wrap the query to return NULL when fewer than 3 distinct salaries exist?",
+        "a": "SELECT (SELECT DISTINCT salary FROM employees ORDER BY salary DESC LIMIT 1 OFFSET 2) AS ThirdHighestSalary"
+      }
+    ],
+    "pattern": "Query Structure",
+    "skeleton": "SELECT col FROM table WHERE condition"
+  },
+  "sql-7": {
+    "trace": [
+      {
+        "q": "What window function do you use to assign dense ranks without gaps?",
+        "a": "DENSE_RANK() OVER (ORDER BY score DESC)"
+      },
+      {
+        "q": "How do you select the score column alongside its rank?",
+        "a": "SELECT score, DENSE_RANK() OVER (ORDER BY score DESC) AS rank"
+      },
+      {
+        "q": "What clause do you add to order the final result by rank ascending?",
+        "a": "ORDER BY rank"
+      }
+    ],
+    "pattern": "Window Function",
+    "skeleton": "SELECT col, RANK() OVER (...)"
+  },
+  "sql-8": {
+    "trace": [
+      {
+        "q": "How do you select the distinct num values from the first alias of the Logs table?",
+        "a": "SELECT DISTINCT l1.num"
+      },
+      {
+        "q": "What is the FROM clause to start the self-join with the first alias?",
+        "a": "FROM Logs l1"
+      },
+      {
+        "q": "How do you join Logs a second time (alias l2) on id+1 and matching num?",
+        "a": "JOIN Logs l2 ON l1.id = l2.id - 1 AND l1.num = l2.num"
+      },
+      {
+        "q": "How do you join Logs a third time (alias l3) on id+2 and matching num?",
+        "a": "JOIN Logs l3 ON l1.id = l3.id - 2 AND l1.num = l3.num"
+      }
+    ],
+    "pattern": "Window Function",
+    "skeleton": "SELECT col, RANK() OVER (...)"
+  },
+  "sql-9": {
+    "trace": [
+      {
+        "q": "How do you alias the Employee table twice for a self-join?",
+        "a": "FROM Employee e1 JOIN Employee e2"
+      },
+      {
+        "q": "What is the ON condition to match each employee to their manager?",
+        "a": "ON e1.managerId = e2.id"
+      },
+      {
+        "q": "How do you select only the employee's name from the first alias?",
+        "a": "SELECT e1.name"
+      },
+      {
+        "q": "What WHERE clause filters for employees earning more than their manager?",
+        "a": "WHERE e1.salary > e2.salary"
+      }
+    ],
+    "pattern": "Join",
+    "skeleton": "SELECT a.col, b.col FROM table_a a JOIN table_b b"
+  },
+  "sql-10": {
+    "trace": [
+      {
+        "q": "What SQL clause groups rows by email so we can count occurrences per email?",
+        "a": "GROUP BY email"
+      },
+      {
+        "q": "What aggregate function counts how many rows are in each group?",
+        "a": "COUNT(*)"
+      },
+      {
+        "q": "What clause filters groups to only those with a count greater than 1?",
+        "a": "HAVING COUNT(*) > 1"
+      },
+      {
+        "q": "What column do you select to return the duplicate email values?",
+        "a": "SELECT email"
+      }
+    ],
+    "pattern": "Group By / Aggregation",
+    "skeleton": "SELECT group_col, AGG_FUNC(value_col)"
+  },
+  "sql-11": {
+    "trace": [
+      {
+        "q": "What SQL clause selects only the names from the Customers table?",
+        "a": "SELECT name"
+      },
+      {
+        "q": "What SQL clause specifies the Customers table and gives it an alias 'c'?",
+        "a": "FROM Customers c"
+      },
+      {
+        "q": "What SQL clause filters out customers whose id appears in the Orders table's customerId column?",
+        "a": "WHERE c.id NOT IN (SELECT customerId FROM Orders)"
+      }
+    ],
+    "pattern": "Join",
+    "skeleton": "SELECT a.col, b.col FROM table_a a JOIN table_b b"
+  },
+  "sql-12": {
+    "trace": [
+      {
+        "q": "What SELECT clause lists the department name, employee name, and salary from the joined tables?",
+        "a": "SELECT d.name AS Department, e.name AS Employee, e.salary AS Salary"
+      },
+      {
+        "q": "What FROM clause joins Employee and Department on departmentId?",
+        "a": "FROM Employee e JOIN Department d ON e.departmentId = d.id"
+      },
+      {
+        "q": "What WHERE clause compares each employee's salary to the max salary in their own department using a correlated subquery?",
+        "a": "WHERE e.salary = (SELECT MAX(salary) FROM Employee WHERE departmentId = e.departmentId)"
+      }
+    ],
+    "pattern": "Group By / Aggregation",
+    "skeleton": "SELECT group_col, AGG_FUNC(value_col)"
+  },
+  "sql-13": {
+    "trace": [
+      {
+        "q": "How do you start the SELECT clause to get the id from the Weather table, aliasing it as 'a'?",
+        "a": "SELECT a.id"
+      },
+      {
+        "q": "How do you write the FROM clause to alias the Weather table as 'a'?",
+        "a": "FROM Weather a"
+      },
+      {
+        "q": "How do you write the JOIN clause to join the Weather table again as 'b'?",
+        "a": "JOIN Weather b"
+      },
+      {
+        "q": "How do you write the ON condition to match each day in 'a' with the previous calendar day in 'b' using date subtraction?",
+        "a": "ON a.recordDate = DATE(b.recordDate, '+1 day')"
+      },
+      {
+        "q": "How do you write the WHERE clause to filter for rows where the temperature in 'a' is higher than in 'b'?",
+        "a": "WHERE a.temperature > b.temperature"
+      }
+    ],
+    "pattern": "Join",
+    "skeleton": "SELECT a.col, b.col FROM table_a a JOIN table_b b"
+  },
+  "sql-14": {
+    "trace": [
+      {
+        "q": "What SQL clause groups rows by player_id?",
+        "a": "GROUP BY player_id"
+      },
+      {
+        "q": "What aggregate function returns the earliest event_date for each player?",
+        "a": "MIN(event_date)"
+      },
+      {
+        "q": "How do you select the player_id and the earliest login date in one SELECT statement?",
+        "a": "SELECT player_id, MIN(event_date)"
+      },
+      {
+        "q": "What alias would you give the MIN(event_date) column to name it 'first_login'?",
+        "a": "AS first_login"
+      }
+    ],
+    "pattern": "Group By / Aggregation",
+    "skeleton": "SELECT group_col, AGG_FUNC(value_col)"
+  },
+  "sql-15": {
+    "trace": [
+      {
+        "q": "How do you create a CTE that finds each player's first login date?",
+        "a": "WITH first_logins AS (SELECT player_id, MIN(event_date) AS first_date FROM Activity GROUP BY player_id)"
+      },
+      {
+        "q": "How do you join the CTE with the Activity table to find players who logged in exactly one day after their first login?",
+        "a": "SELECT COUNT(DISTINCT f.player_id) FROM first_logins f JOIN Activity a ON f.player_id = a.player_id AND a.event_date = DATE(f.first_date, '+1 day')"
+      },
+      {
+        "q": "How do you compute the fraction of such players out of all players, rounded to 2 decimal places?",
+        "a": "SELECT ROUND(1.0 * COUNT(DISTINCT f.player_id) / (SELECT COUNT(DISTINCT player_id) FROM Activity), 2) FROM first_logins f JOIN Activity a ON f.player_id = a.player_id AND a.event_date = DATE(f.first_date, '+1 day')"
+      }
+    ],
+    "pattern": "Subquery",
+    "skeleton": "SELECT col FROM table WHERE col = (SELECT ...)"
+  },
+  "sql-16": {
+    "trace": [
+      {
+        "q": "What SQL clause groups rows by managerId to count direct reports per manager?",
+        "a": "GROUP BY managerId"
+      },
+      {
+        "q": "What aggregate function counts the number of direct reports for each managerId?",
+        "a": "COUNT(*)"
+      },
+      {
+        "q": "What HAVING condition filters for managers with at least 5 direct reports?",
+        "a": "HAVING COUNT(*) >= 5"
+      },
+      {
+        "q": "How do you join the grouped result back to the Employee table to get the manager's name?",
+        "a": "INNER JOIN Employee ON Employee.id = grouped.managerId"
+      },
+      {
+        "q": "What column do you select to output the manager's name?",
+        "a": "SELECT Employee.name"
+      }
+    ],
+    "pattern": "Group By / Aggregation",
+    "skeleton": "SELECT group_col, AGG_FUNC(value_col)"
+  },
+  "sql-17": {
+    "trace": [
+      {
+        "q": "What SQL clause do you use to combine Employee with Bonus, keeping all employees even if they have no matching bonus row?",
+        "a": "LEFT JOIN Bonus ON Employee.empId = Bonus.empId"
+      },
+      {
+        "q": "How do you select the employee name and their bonus amount from the joined tables?",
+        "a": "SELECT Employee.name, Bonus.bonus"
+      },
+      {
+        "q": "What condition in the WHERE clause includes employees whose bonus is less than 1000?",
+        "a": "Bonus.bonus < 1000"
+      },
+      {
+        "q": "What additional condition do you need in the WHERE clause to include employees who have no bonus row (bonus is NULL)?",
+        "a": "Bonus.bonus IS NULL"
+      },
+      {
+        "q": "How do you combine the two conditions so that either one qualifies an employee?",
+        "a": "WHERE Bonus.bonus < 1000 OR Bonus.bonus IS NULL"
+      }
+    ],
+    "pattern": "Join",
+    "skeleton": "SELECT a.col, b.col FROM table_a a JOIN table_b b"
+  },
+  "sql-18": {
+    "trace": [
+      {
+        "q": "How do you select only the 'name' column from the Customer table?",
+        "a": "SELECT name"
+      },
+      {
+        "q": "What table do you query from?",
+        "a": "FROM Customer"
+      },
+      {
+        "q": "How do you filter out rows where referee_id equals 2?",
+        "a": "referee_id <> 2"
+      },
+      {
+        "q": "How do you also include rows where referee_id has no value (NULL)?",
+        "a": "OR referee_id IS NULL"
+      }
+    ],
+    "pattern": "Query Structure",
+    "skeleton": "SELECT col FROM table WHERE condition"
+  },
+  "sql-19": {
+    "trace": [
+      {
+        "q": "How do you start the query to select the sum of tiv_2016 from the Insurance table?",
+        "a": "SELECT SUM(tiv_2016) FROM Insurance"
+      },
+      {
+        "q": "What SQL condition checks that a policyholder's tiv_2015 appears more than once in the table?",
+        "a": "tiv_2015 IN (SELECT tiv_2015 FROM Insurance GROUP BY tiv_2015 HAVING COUNT(*) > 1)"
+      },
+      {
+        "q": "What SQL condition checks that a policyholder's (lat, lon) pair is unique across the table?",
+        "a": "(lat, lon) IN (SELECT lat, lon FROM Insurance GROUP BY lat, lon HAVING COUNT(*) = 1)"
+      },
+      {
+        "q": "How do you combine both conditions with a logical operator in the WHERE clause?",
+        "a": "WHERE tiv_2015 IN (SELECT tiv_2015 FROM Insurance GROUP BY tiv_2015 HAVING COUNT(*) > 1) AND (lat, lon) IN (SELECT lat, lon FROM Insurance GROUP BY lat, lon HAVING COUNT(*) = 1)"
+      }
+    ],
+    "pattern": "Query Structure",
+    "skeleton": "SELECT col FROM table WHERE condition"
+  },
+  "sql-20": {
+    "trace": [
+      {
+        "q": "What SQL clause groups rows by customer_number so we can count orders per customer?",
+        "a": "GROUP BY customer_number"
+      },
+      {
+        "q": "What aggregate function counts the number of orders for each customer?",
+        "a": "COUNT(*)"
+      },
+      {
+        "q": "How do you sort the groups so the customer with the most orders appears first?",
+        "a": "ORDER BY COUNT(*) DESC"
+      },
+      {
+        "q": "What clause limits the result to only the top row (the customer with the most orders)?",
+        "a": "LIMIT 1"
+      },
+      {
+        "q": "What column do you select to return just the customer_number?",
+        "a": "SELECT customer_number"
+      }
+    ],
+    "pattern": "Group By / Aggregation",
+    "skeleton": "SELECT group_col, AGG_FUNC(value_col)"
+  },
+  "sql-21": {
+    "trace": [
+      {
+        "q": "What columns do you need to select from the World table?",
+        "a": "SELECT name, population, area"
+      },
+      {
+        "q": "Which table are you querying from?",
+        "a": "FROM World"
+      },
+      {
+        "q": "How do you filter for countries with area >= 3,000,000 OR population >= 25,000,000?",
+        "a": "WHERE area >= 3000000 OR population >= 25000000"
+      }
+    ],
+    "pattern": "Query Structure",
+    "skeleton": "SELECT col FROM table WHERE condition"
+  },
+  "sql-22": {
+    "trace": [
+      {
+        "q": "What SQL clause groups rows by class so we can count students per class?",
+        "a": "GROUP BY class"
+      },
+      {
+        "q": "What aggregate function counts the number of students in each group?",
+        "a": "COUNT(*)"
+      },
+      {
+        "q": "What clause filters groups to only those with 5 or more students?",
+        "a": "HAVING COUNT(*) >= 5"
+      },
+      {
+        "q": "What column do you select to return the class names?",
+        "a": "SELECT class"
+      }
+    ],
+    "pattern": "Group By / Aggregation",
+    "skeleton": "SELECT group_col, AGG_FUNC(value_col)"
+  },
+  "sql-23": {
+    "trace": [
+      {
+        "q": "What SQL clause combines the requester_id and accepter_id columns into a single column of ids?",
+        "a": "SELECT requester_id AS id FROM RequestAccepted UNION ALL SELECT accepter_id AS id FROM RequestAccepted"
+      },
+      {
+        "q": "How do you count how many times each id appears in the union result?",
+        "a": "SELECT id, COUNT(*) AS num FROM (SELECT requester_id AS id FROM RequestAccepted UNION ALL SELECT accepter_id AS id FROM RequestAccepted) AS friends GROUP BY id"
+      },
+      {
+        "q": "How do you order the results to get the person with the most friends at the top?",
+        "a": "ORDER BY num DESC"
+      },
+      {
+        "q": "How do you limit the output to only the top person (the one with the most friends)?",
+        "a": "LIMIT 1"
+      }
+    ],
+    "pattern": "Query Structure",
+    "skeleton": "SELECT col FROM table WHERE condition"
+  },
+  "sql-24": {
+    "trace": [
+      {
+        "q": "What SQL clause groups rows by email so we can find the minimum Id per group?",
+        "a": "GROUP BY Email"
+      },
+      {
+        "q": "How do you select the smallest Id for each email group?",
+        "a": "MIN(Id)"
+      },
+      {
+        "q": "What SQL keyword orders the final result by Id?",
+        "a": "ORDER BY Id"
+      }
+    ],
+    "pattern": "Join",
+    "skeleton": "SELECT a.col, b.col FROM table_a a JOIN table_b b"
+  },
+  "sql-25": {
+    "trace": [
+      {
+        "q": "How do you select the salesperson name from the SalesPerson table?",
+        "a": "SELECT name FROM SalesPerson"
+      },
+      {
+        "q": "What subquery finds the sales_id of salespeople who have placed an order with the company named 'RED'?",
+        "a": "SELECT sales_id FROM Orders WHERE com_id = (SELECT com_id FROM Company WHERE name = 'RED')"
+      },
+      {
+        "q": "How do you filter the main query to exclude salespeople found in that subquery?",
+        "a": "WHERE sales_id NOT IN (SELECT sales_id FROM Orders WHERE com_id = (SELECT com_id FROM Company WHERE name = 'RED'))"
+      },
+      {
+        "q": "How do you sort the final result by name alphabetically?",
+        "a": "ORDER BY name"
+      }
+    ],
+    "pattern": "Join",
+    "skeleton": "SELECT a.col, b.col FROM table_a a JOIN table_b b"
+  },
+  "sql-26": {
+    "trace": [
+      {
+        "q": "What SQL keyword and condition do you write to start the query and select the id and a computed type column from the Tree table?",
+        "a": "SELECT id, CASE"
+      },
+      {
+        "q": "What is the first WHEN condition to check if a node is the root (p_id is null)?",
+        "a": "WHEN p_id IS NULL THEN 'Root'"
+      },
+      {
+        "q": "How do you check if a node is a leaf (its id never appears as a parent in any other row)?",
+        "a": "WHEN id NOT IN (SELECT DISTINCT p_id FROM Tree WHERE p_id IS NOT NULL) THEN 'Leaf'"
+      },
+      {
+        "q": "What is the ELSE clause for nodes that are neither root nor leaf (inner nodes)?",
+        "a": "ELSE 'Inner' END AS type"
+      },
+      {
+        "q": "How do you complete the query to order the results by id?",
+        "a": "FROM Tree ORDER BY id"
+      }
+    ],
+    "pattern": "Query Structure",
+    "skeleton": "SELECT col FROM table WHERE condition"
+  },
+  "sql-27": {
+    "trace": [
+      {
+        "q": "What SQL keyword and condition do you use to check if x + y is greater than z?",
+        "a": "x + y > z"
+      },
+      {
+        "q": "How do you combine the three inequality checks (x+y>z, x+z>y, y+z>x) into a single condition?",
+        "a": "x + y > z AND x + z > y AND y + z > x"
+      },
+      {
+        "q": "What SQL construct do you use to return 'Yes' or 'No' based on the condition?",
+        "a": "CASE WHEN x + y > z AND x + z > y AND y + z > x THEN 'Yes' ELSE 'No' END AS triangle"
+      },
+      {
+        "q": "Which columns do you select in the SELECT clause to match the expected output?",
+        "a": "SELECT x, y, z, CASE WHEN x + y > z AND x + z > y AND y + z > x THEN 'Yes' ELSE 'No' END AS triangle"
+      },
+      {
+        "q": "What is the complete SELECT statement to query the Triangle table?",
+        "a": "SELECT x, y, z, CASE WHEN x + y > z AND x + z > y AND y + z > x THEN 'Yes' ELSE 'No' END AS triangle FROM Triangle"
+      }
+    ],
+    "pattern": "Query Structure",
+    "skeleton": "SELECT col FROM table WHERE condition"
+  },
+  "sql-28": {
+    "trace": [
+      {
+        "q": "What SQL clause groups rows by the same num value so you can count occurrences per value?",
+        "a": "GROUP BY num"
+      },
+      {
+        "q": "What HAVING condition filters to only those num values that appear exactly once?",
+        "a": "HAVING COUNT(*) = 1"
+      },
+      {
+        "q": "How do you select the largest num from that filtered set, ensuring null if no such value exists?",
+        "a": "SELECT MAX(num) AS num FROM (SELECT num FROM MyNumbers GROUP BY num HAVING COUNT(*) = 1) AS singles"
+      }
+    ],
+    "pattern": "Group By / Aggregation",
+    "skeleton": "SELECT group_col, AGG_FUNC(value_col)"
+  },
+  "sql-29": {
+    "trace": [
+      {
+        "q": "What's the first step?",
+        "a": "Identify the core operation."
+      }
+    ],
+    "pattern": "Query Structure",
+    "skeleton": "SELECT col FROM table WHERE condition"
+  },
+  "sql-30": {
+    "trace": [
+      {
+        "q": "What SQL expression maps an odd id to id+1 and an even id to id-1?",
+        "a": "CASE WHEN id % 2 = 1 THEN id + 1 ELSE id - 1 END"
+      },
+      {
+        "q": "How do you handle the last odd id when the total count is odd, so it maps to itself?",
+        "a": "CASE WHEN id = (SELECT MAX(id) FROM Seat) AND id % 2 = 1 THEN id ELSE CASE WHEN id % 2 = 1 THEN id + 1 ELSE id - 1 END END"
+      },
+      {
+        "q": "What SQL clause reorders the result by the original id order after swapping?",
+        "a": "ORDER BY id"
+      },
+      {
+        "q": "What SQL keyword selects the computed id and the original student column?",
+        "a": "SELECT"
+      },
+      {
+        "q": "What is the complete SELECT statement to produce the swapped seat output?",
+        "a": "SELECT CASE WHEN id = (SELECT MAX(id) FROM Seat) AND id % 2 = 1 THEN id ELSE CASE WHEN id % 2 = 1 THEN id + 1 ELSE id - 1 END END AS id, student FROM Seat ORDER BY id"
+      }
+    ],
+    "pattern": "Query Structure",
+    "skeleton": "SELECT col FROM table WHERE condition"
+  },
+  "sql-31": {
+    "trace": [
+      {
+        "q": "What SQL clause selects all columns from the Salary table?",
+        "a": "SELECT * FROM Salary"
+      },
+      {
+        "q": "How do you write a CASE expression that flips 'm' to 'f' and 'f' to 'm'?",
+        "a": "CASE WHEN sex = 'm' THEN 'f' ELSE 'm' END"
+      },
+      {
+        "q": "How do you replace the original sex column with the flipped value in the SELECT list?",
+        "a": "SELECT id, name, CASE WHEN sex = 'm' THEN 'f' ELSE 'm' END AS sex, salary"
+      },
+      {
+        "q": "What clause orders the result by id?",
+        "a": "ORDER BY id"
+      }
+    ],
+    "pattern": "Query Structure",
+    "skeleton": "SELECT col FROM table WHERE condition"
+  },
+  "sql-32": {
+    "trace": [
+      {
+        "q": "What SQL clause do you use to group rows by customer_id so you can count products per customer?",
+        "a": "GROUP BY customer_id"
+      },
+      {
+        "q": "What aggregate function counts the distinct product_key values for each customer?",
+        "a": "COUNT(DISTINCT product_key)"
+      },
+      {
+        "q": "How do you get the total number of products in the Product table?",
+        "a": "(SELECT COUNT(*) FROM Product)"
+      },
+      {
+        "q": "What clause filters groups to only those whose distinct product count equals the total product count?",
+        "a": "HAVING COUNT(DISTINCT product_key) = (SELECT COUNT(*) FROM Product)"
+      },
+      {
+        "q": "How do you order the final result by customer_id?",
+        "a": "ORDER BY customer_id"
+      }
+    ],
+    "pattern": "Group By / Aggregation",
+    "skeleton": "SELECT group_col, AGG_FUNC(value_col)"
+  },
+  "sql-33": {
+    "trace": [
+      {
+        "q": "What SQL clause groups rows by both actor_id and director_id together?",
+        "a": "GROUP BY actor_id, director_id"
+      },
+      {
+        "q": "What aggregate function counts how many rows are in each group?",
+        "a": "COUNT(*) AS cooperation_count"
+      },
+      {
+        "q": "What clause filters groups to keep only those with at least 3 cooperations?",
+        "a": "HAVING COUNT(*) >= 3"
+      },
+      {
+        "q": "What columns do you select to output the actor_id and director_id pairs?",
+        "a": "SELECT actor_id, director_id"
+      }
+    ],
+    "pattern": "Group By / Aggregation",
+    "skeleton": "SELECT group_col, AGG_FUNC(value_col)"
+  },
+  "sql-34": {
+    "trace": [
+      {
+        "q": "What SQL clause do you use to combine the Sales and Product tables based on matching product_id?",
+        "a": "FROM Sales s JOIN Product p"
+      },
+      {
+        "q": "How do you specify the join condition that links the two tables?",
+        "a": "ON s.product_id = p.product_id"
+      },
+      {
+        "q": "Which columns from the Product table do you select to get the product name?",
+        "a": "p.product_name"
+      },
+      {
+        "q": "Which columns from the Sales table do you select to get the year and price?",
+        "a": "s.year, s.price"
+      }
+    ],
+    "pattern": "Join",
+    "skeleton": "SELECT a.col, b.col FROM table_a a JOIN table_b b"
+  },
+  "sql-35": {
+    "trace": [
+      {
+        "q": "What SQL clause groups rows by product_id to find each product's first sale year?",
+        "a": "GROUP BY product_id"
+      },
+      {
+        "q": "What aggregate function finds the minimum year for each product?",
+        "a": "MIN(year) AS first_year"
+      },
+      {
+        "q": "How do you join the subquery result back to the Sales table on both product_id and year?",
+        "a": "JOIN Sales s2 ON s1.product_id = s2.product_id AND s1.first_year = s2.year"
+      },
+      {
+        "q": "What columns do you select from the joined tables to get product_id, first_year, quantity, and price?",
+        "a": "SELECT s1.product_id, s1.first_year, s2.quantity, s2.price"
+      }
+    ],
+    "pattern": "Group By / Aggregation",
+    "skeleton": "SELECT group_col, AGG_FUNC(value_col)"
+  },
+  "sql-36": {
+    "trace": [
+      {
+        "q": "What SQL clause joins Project to Employee to bring experience_years into each row?",
+        "a": "FROM Project JOIN Employee ON Project.employee_id = Employee.employee_id"
+      },
+      {
+        "q": "What column do you group by to calculate average experience per project?",
+        "a": "GROUP BY Project.project_id"
+      },
+      {
+        "q": "What aggregate function and column compute the average experience, rounded to 2 decimal places?",
+        "a": "ROUND(AVG(Employee.experience_years), 2) AS average_years"
+      },
+      {
+        "q": "What columns do you select in the SELECT clause to output project_id and the computed average?",
+        "a": "SELECT Project.project_id, ROUND(AVG(Employee.experience_years), 2) AS average_years"
+      }
+    ],
+    "pattern": "Group By / Aggregation",
+    "skeleton": "SELECT group_col, AGG_FUNC(value_col)"
+  },
+  "sql-37": {
+    "trace": [
+      {
+        "q": "What SQL clause do you use to group rows by product so you can check each product's sale date range?",
+        "a": "GROUP BY product_id"
+      },
+      {
+        "q": "What aggregate function do you use to get the earliest sale date for each product?",
+        "a": "MIN(sale_date)"
+      },
+      {
+        "q": "What aggregate function do you use to get the latest sale date for each product?",
+        "a": "MAX(sale_date)"
+      },
+      {
+        "q": "What HAVING condition ensures that every sale for a product falls within the date range 2019-01-01 to 2019-03-31?",
+        "a": "HAVING MIN(sale_date) >= '2019-01-01' AND MAX(sale_date) <= '2019-03-31'"
+      }
+    ],
+    "pattern": "Group By / Aggregation",
+    "skeleton": "SELECT group_col, AGG_FUNC(value_col)"
+  },
+  "sql-38": {
+    "trace": [
+      {
+        "q": "What column do you select to get the day and the count of distinct users?",
+        "a": "SELECT activity_date AS day, COUNT(DISTINCT user_id) AS active_users"
+      },
+      {
+        "q": "Which table does the data come from?",
+        "a": "FROM Activity"
+      },
+      {
+        "q": "How do you group rows by each day to calculate the per-day count?",
+        "a": "GROUP BY activity_date"
+      },
+      {
+        "q": "How do you filter to only include days between 2021-01-01 and 2021-01-30?",
+        "a": "WHERE activity_date BETWEEN '2021-01-01' AND '2021-01-30'"
+      },
+      {
+        "q": "How do you order the results by day?",
+        "a": "ORDER BY activity_date"
+      }
+    ],
+    "pattern": "Query Structure",
+    "skeleton": "SELECT col FROM table WHERE condition"
+  },
+  "sql-39": {
+    "trace": [
+      {
+        "q": "What SQL keyword and condition filter rows where the author viewed their own article?",
+        "a": "WHERE author_id = viewer_id"
+      },
+      {
+        "q": "What SQL clause removes duplicate author ids from the result?",
+        "a": "SELECT DISTINCT author_id"
+      },
+      {
+        "q": "How do you alias the selected column to 'id' as required by the problem?",
+        "a": "SELECT DISTINCT author_id AS id"
+      },
+      {
+        "q": "What clause orders the result by the author id?",
+        "a": "ORDER BY id"
+      }
+    ],
+    "pattern": "Join",
+    "skeleton": "SELECT a.col, b.col FROM table_a a JOIN table_b b"
+  },
+  "sql-40": {
+    "trace": [
+      {
+        "q": "What SQL keyword starts the query to select columns from Users and Orders?",
+        "a": "SELECT"
+      },
+      {
+        "q": "How do you write the LEFT JOIN to keep all users even if they have no matching orders?",
+        "a": "LEFT JOIN Orders o ON u.user_id = o.buyer_id"
+      },
+      {
+        "q": "How do you restrict the join to only orders from 2019, using the order_date column?",
+        "a": "AND o.order_date LIKE '2019%'"
+      },
+      {
+        "q": "How do you count the number of orders per user, handling NULLs as 0?",
+        "a": "COUNT(o.order_id) AS orders_in_2019"
+      },
+      {
+        "q": "How do you group the results by user and order them by user_id?",
+        "a": "GROUP BY u.user_id ORDER BY u.user_id"
+      }
+    ],
+    "pattern": "Join",
+    "skeleton": "SELECT a.col, b.col FROM table_a a JOIN table_b b"
+  },
+  "sql-41": {
+    "trace": [
+      {
+        "q": "How do you select each product's latest price on or before 2019-08-16 using a correlated subquery?",
+        "a": "SELECT product_id, new_price FROM Products p1 WHERE change_date = (SELECT MAX(change_date) FROM Products p2 WHERE p2.product_id = p1.product_id AND p2.change_date <= '2019-08-16')"
+      },
+      {
+        "q": "How do you select products that have no price change on or before 2019-08-16, giving them a default price of 10?",
+        "a": "SELECT product_id, 10 AS price FROM Products GROUP BY product_id HAVING MAX(change_date) > '2019-08-16' OR MAX(change_date) IS NULL"
+      },
+      {
+        "q": "What SQL keyword combines the two result sets (products with a price change and products without) into one final output?",
+        "a": "UNION"
+      },
+      {
+        "q": "How do you ensure you only get distinct product IDs from the default-price query, avoiding duplicates from multiple rows?",
+        "a": "SELECT DISTINCT product_id, 10 AS price FROM Products WHERE product_id NOT IN (SELECT product_id FROM Products WHERE change_date <= '2019-08-16')"
+      }
+    ],
+    "pattern": "Query Structure",
+    "skeleton": "SELECT col FROM table WHERE condition"
+  },
+  "sql-42": {
+    "trace": [
+      {
+        "q": "How do you select each customer's earliest order date using a subquery?",
+        "a": "SELECT customer_id, MIN(order_date) FROM Delivery GROUP BY customer_id"
+      },
+      {
+        "q": "How do you filter the Delivery table to only include rows that match a customer's first order date?",
+        "a": "WHERE (customer_id, order_date) IN (SELECT customer_id, MIN(order_date) FROM Delivery GROUP BY customer_id)"
+      },
+      {
+        "q": "How do you compute the percentage of immediate orders (where order_date equals customer_pref_delivery_date) among those first orders?",
+        "a": "ROUND(AVG(CASE WHEN order_date = customer_pref_delivery_date THEN 100.0 ELSE 0 END), 2)"
+      },
+      {
+        "q": "What alias should you give the computed percentage column?",
+        "a": "AS immediate_percentage"
+      }
+    ],
+    "pattern": "Subquery",
+    "skeleton": "SELECT col FROM table WHERE col = (SELECT ...)"
+  },
+  "sql-43": {
+    "trace": [
+      {
+        "q": "What SQL clause groups rows by each department id so we get one row per id?",
+        "a": "GROUP BY id"
+      },
+      {
+        "q": "How do you write the conditional sum for January revenue, using a CASE expression inside SUM?",
+        "a": "SUM(CASE WHEN month = 'Jan' THEN revenue END) AS Jan_Revenue"
+      },
+      {
+        "q": "How do you write the conditional sum for February revenue?",
+        "a": "SUM(CASE WHEN month = 'Feb' THEN revenue END) AS Feb_Revenue"
+      },
+      {
+        "q": "How do you write the conditional sum for March revenue?",
+        "a": "SUM(CASE WHEN month = 'Mar' THEN revenue END) AS Mar_Revenue"
+      }
+    ],
+    "pattern": "Group By / Aggregation",
+    "skeleton": "SELECT group_col, AGG_FUNC(value_col)"
+  },
+  "sql-44": {
+    "trace": [
+      {
+        "q": "What SQL function extracts the year-month from trans_date for grouping?",
+        "a": "strftime('%Y-%m', trans_date)"
+      },
+      {
+        "q": "How do you count all transactions per group?",
+        "a": "COUNT(*) AS trans_count"
+      },
+      {
+        "q": "How do you count only approved transactions per group?",
+        "a": "SUM(CASE WHEN state = 'approved' THEN 1 ELSE 0 END) AS approved_count"
+      },
+      {
+        "q": "How do you sum the total amount of all transactions per group?",
+        "a": "SUM(amount) AS trans_total_amount"
+      },
+      {
+        "q": "How do you sum only the amount of approved transactions per group?",
+        "a": "SUM(CASE WHEN state = 'approved' THEN amount ELSE 0 END) AS approved_total_amount"
+      }
+    ],
+    "pattern": "Group By / Aggregation",
+    "skeleton": "SELECT group_col, AGG_FUNC(value_col)"
+  },
+  "sql-45": {
+    "trace": [
+      {
+        "q": "What SQL clause computes the running total of weight ordered by turn?",
+        "a": "SUM(weight) OVER (ORDER BY turn) AS cumulative_weight"
+      },
+      {
+        "q": "How do you filter rows where the cumulative weight does not exceed 1000?",
+        "a": "WHERE cumulative_weight <= 1000"
+      },
+      {
+        "q": "How do you order the filtered rows so the last person who fits appears first?",
+        "a": "ORDER BY cumulative_weight DESC"
+      },
+      {
+        "q": "What clause limits the result to just that one person's name?",
+        "a": "LIMIT 1"
+      },
+      {
+        "q": "How do you select only the person_name column in the final query?",
+        "a": "SELECT person_name"
+      }
+    ],
+    "pattern": "Query Structure",
+    "skeleton": "SELECT col FROM table WHERE condition"
+  },
+  "sql-46": {
+    "trace": [
+      {
+        "q": "How do you select the query_name and compute the average of rating/position for each query_name?",
+        "a": "SELECT query_name, ROUND(AVG(rating * 1.0 / position), 2) AS quality"
+      },
+      {
+        "q": "How do you compute the percentage of rows with rating < 5 for each query_name?",
+        "a": "ROUND(AVG(CASE WHEN rating < 5 THEN 100 ELSE 0 END), 2) AS poor_query_percentage"
+      },
+      {
+        "q": "What clause groups the results by each query_name?",
+        "a": "GROUP BY query_name"
+      },
+      {
+        "q": "How do you ensure the rating/position division uses decimal division instead of integer division?",
+        "a": "rating * 1.0 / position"
+      }
+    ],
+    "pattern": "Query Structure",
+    "skeleton": "SELECT col FROM table WHERE condition"
+  },
+  "sql-47": {
+    "trace": [
+      {
+        "q": "What SQL keyword and clause do you use to join Prices and UnitsSold tables on matching product_id?",
+        "a": "FROM Prices p JOIN UnitsSold u ON p.product_id = u.product_id"
+      },
+      {
+        "q": "How do you restrict the join so that only UnitsSold rows with purchase_date inside the product's price window are included?",
+        "a": "AND u.purchase_date BETWEEN p.start_date AND p.end_date"
+      },
+      {
+        "q": "How do you compute the total revenue (price * units) for each product?",
+        "a": "SUM(p.price * u.units)"
+      },
+      {
+        "q": "How do you safely compute the average price, handling the case where total units sold is zero?",
+        "a": "ROUND(SUM(p.price * u.units) / NULLIF(SUM(u.units), 0), 2)"
+      },
+      {
+        "q": "How do you group the results by product to get one row per product_id?",
+        "a": "GROUP BY p.product_id"
+      }
+    ],
+    "pattern": "Join",
+    "skeleton": "SELECT a.col, b.col FROM table_a a JOIN table_b b"
+  },
+  "sql-48": {
+    "trace": [
+      {
+        "q": "What SQL construct creates every possible combination of students and subjects?",
+        "a": "FROM Students CROSS JOIN Subjects"
+      },
+      {
+        "q": "How do you write the SELECT clause to include student_id, student_name, and subject_name from the cross-joined result?",
+        "a": "SELECT Students.student_id, Students.student_name, Subjects.subject_name"
+      },
+      {
+        "q": "How do you left-join the Examinations table onto the cross-joined result to count attendances?",
+        "a": "LEFT JOIN Examinations ON Students.student_id = Examinations.student_id AND Subjects.subject_name = Examinations.subject_name"
+      },
+      {
+        "q": "How do you count the number of exam rows per student-subject pair and alias it as attended_exams?",
+        "a": "COUNT(Examinations.subject_name) AS attended_exams"
+      },
+      {
+        "q": "How do you group the results by student and subject to get per-pair counts?",
+        "a": "GROUP BY Students.student_id, Students.student_name, Subjects.subject_name"
+      }
+    ],
+    "pattern": "Join",
+    "skeleton": "SELECT a.col, b.col FROM table_a a JOIN table_b b"
+  },
+  "sql-49": {
+    "trace": [
+      {
+        "q": "How do you compute the daily total amount per visited_on date?",
+        "a": "SELECT visited_on, SUM(amount) AS total FROM Customer GROUP BY visited_on"
+      },
+      {
+        "q": "What window function gives the trailing 7-day sum over the daily totals, ordered by visited_on?",
+        "a": "SUM(total) OVER (ORDER BY visited_on ROWS BETWEEN 6 PRECEDING AND CURRENT ROW) AS amount"
+      },
+      {
+        "q": "How do you compute the 7-day moving average rounded to 2 decimals?",
+        "a": "ROUND(SUM(total) OVER (ORDER BY visited_on ROWS BETWEEN 6 PRECEDING AND CURRENT ROW) / 7.0, 2) AS average_amount"
+      },
+      {
+        "q": "How do you filter to only include rows where a full 7-day window exists (i.e., the 7th distinct date onward)?",
+        "a": "WHERE ROW_NUMBER() OVER (ORDER BY visited_on) >= 7"
+      },
+      {
+        "q": "What is the final SELECT clause to output visited_on, amount, and average_amount in the required order?",
+        "a": "SELECT visited_on, amount, average_amount ORDER BY visited_on"
+      }
+    ],
+    "pattern": "Query Structure",
+    "skeleton": "SELECT col FROM table WHERE condition"
+  },
+  "sql-50": {
+    "trace": [
+      {
+        "q": "What SQL clause filters orders to only those in February 2020?",
+        "a": "WHERE order_date >= '2020-02-01' AND order_date < '2020-03-01'"
+      },
+      {
+        "q": "What SQL clause groups the filtered orders by product?",
+        "a": "GROUP BY Products.product_id"
+      },
+      {
+        "q": "How do you calculate the total units ordered per product?",
+        "a": "SUM(Orders.unit)"
+      },
+      {
+        "q": "What SQL clause filters groups to only those with total units at least 100?",
+        "a": "HAVING SUM(Orders.unit) >= 100"
+      }
+    ],
+    "pattern": "Group By / Aggregation",
+    "skeleton": "SELECT group_col, AGG_FUNC(value_col)"
+  },
+  "sql-51": {
+    "trace": [
+      {
+        "q": "What SQL clause groups the ratings by user and counts how many ratings each user gave?",
+        "a": "SELECT user_id, COUNT(*) AS cnt FROM MovieRating GROUP BY user_id"
+      },
+      {
+        "q": "How do you order the users by count descending and then by name ascending to break ties, then pick the top one?",
+        "a": "ORDER BY cnt DESC, name ASC LIMIT 1"
+      },
+      {
+        "q": "What WHERE clause filters ratings to only those in February 2020?",
+        "a": "WHERE created_at LIKE '2020-02%'"
+      },
+      {
+        "q": "What SQL clause groups the February ratings by movie and computes the average rating?",
+        "a": "SELECT movie_id, AVG(rating) AS avg_rating FROM MovieRating WHERE created_at LIKE '2020-02%' GROUP BY movie_id"
+      },
+      {
+        "q": "How do you combine the two single-row results (user name and movie title) into one column named 'results'?",
+        "a": "SELECT name AS results FROM ... UNION ALL SELECT title AS results FROM ..."
+      }
+    ],
+    "pattern": "Group By / Aggregation",
+    "skeleton": "SELECT group_col, AGG_FUNC(value_col)"
+  },
+  "sql-52": {
+    "trace": [
+      {
+        "q": "What SQL clause do you use to combine Employees with EmployeeUNI based on matching id?",
+        "a": "LEFT JOIN EmployeeUNI ON Employees.id = EmployeeUNI.id"
+      },
+      {
+        "q": "How do you select the unique_id column from the right table and the name column from the left table?",
+        "a": "SELECT EmployeeUNI.unique_id, Employees.name"
+      },
+      {
+        "q": "What clause orders the result by the employee id?",
+        "a": "ORDER BY Employees.id"
+      }
+    ],
+    "pattern": "Join",
+    "skeleton": "SELECT a.col, b.col FROM table_a a JOIN table_b b"
+  },
+  "sql-53": {
+    "trace": [
+      {
+        "q": "What SQL keyword and filter condition do you write to start selecting rows from the Stocks table ordered by stock_name?",
+        "a": "SELECT stock_name, FROM Stocks ORDER BY stock_name"
+      },
+      {
+        "q": "In the SELECT clause, how do you compute the net gain/loss by conditionally subtracting price on 'Buy' rows and adding price on 'Sell' rows, aliased as capital_gain_loss?",
+        "a": "SUM(CASE WHEN operation = 'Buy' THEN -price ELSE price END) AS capital_gain_loss"
+      },
+      {
+        "q": "What is the final SQL clause to group the results by each stock_name?",
+        "a": "GROUP BY stock_name"
+      }
+    ],
+    "pattern": "Query Structure",
+    "skeleton": "SELECT col FROM table WHERE condition"
+  },
+  "sql-54": {
+    "trace": [
+      {
+        "q": "What SQL clause do you use to combine Users with Rides so that users with no rides still appear?",
+        "a": "LEFT JOIN Rides ON Users.id = Rides.user_id"
+      },
+      {
+        "q": "How do you compute the total distance per user, replacing NULL with 0 when there are no rides?",
+        "a": "COALESCE(SUM(Rides.distance), 0) AS travelled_distance"
+      },
+      {
+        "q": "What columns do you select to show each user's name and their total distance?",
+        "a": "Users.name, COALESCE(SUM(Rides.distance), 0) AS travelled_distance"
+      },
+      {
+        "q": "How do you group the rows to get one result per user?",
+        "a": "GROUP BY Users.id, Users.name"
+      },
+      {
+        "q": "How do you order the results by distance descending, then by name ascending?",
+        "a": "ORDER BY travelled_distance DESC, Users.name ASC"
+      }
+    ],
+    "pattern": "Join",
+    "skeleton": "SELECT a.col, b.col FROM table_a a JOIN table_b b"
+  },
+  "sql-55": {
+    "trace": [
+      {
+        "q": "What SQL clause groups rows by sell_date so we can compute per-date aggregates?",
+        "a": "GROUP BY sell_date"
+      },
+      {
+        "q": "What aggregate function counts distinct products per sell_date?",
+        "a": "COUNT(DISTINCT product) AS num_sold"
+      },
+      {
+        "q": "How do you write a correlated subquery that selects distinct products for the current sell_date, sorted alphabetically, then concatenated with commas?",
+        "a": "(SELECT GROUP_CONCAT(DISTINCT product) FROM (SELECT DISTINCT product FROM Activities WHERE sell_date = a.sell_date ORDER BY product) AS sub) AS products"
+      },
+      {
+        "q": "What is the complete SELECT clause that includes sell_date, the count, and the subquery result?",
+        "a": "SELECT sell_date, COUNT(DISTINCT product) AS num_sold, (SELECT GROUP_CONCAT(DISTINCT product) FROM (SELECT DISTINCT product FROM Activities WHERE sell_date = a.sell_date ORDER BY product) AS sub) AS products"
+      },
+      {
+        "q": "What ORDER BY clause sorts the final result by sell_date?",
+        "a": "ORDER BY sell_date"
+      }
+    ],
+    "pattern": "Join",
+    "skeleton": "SELECT a.col, b.col FROM table_a a JOIN table_b b"
+  },
+  "sql-56": {
+    "trace": [
+      {
+        "q": "What SQL keyword and pattern do you use to check if the conditions string starts with 'DIAB1'?",
+        "a": "conditions LIKE 'DIAB1%'"
+      },
+      {
+        "q": "What SQL keyword and pattern do you use to check if 'DIAB1' appears right after a space anywhere in the conditions string?",
+        "a": "conditions LIKE '% DIAB1%'"
+      },
+      {
+        "q": "How do you combine these two conditions to select rows where either is true?",
+        "a": "WHERE conditions LIKE 'DIAB1%' OR conditions LIKE '% DIAB1%'"
+      },
+      {
+        "q": "What columns do you select to return patient_id, patient_name, and conditions?",
+        "a": "SELECT patient_id, patient_name, conditions"
+      }
+    ],
+    "pattern": "Query Structure",
+    "skeleton": "SELECT col FROM table WHERE condition"
+  },
+  "sql-57": {
+    "trace": [
+      {
+        "q": "How do you start a query that joins Visits with Transactions, preserving all visits even if they have no match?",
+        "a": "SELECT v.customer_id, v.visit_id FROM Visits v LEFT JOIN Transactions t ON v.visit_id = t.visit_id"
+      },
+      {
+        "q": "What WHERE condition isolates visits that had no transaction?",
+        "a": "WHERE t.transaction_id IS NULL"
+      },
+      {
+        "q": "How do you group by customer and count how many such visits each customer had?",
+        "a": "GROUP BY v.customer_id"
+      },
+      {
+        "q": "What aggregate function and alias count the number of visits per customer that had no transaction?",
+        "a": "COUNT(*) AS count_no_trans"
+      },
+      {
+        "q": "How do you ensure the result includes only customers with at least one such visit (which the filter already handles) and sort by customer_id?",
+        "a": "ORDER BY v.customer_id"
+      }
+    ],
+    "pattern": "Group By / Aggregation",
+    "skeleton": "SELECT group_col, AGG_FUNC(value_col)"
+  },
+  "sql-58": {
+    "trace": [
+      {
+        "q": "What SQL clause do you use to join Users with Transactions so each account's transactions are linked to the account name?",
+        "a": "FROM Users JOIN Transactions ON Users.account = Transactions.account"
+      },
+      {
+        "q": "How do you group the joined rows so that each account appears once, allowing SUM to compute per-account balance?",
+        "a": "GROUP BY Users.account, Users.name"
+      },
+      {
+        "q": "What aggregate function and column do you write in the SELECT to compute the net balance (sum of all amounts) for each account?",
+        "a": "SUM(Transactions.amount) AS balance"
+      },
+      {
+        "q": "What clause filters the grouped results to only include accounts whose total balance exceeds 10000?",
+        "a": "HAVING SUM(Transactions.amount) > 10000"
+      }
+    ],
+    "pattern": "Group By / Aggregation",
+    "skeleton": "SELECT group_col, AGG_FUNC(value_col)"
+  },
+  "sql-59": {
+    "trace": [
+      {
+        "q": "What scalar subquery returns the total number of users from the Users table?",
+        "a": "(SELECT COUNT(*) FROM Users)"
+      },
+      {
+        "q": "How do you count registrations per contest and compute the percentage rounded to 2 decimals?",
+        "a": "ROUND(COUNT(*) * 100.0 / (SELECT COUNT(*) FROM Users), 2) AS percentage"
+      },
+      {
+        "q": "What clause groups rows by contest to calculate per-contest registration counts?",
+        "a": "GROUP BY contest_id"
+      },
+      {
+        "q": "How do you order results by percentage descending, then contest_id ascending?",
+        "a": "ORDER BY percentage DESC, contest_id ASC"
+      }
+    ],
+    "pattern": "Subquery",
+    "skeleton": "SELECT col FROM table WHERE col = (SELECT ...)"
+  },
+  "sql-60": {
+    "trace": [
+      {
+        "q": "How do you start the subquery to pivot each (machine_id, process_id) pair into one row with start and end timestamps?",
+        "a": "SELECT machine_id, process_id,"
+      },
+      {
+        "q": "What expression extracts the start timestamp for each process using conditional aggregation?",
+        "a": "MAX(CASE WHEN activity_type = 'start' THEN timestamp END) AS start_time,"
+      },
+      {
+        "q": "What expression extracts the end timestamp similarly?",
+        "a": "MAX(CASE WHEN activity_type = 'end' THEN timestamp END) AS end_time"
+      },
+      {
+        "q": "How do you group the subquery to get one row per (machine_id, process_id)?",
+        "a": "FROM Activity GROUP BY machine_id, process_id"
+      },
+      {
+        "q": "In the outer query, how do you compute the average processing time per machine, rounded to 3 decimals?",
+        "a": "SELECT machine_id, ROUND(AVG(end_time - start_time), 3) AS processing_time"
+      }
+    ],
+    "pattern": "Group By / Aggregation",
+    "skeleton": "SELECT group_col, AGG_FUNC(value_col)"
+  },
+  "sql-61": {
+    "trace": [
+      {
+        "q": "How do you select the user_id and the reformatted name from the Users table?",
+        "a": "SELECT user_id, ... FROM Users"
+      },
+      {
+        "q": "Which SQL function extracts the first character of the name?",
+        "a": "SUBSTRING(name, 1, 1)"
+      },
+      {
+        "q": "How do you convert the first character to uppercase?",
+        "a": "UPPER(SUBSTRING(name, 1, 1))"
+      },
+      {
+        "q": "How do you get the rest of the name starting from the second character?",
+        "a": "SUBSTRING(name, 2)"
+      },
+      {
+        "q": "How do you convert the rest of the name to lowercase and concatenate with the first uppercase character?",
+        "a": "CONCAT(UPPER(SUBSTRING(name, 1, 1)), LOWER(SUBSTRING(name, 2)))"
+      }
+    ],
+    "pattern": "Query Structure",
+    "skeleton": "SELECT col FROM table WHERE condition"
+  }
+}

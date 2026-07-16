@@ -1,3 +1,4 @@
+import difflib
 import json
 import os
 import random
@@ -14,6 +15,7 @@ from openai import OpenAI
 load_dotenv()
 
 app = Flask(__name__)
+# prep sage: single-user local interview prep platform
 HEADROOM_ENABLED = os.environ.get("HEADROOM_ENABLED", "").lower() in ("1", "true", "yes")
 API_BASE = "http://localhost:9090/v1" if HEADROOM_ENABLED else "https://openrouter.ai/api/v1"
 client = OpenAI(base_url=API_BASE, api_key=os.environ["OPENROUTER_API_KEY"])
@@ -48,6 +50,10 @@ REPLAY_COMMENTS_FILE = "replay_comments.json"
 # chat_key -> [{"turn_idx", "author", "text", "ts"}, ...] — same persistence shape as
 # CHATS, so a shared replay link's comments survive a restart too.
 REPLAY_COMMENTS = json.load(open(REPLAY_COMMENTS_FILE)) if os.path.exists(REPLAY_COMMENTS_FILE) else {}
+
+PRECOMPUTED_TRACES = json.load(open("traces.json")) if os.path.exists("traces.json") else {}
+PRECOMPUTED_CONCEPTS = json.load(open("concept_maps.json")) if os.path.exists("concept_maps.json") else {}
+PRECOMPUTED_SOLUTIONS = json.load(open("solutions.json")) if os.path.exists("solutions.json") else {}
 
 # ponytail: static keyword map, not an LLM call — topic tagging doesn't need to cost anything.
 PATTERN_SKELETONS = {
@@ -225,6 +231,8 @@ CONCEPT_TAXONOMY = [
     "clarifying_requirements", "batch_vs_stream_choice", "partitioning_hot_key_skew",
     "idempotency_dedup", "backfill_reprocessing", "schema_evolution_compat",
     "replication_consistency", "data_quality_observability", "storage_format_choice",
+    "late_data_watermarks", "domain_alignment",
+    "entity_enumeration", "grain_awareness", "scd_strategy", "missing_dimension_audit",
 ]
 
 WAR_STORIES = {
@@ -237,6 +245,12 @@ WAR_STORIES = {
     "replication_consistency": "a leader failover during a write burst promoted a stale follower, silently rolling back several seconds of already-committed writes",
     "data_quality_observability": "a silent null-rate spike in an upstream table went unnoticed for two weeks because nothing monitored data quality, and it fed straight into an exec-facing revenue dashboard",
     "storage_format_choice": "row-oriented JSON storage for high-cardinality clickstream data meant a report scanning one column had to read the entire dataset",
+    "late_data_watermarks": "a mobile client synced buffered events after being offline for a day, arriving well after the daily aggregation window had already closed and published — 'yesterday's' revenue quietly stayed wrong until someone noticed the late batch",
+    "domain_alignment": "a data team built a sophisticated real-time clickstream pipeline with exactly-once semantics, but never talked to the marketing stakeholders — who only needed a daily CSV export in a specific schema, and had been manually emailing it to themselves because the pipeline's output didn't match their reporting tool's import format",
+    "entity_enumeration": "a team designed a 'trip' fact table without identifying 'offer' as a separate entity first, so the grain was ambiguous — some rows represented trip requests, others accepted trips, and every aggregation that counted trips double-counted the ones that went through the offer flow",
+    "grain_awareness": "a star schema stored ratings in a separate dimension table keyed by (user_id, driver_id), but a single trip has exactly two ratings (user→driver, driver→user) — joining on those keys silently fanned out the trip fact 4× and revenue reports were 2× actual for two quarters",
+    "scd_strategy": "a customer dimension used Type 2 tracking for every column (including ZIP code), and after three years the dimension had 18M rows for 2M unique customers — every join scanned 9× dead history, slowing a weekly BI dashboard from 4 seconds to 3 minutes before anyone investigated",
+    "missing_dimension_audit": "a marketing analytics mart had no location dimension because the data team assumed 'city is just a column on the customer table' — then a regional promo analysis required grouping by store proximity, which needed lat/lng joins against a geography table that didn't exist, delaying the campaign launch by three weeks",
 }
 
 # ponytail: SQL/Python's version of WAR_STORIES, keyed by topic_for()'s output instead of
@@ -254,11 +268,114 @@ WAR_STORIES_CODE = {
     "sorting": "an in-place sort mutated a list that another part of the pipeline still held a reference to, corrupting a report that ran concurrently against 'the same' data",
 }
 
+DESIGN_RUBRIC_44 = {
+    "phases": [
+        {
+            "name": "Phase 1: Requirements & Scoping",
+            "max": 8,
+            "items": [
+                {"id": "r1", "desc": "Asks about scale — event volume, row counts, growth projections", "max": 2},
+                {"id": "r2", "desc": "Asks about latency SLAs — batch hourly? streaming? sub-second?", "max": 2},
+                {"id": "r3", "desc": "Asks about data sources — how many, what format, reliable or not", "max": 2},
+                {"id": "r4", "desc": "Asks about consumers — who reads, how many teams, query patterns", "max": 2},
+                {"id": "r5", "desc": "Asks about constraints — budget, team, timeline, compliance, existing infra", "max": 2},
+                {"id": "r6", "desc": "Summarizes understanding — restates requirements before designing", "max": 2},
+                {"id": "r7", "desc": "Identifies ambiguities — flags what's unclear and makes reasonable assumptions", "max": 2},
+                {"id": "r8", "desc": "Defines 'done' — what does success look like for this system", "max": 2},
+            ]
+        },
+        {
+            "name": "Phase 2: High-Level Architecture",
+            "max": 10,
+            "items": [
+                {"id": "a1", "desc": "Correct ingestion layer — picks appropriate tool for scale/latency", "max": 2},
+                {"id": "a2", "desc": "Correct processing layer — batch/streaming/hybrid is appropriate", "max": 2},
+                {"id": "a3", "desc": "Correct storage layer — right format, right system, right tiering", "max": 2},
+                {"id": "a4", "desc": "Correct serving layer — matches consumer access patterns", "max": 2},
+                {"id": "a5", "desc": "Clean data flow — sources → ingestion → processing → storage → serving", "max": 2},
+                {"id": "a6", "desc": "Appropriate complexity — not over-engineered for stated scale", "max": 2},
+                {"id": "a7", "desc": "Uses existing infrastructure — acknowledges what already exists", "max": 2},
+                {"id": "a8", "desc": "Component naming — uses specific tools, not vague boxes", "max": 2},
+                {"id": "a9", "desc": "Handles the happy path first — doesn't get bogged down in edge cases early", "max": 2},
+                {"id": "a10", "desc": "Can defend against 'why not X?' — has alternatives ready", "max": 2},
+            ]
+        },
+        {
+            "name": "Phase 3: Deep Dive — Data Modeling",
+            "max": 6,
+            "items": [
+                {"id": "d1", "desc": "Schema design — tables/entities/relationships discussed", "max": 2},
+                {"id": "d2", "desc": "Partitioning strategy — chosen and explained", "max": 2},
+                {"id": "d3", "desc": "File format choice — Parquet/ORC/Avro/etc with reasoning", "max": 2},
+                {"id": "d4", "desc": "Schema evolution handling — forward/backward compatibility", "max": 2},
+                {"id": "d5", "desc": "Deduplication strategy — how to handle duplicate records", "max": 2},
+                {"id": "d6", "desc": "Data versioning — how to track changes over time", "max": 2},
+            ]
+        },
+        {
+            "name": "Phase 4: Deep Dive — Reliability & Fault Tolerance",
+            "max": 8,
+            "items": [
+                {"id": "f1", "desc": "Late/arriving data — explicit handling mechanism", "max": 2},
+                {"id": "f2", "desc": "Idempotency — reruns don't corrupt state", "max": 2},
+                {"id": "f3", "desc": "Error handling — dead letter queues, retries, alerting", "max": 2},
+                {"id": "f4", "desc": "Exactly-once semantics — trade-offs articulated", "max": 2},
+                {"id": "f5", "desc": "Backpressure — what happens when consumer is slow", "max": 2},
+                {"id": "f6", "desc": "Data quality checks — validation at ingestion and processing", "max": 2},
+                {"id": "f7", "desc": "Failure isolation — one bad source doesn't kill everything", "max": 2},
+                {"id": "f8", "desc": "Recovery/rollback — how to fix a bad run", "max": 2},
+            ]
+        },
+        {
+            "name": "Phase 5: Deep Dive — Operational Maturity",
+            "max": 6,
+            "items": [
+                {"id": "o1", "desc": "Monitoring & alerting — metrics, dashboards, SLOs", "max": 2},
+                {"id": "o2", "desc": "Data freshness tracking — how consumers know data is fresh", "max": 2},
+                {"id": "o3", "desc": "Cost estimation — rough awareness of cloud spend", "max": 2},
+                {"id": "o4", "desc": "Scaling strategy — how system grows with data", "max": 2},
+                {"id": "o5", "desc": "Access control — who can read/write what", "max": 2},
+                {"id": "o6", "desc": "Deployment/CI-CD — how changes get to production safely", "max": 2},
+            ]
+        },
+        {
+            "name": "Phase 6: Communication & Presence",
+            "max": 6,
+            "items": [
+                {"id": "c1", "desc": "Structured walkthrough — clear beginning, middle, end", "max": 2},
+                {"id": "c2", "desc": "Trade-off articulation — 'I chose X over Y because...'", "max": 2},
+                {"id": "c3", "desc": "Handles pushback — doesn't get defensive, pivots well", "max": 2},
+                {"id": "c4", "desc": "Asks for feedback — checks in with interviewer", "max": 2},
+                {"id": "c5", "desc": "Time management — covers all areas without rushing", "max": 2},
+                {"id": "c6", "desc": "Confidence vs humility — knows what they know and don't", "max": 2},
+            ]
+        },
+    ]
+}
+
+RETRO_QUESTIONS = [
+    {"q": "What phase felt hardest?", "why": "Focus prep there"},
+    {"q": "Where did you stall?", "why": "That's your knowledge gap"},
+    {"q": "What would you do differently?", "why": "Self-awareness matters"},
+    {"q": "What did you forget to mention?", "why": "Build a mental checklist"},
+    {"q": "What surprised you about the questions?", "why": "Reveals blind spots"},
+]
+
 BASELINE_RUBRIC = [
     "Idempotency: the design handles re-delivery/replay without double-processing (duplicate messages, retried writes)",
-    "Backfill/reprocessing: there's a concrete story for replaying historical data (a bug fix, a schema change, a late correction) without corrupting or duplicating downstream results",
+    "Backfill/reprocessing: there's a concrete story for replaying historical data (a bug fix, a schema change, a late correction) via a dedicated separate pipeline, not just re-running the main one",
     "Schema evolution: producers and consumers can evolve independently without a synchronized deploy, and breaking vs non-breaking changes are distinguished",
     "Data quality/observability: some mechanism exists to catch bad data before it reaches consumers, not just after",
+    "Late/out-of-order data: an explicit watermark or allowed-lateness policy for events that arrive after their window closes, not an assumption that events arrive in order",
+    "Partitioning initiative: the candidate volunteers a partitioning strategy (key + granularity) during the storage discussion rather than waiting to be asked, showing they anticipate the scale bottleneck",
+    "Engine choice with org-context: tool decisions account for the team's existing stack, skill set, and ecosystem (e.g. Redshift over Athena when the team uses dbt), not just feature checklists",
+    "Domain alignment: the candidate connects data architecture decisions to business outcomes (KPIs, stakeholder needs, downstream consumers), not just technical correctness",
+    "Incremental load awareness: the candidate addresses how data arrives incrementally (CDC, watermark columns, metadata-driven partitioning) rather than assuming full daily reloads, and can articulate when each approach fits",
+    "Option survey: the candidate surveys 2-3 architectural options with explicit pros/cons before committing to one, rather than jumping straight to a single solution",
+    "Entity enumeration: the candidate identifies all core entities before designing columns or tables, establishing the scope and grain of the model upfront rather than adding tables reactively",
+    "SCD strategy: the candidate justifies their slowly-changing-dimension approach (Type 1 vs Type 2 vs Type 3) for each dimension based on query patterns and historical needs, not just defaulting to one strategy",
+    "Grain awareness: fact and dimension tables respect their declared grain — one row per business event, no silent fan-out from many-to-many relationships embedded as columns",
+    "Missing dimension self-audit: when asked what they missed, the candidate can identify a real missing entity or dimension (location, time, channel) rather than claiming completeness",
 ]
 
 # ponytail: AI-engineering counterpart to the three DE globals above, same shape/length,
@@ -341,10 +458,10 @@ def save_replay_comments():
 
 def split_wrap_up_reply(reply, taxonomy=CONCEPT_TAXONOMY):
     """Split an interview wrap-up reply into (prose, missed_concepts, rushed_to_design,
-    communication_score, communication_note) — the trailing ```json fence is a grading
+    communication_score, communication_note, rubric_scores) — the trailing ```json fence is a grading
     artifact and never shown to the candidate."""
     if "```json" not in reply:
-        return reply.strip(), [], False, None, ""
+        return reply.strip(), [], False, None, "", {}
     prose, _, tail = reply.partition("```json")
     try:
         raw = tail.split("```")[0]
@@ -354,9 +471,35 @@ def split_wrap_up_reply(reply, taxonomy=CONCEPT_TAXONOMY):
         score = parsed.get("communication_score")
         score = int(score) if isinstance(score, (int, float)) and 1 <= score <= 5 else None
         note = parsed.get("communication_note") or ""
+        rubric_scores = parsed.get("rubric_scores") or {}
     except Exception:
-        concepts, rushed, score, note = [], False, None, ""
-    return prose.strip(), concepts, rushed, score, note
+        concepts, rushed, score, note, rubric_scores = [], False, None, "", {}
+    return prose.strip(), concepts, rushed, score, note, rubric_scores
+
+
+def hire_verdict(missed_concepts, rushed_to_design, communication_score, rubric_scores=None):
+    """Cheap point-based read, not a real calibrated rubric — reuses the signals the
+    debrief already computes to surface a directional strong hire / hire / no hire."""
+    if rubric_scores:
+        phase_maxes = [8, 10, 6, 8, 6, 6]
+        total = sum(rubric_scores.get(f"phase{i+1}", 0) for i in range(6))
+        total_max = sum(phase_maxes)
+        pct = total / total_max
+        if pct >= 0.85:
+            return "Strong Hire"
+        if pct >= 0.60:
+            return "Hire"
+        return "No Hire"
+    points = -len(missed_concepts)
+    if rushed_to_design:
+        points -= 2
+    if communication_score is not None:
+        points += communication_score - 3
+    if points >= 0:
+        return "Strong Hire"
+    if points >= -3:
+        return "Hire"
+    return "No Hire"
 
 
 def recurring_missed_concepts():
@@ -672,6 +815,162 @@ def run():
                      "expected": expected, "expected_columns": case.get("expected_columns"), "error": err})
 
 
+@app.route("/api/debug", methods=["POST"])
+def debug():
+    """Step-by-step variable walkthrough for Python questions using sys.settrace."""
+    data = request.json
+    q = QUESTIONS.get(data["question_id"])
+    if not q or q["lang"] != "python":
+        return jsonify({"error": "not found"}), 404
+    code = data.get("code", "")
+    if not code.strip():
+        return jsonify({"error": "write some code first"}), 400
+    case = q["test_cases"][0]
+    harness = case.get("harness", "")
+
+    tracer_code = """
+import sys, json
+
+class _Tracer:
+    def __init__(self):
+        self.steps = []
+        self._in_target = False
+
+    def trace(self, frame, event, arg):
+        if event == 'call' and frame.f_code.co_name == 'solve':
+            self._in_target = True
+        elif event == 'return' and self._in_target:
+            self._in_target = False
+        elif event == 'line' and self._in_target:
+            self.steps.append({
+                "line": frame.f_lineno - frame.f_code.co_firstlineno + 1,
+                "locals": {k: repr(v) for k, v in frame.f_locals.items() if not k.startswith("_")}
+            })
+        return self.trace
+
+_tracer = _Tracer()
+sys.settrace(_tracer.trace)
+"""
+    dump_code = """
+sys.settrace(None)
+print("__DEBUG_START__")
+print(json.dumps(_tracer.steps))
+print("__DEBUG_END__")
+"""
+    full_code = tracer_code + code + "\n\n" + harness + "\n" + dump_code
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
+        f.write(full_code)
+        path = f.name
+    try:
+        result = subprocess.run(["python3", path], capture_output=True, text=True, timeout=5)
+    except subprocess.TimeoutExpired:
+        os.unlink(path)
+        return jsonify({"error": "Timed out (5s)"}), 502
+    finally:
+        if os.path.exists(path):
+            os.unlink(path)
+
+    stdout = result.stdout
+    stderr = result.stderr.strip()
+    debug_start = stdout.find("__DEBUG_START__")
+    debug_end = stdout.find("__DEBUG_END__")
+
+    if result.returncode != 0:
+        return jsonify({"error": stderr or "execution failed", "steps": []})
+
+    if debug_start == -1 or debug_end == -1:
+        return jsonify({"error": None, "steps": [], "output": stdout.strip()})
+
+    output = stdout[:debug_start].strip()
+    raw_steps = stdout[debug_start + len("__DEBUG_START__"):debug_end].strip()
+    try:
+        steps = json.loads(raw_steps)
+    except json.JSONDecodeError:
+        steps = []
+
+    return jsonify({"error": None, "steps": steps, "output": output, "source": code.split('\n')})
+
+
+@app.route("/api/diff", methods=["POST"])
+def diff():
+    data = request.json
+    q = QUESTIONS.get(data["question_id"])
+    if not q or q["lang"] not in ("sql", "python"):
+        return jsonify({"error": "not found"}), 404
+    code = data.get("code", "")
+
+    if q["id"] not in SOLUTION_CACHE:
+        pre = PRECOMPUTED_SOLUTIONS.get(q["id"])
+        if pre:
+            SOLUTION_CACHE[q["id"]] = pre
+        else:
+            prompt = f"""Write a correct, clean {q['lang']} solution for this problem.
+
+Problem: {q['title']}
+{q['prompt']}
+Concept: {q['concept']}
+
+Respond ONLY with the code, no markdown fences, no commentary."""
+            try:
+                resp = client.chat.completions.create(
+                    model=MODEL, messages=[{"role": "user", "content": prompt}],
+                    max_tokens=500, temperature=0, extra_body={"reasoning": {"enabled": False}},
+                )
+                solution = resp.choices[0].message.content.strip()
+                if "```" in solution:
+                    for part in solution.split("```"):
+                        if q["lang"] in part or (not part.startswith("{") and not part.startswith("<") and not part.startswith("[")):
+                            solution = part
+                            if solution.startswith(q["lang"]):
+                                solution = solution[len(q["lang"]):].strip()
+                            break
+                SOLUTION_CACHE[q["id"]] = solution.strip()
+            except Exception as e:
+                return jsonify({"error": str(e)}), 502
+
+    solution = SOLUTION_CACHE[q["id"]]
+    user_lines = code.splitlines(True)
+    sol_lines = solution.splitlines(True)
+
+    matcher = difflib.SequenceMatcher(None, user_lines, sol_lines)
+    entries = []
+
+    for tag, i1, i2, j1, j2 in matcher.get_opcodes():
+        if tag == "equal":
+            for k in range(i1, i2):
+                entries.append({"user": user_lines[k].rstrip(), "solution": sol_lines[j1 + (k - i1)].rstrip(), "context": ""})
+        else:
+            user_hunk = "".join(user_lines[i1:i2]).strip()
+            sol_hunk = "".join(sol_lines[j1:j2]).strip()
+            context = ""
+            if user_hunk and sol_hunk:
+                try:
+                    ap = f"""User's code:
+```{q['lang']}
+{user_hunk}
+```
+Correct code:
+```{q['lang']}
+{sol_hunk}
+```
+Explain in one short sentence why this difference matters conceptually — not just syntactically."""
+                    r = client.chat.completions.create(
+                        model=MODEL, messages=[{"role": "user", "content": ap}],
+                        max_tokens=80, temperature=0, extra_body={"reasoning": {"enabled": False}},
+                    )
+                    context = r.choices[0].message.content.strip()
+                except Exception:
+                    context = ""
+
+            max_lines = max(i2 - i1, j2 - j1)
+            for k in range(max_lines):
+                u = user_lines[i1 + k].rstrip() if k < i2 - i1 else ""
+                s = sol_lines[j1 + k].rstrip() if k < j2 - j1 else ""
+                entries.append({"user": u, "solution": s, "context": context if k == 0 else ""})
+
+    return jsonify({"diff": entries})
+
+
 @app.route("/api/submit", methods=["POST"])
 def submit():
     data = request.json
@@ -822,7 +1121,116 @@ Respond with ONLY strict JSON, no markdown fences, no commentary:
         return jsonify({"ok": True, "feedback": "(couldn't auto-grade that — proceeding anyway)"})
 
 
+CONCEPT_MAP_NODES = ["Problem", "Approach", "Pattern", "Skeleton", "Solution"]
+
+SOLUTION_CACHE = {}  # qid -> correct solution code for diff
+
+REVERSE_STATE = {}  # qid -> {"code": buggy_code, "bugs": [{"note": "...", "found": bool}], "history": [...]}
+
+REVERSE_SYSTEM = """You are an early- to mid-career candidate who wrote the code below for this interview problem. 
+The user is now the senior interviewer reviewing your code.
+
+Your code has specific bugs (listed below — never reveal them directly).
+Rules:
+1. Respond in character — slightly nervous, not immediately seeing what's wrong
+2. Don't volunteer what's wrong. Answer the interviewer's questions naturally
+3. If they point at the right area, show gradual recognition ("oh, I see what you mean...")
+4. Only fully "realize" the bug when they clearly articulate what's wrong and why
+5. Keep replies to 1-3 sentences
+6. If they're hinting, don't immediately get it — let them teach you
+7. When they correctly identify and explain a bug, acknowledge it clearly
+"""
+
 CURVEBALLS = {}  # qid -> twist text, so grading judges against the same twist that was shown
+
+
+@app.route("/api/reverse", methods=["POST"])
+def reverse():
+    data = request.json
+    q = QUESTIONS.get(data["question_id"])
+    if not q or q["lang"] not in ("sql", "python"):
+        return jsonify({"error": "not found"}), 404
+    if not is_solved(q["id"]):
+        return jsonify({"error": "solve the question first"}), 400
+
+    state = REVERSE_STATE.get(q["id"])
+
+    if not data.get("message") and data.get("found_bug_index") is None:
+        prompt = f"""You are a senior interviewer preparing a code-review drill.
+
+Problem: {q['title']}
+{q['prompt']}
+Known idiomatic approach and pitfall: {q['concept']}
+
+Write a plausible-looking {q['lang']} solution with 2-3 deliberate subtle bugs (not syntax errors, not something a linter would catch).
+Respond ONLY strict JSON, no markdown fences:
+{{"code": "the buggy {q['lang']} code as a single string with \\\\n line breaks", "bugs": [{{"note": "one sentence describing the specific bug and what input would expose it"}}, ...]}}"""
+        try:
+            resp = client.chat.completions.create(
+                model=MODEL, messages=[{"role": "user", "content": prompt}],
+                max_tokens=500, temperature=0.4, extra_body={"reasoning": {"enabled": False}},
+            )
+            raw = resp.choices[0].message.content.strip()
+            raw = raw[raw.index("{"):raw.rindex("}") + 1]
+            result = json.loads(raw)
+            buggy_code = result.get("code", "")
+            bugs = result.get("bugs", [])
+            for b in bugs:
+                b["found"] = False
+        except Exception as e:
+            return jsonify({"error": str(e)}), 502
+
+        opening_prompt = f"""You are a candidate who wrote this code for an interview problem. The interviewer just asked you to walk through it. Reply in character (1-2 sentences), slightly nervous, not seeing what's wrong.
+
+Code: ```{q['lang']}
+{buggy_code}
+```"""
+        try:
+            r = client.chat.completions.create(
+                model=MODEL,
+                messages=[{"role": "system", "content": "You are an early-career candidate in an interview."},
+                          {"role": "user", "content": opening_prompt}],
+                max_tokens=100, temperature=0.5, extra_body={"reasoning": {"enabled": False}},
+            )
+            reply = r.choices[0].message.content.strip()
+        except Exception:
+            reply = "Oh, um, sure — I wrote this solution. I think it handles the main case correctly?"
+
+        REVERSE_STATE[q["id"]] = {"code": buggy_code, "bugs": bugs, "history": [{"role": "assistant", "content": reply}]}
+        return jsonify({"code": buggy_code, "bugs": [{"note": b["note"], "found": False} for b in bugs], "reply": reply, "started": True})
+
+    if data.get("found_bug_index") is not None:
+        idx = data["found_bug_index"]
+        if state and 0 <= idx < len(state["bugs"]):
+            state["bugs"][idx]["found"] = True
+        all_found = all(b["found"] for b in state["bugs"])
+        reply = "You're right — those are all the issues I can see now. Thanks for walking me through it." if all_found else "Ah, yes, I see what you mean about that part."
+        state["history"].append({"role": "assistant", "content": reply})
+        return jsonify({"reply": reply, "bugs": [{"note": b["note"], "found": b["found"]} for b in state["bugs"]]})
+
+    message = (data.get("message") or "").strip()
+    if not state or not message:
+        return jsonify({"error": "start the drill first"}), 400
+
+    state["history"].append({"role": "user", "content": message})
+
+    bug_context = "\n".join(f"- Bug: {b['note']}" for b in state["bugs"])
+    system_prompt = REVERSE_SYSTEM.replace("listed below", "\n" + bug_context)
+    system_prompt += f"\n\nYour code:\n```{q['lang']}\n{state['code']}\n```"
+
+    try:
+        resp = client.chat.completions.create(
+            model=MODEL,
+            messages=[{"role": "system", "content": system_prompt}] + state["history"],
+            max_tokens=200, extra_body={"reasoning": {"enabled": False}},
+        )
+        reply = resp.choices[0].message.content.strip()
+    except Exception as e:
+        state["history"].pop()
+        return jsonify({"error": str(e)}), 502
+
+    state["history"].append({"role": "assistant", "content": reply})
+    return jsonify({"reply": reply, "bugs": [{"note": b["note"], "found": b["found"]} for b in state["bugs"]]})
 
 
 @app.route("/api/curveball", methods=["POST"])
@@ -982,6 +1390,77 @@ Respond with ONLY strict JSON, no markdown fences, no commentary:
         return jsonify(fallback)
 
 
+@app.route("/api/concept-map", methods=["POST"])
+def concept_map():
+    data = request.json
+    q = QUESTIONS.get(data["question_id"])
+    if not q or q["lang"] not in ("sql", "python"):
+        return jsonify({"error": "not found"}), 404
+
+    p = PROGRESS.get(q["id"], {})
+    if isinstance(p, dict) and p.get("concept_map"):
+        return jsonify(p["concept_map"])
+
+    pre = PRECOMPUTED_CONCEPTS.get(q["id"])
+    if pre:
+        pre["active_count"] = len(pre.get("nodes", CONCEPT_MAP_NODES)) if is_solved(q["id"]) else 3
+        if q["id"] not in PROGRESS:
+            PROGRESS[q["id"]] = {}
+        if isinstance(PROGRESS[q["id"]], dict):
+            PROGRESS[q["id"]]["concept_map"] = pre
+            save_progress()
+        return jsonify(pre)
+
+    prompt = f"""You are a coding tutor. For this problem, generate concise one-liner explanations for each concept-map stage.
+
+Problem: {q['title']}
+{q['prompt']}
+Concept: {q['concept']}
+
+For each node provide:
+- "why": one-liner on why this stage matters
+- "what_if": one-liner on what goes wrong if this stage is skipped or wrong
+- "intuition": one-liner intuitive connection to the actual code
+
+Respond ONLY strict JSON, no markdown fences:
+{{"details": {{
+  "Problem": {{"why": "...", "what_if": "...", "intuition": "..."}},
+  "Approach": {{"why": "...", "what_if": "...", "intuition": "..."}},
+  "Pattern": {{"why": "...", "what_if": "...", "intuition": "..."}},
+  "Skeleton": {{"why": "...", "what_if": "...", "intuition": "..."}},
+  "Solution": {{"why": "...", "what_if": "...", "intuition": "..."}}
+}}}}"""
+
+    try:
+        resp = client.chat.completions.create(
+            model=MODEL, messages=[{"role": "user", "content": prompt}],
+            max_tokens=700, temperature=0, extra_body={"reasoning": {"enabled": False}},
+        )
+        raw = resp.choices[0].message.content.strip()
+        if "```" in raw:
+            raw = raw.split("```")[1]
+            if raw.startswith("json"):
+                raw = raw[4:]
+        start = raw.find("{")
+        end = raw.rfind("}")
+        raw = raw[start:end+1]
+        result = json.loads(raw)
+        details = result.get("details", {})
+    except Exception:
+        details = {n: {"why": "", "what_if": "", "intuition": ""} for n in CONCEPT_MAP_NODES}
+
+    active_count = len(CONCEPT_MAP_NODES) if is_solved(q["id"]) else 3
+    output = {"nodes": CONCEPT_MAP_NODES, "details": details, "active_count": active_count}
+
+    if q["id"] not in PROGRESS:
+        PROGRESS[q["id"]] = {}
+    if isinstance(PROGRESS[q["id"]], dict):
+        PROGRESS[q["id"]]["concept_map"] = output
+    save_progress()
+
+    return jsonify(output)
+
+
 @app.route("/api/trace", methods=["POST"])
 def gen_trace():
     data = request.json
@@ -1000,6 +1479,17 @@ def gen_trace():
     if isinstance(p, dict) and p.get("trace"):
         return jsonify({"trace": p["trace"], "pattern": p.get("pattern", ""), "skeleton": p.get("skeleton", ""), "solved": is_solved(q["id"])})
 
+    pre = PRECOMPUTED_TRACES.get(q["id"])
+    if pre:
+        if q["id"] not in PROGRESS:
+            PROGRESS[q["id"]] = {}
+        if isinstance(PROGRESS[q["id"]], dict):
+            PROGRESS[q["id"]]["trace"] = pre["trace"]
+            PROGRESS[q["id"]]["pattern"] = pre["pattern"]
+            PROGRESS[q["id"]]["skeleton"] = pre["skeleton"]
+        save_progress()
+        return jsonify({"trace": pre["trace"], "pattern": pre["pattern"], "skeleton": pre["skeleton"], "solved": is_solved(q["id"])})
+
     pattern_info = pattern_for(q)
     tc = q["test_cases"][0]
     sample_data = tc.get("harness", "") if q["lang"] == "python" else tc.get("schema_sql", "")
@@ -1013,17 +1503,8 @@ def gen_trace():
   {"q": "How do you sort salaries from highest to lowest?", "a": "ORDER BY salary DESC"},
   {"q": "How do you skip the first row and limit to one row to land on the second highest?", "a": "LIMIT 1 OFFSET 1"}
 ]"""
-    else:
-        code_noun = "Python method"
-        example = """Example of a good full trace for 'Valid Palindrome':
-[
-  {"q": "What method converts a character to lowercase?", "a": "char.lower()"},
-  {"q": "What method keeps only letters and numbers?", "a": "char.isalnum()"},
-  {"q": "How do we combine filtered chars back into a string?", "a": "''.join(filtered)"},
-  {"q": "How do we check if a string equals its reverse?", "a": "cleaned == cleaned[::-1]"}
-]"""
 
-    prompt = f"""You are a coding tutor that teaches CODE TRANSLATION. The student knows the theory but struggles to write specific code lines. Generate trace steps that teach them WHICH CODE to write.
+        prompt = f"""You are a coding tutor that teaches CODE TRANSLATION. The student knows the theory but struggles to write specific code lines. Generate trace steps that teach them WHICH CODE to write.
 
 Problem: {q['title']}
 {q['prompt']}
@@ -1036,7 +1517,7 @@ Expected output: {sample_output}
 Starter code:
 {q.get("starter_code", "")}
 
-Generate 3-5 steps. Each step must ask about a SPECIFIC, DISTINCT line or code construct the student needs to write, in {q["lang"].upper()}. The answer is the ACTUAL CODE (not a description).
+Generate 3-5 steps. Each step must ask about a SPECIFIC, DISTINCT line or code construct the student needs to write, in SQL. The answer is the ACTUAL CODE (not a description).
 
 Do NOT add a final "put it all together" / "write the complete query/function" step — that's just retyping the concatenation of earlier answers and tests nothing new. Every step must teach a translation point the earlier steps didn't already cover.
 
@@ -1047,13 +1528,49 @@ Bad (redundant assembly):
   Q: "What is the complete query/function to solve this?"  A: "<everything from the previous steps combined>"
 
 Good (code-focused):
-  Q: "What {code_noun} checks if a character is alphanumeric?"
-  A: "char.isalnum()"
+  Q: "What SQL keyword removes duplicates?"
+  A: "SELECT DISTINCT salary"
 
 {example}
 
 Respond with ONLY JSON:
 {{"steps": [{{"q": "what line of code to write?", "a": "the actual code"}}]}}"""
+    else:
+        prompt = f"""You are a coding tutor that teaches CODE TRANSLATION through SCAFFOLDED CODE CONSTRUCTION. The student knows the theory but struggles to write specific code lines. Your job is to break the solution into ordered steps where each step asks for the NEXT line of code to write.
+
+Problem: {q['title']}
+{q['prompt']}
+Concept: {q['concept']}
+Pattern skeleton:
+{pattern_info[1] if pattern_info[1] else 'N/A'}
+
+Sample call/harness: {sample_data}
+Expected output: {sample_output}
+Starter code (the student sees this, step 1 picks up after it):
+{q.get("starter_code", "")}
+
+Generate 4-7 steps. Each step asks for ONE specific code line the student needs to write, in the ORDER those lines appear in the function body. Steps after the starter_code.
+
+Rules:
+- Step 1 asks for the first substantive line after initialization (e.g., the data structure initialization, or the loop start)
+- Each later step asks for the NEXT line they'd write
+- Do NOT combine multiple lines into one step (bad: "set up the loop and check condition")
+- Do NOT add a "write the full function" final step
+- The answer for each step is the ACTUAL CODE LINE (not a description)
+- Each step builds on earlier steps — the student should feel like they're writing the function line by line
+
+Example for 'Two Sum' (already has starter_code "def solve(nums, target):"):
+[
+  {{"q": "What line initializes the hashmap to store seen numbers?", "a": "seen = {{}}"}},
+  {{"q": "What line starts the loop over the array with index and value?", "a": "for i, n in enumerate(nums):"}},
+  {{"q": "What line calculates the complement needed to reach target?", "a": "complement = target - n"}},
+  {{"q": "What line checks if the complement is already in the hashmap?", "a": "if complement in seen:"}},
+  {{"q": "What line returns the indices when a match is found?", "a": "return [seen[complement], i]"}},
+  {{"q": "What line stores the current number's index in the hashmap?", "a": "seen[n] = i"}}
+]
+
+Respond with ONLY JSON:
+{{"steps": [{{"q": "what line to write?", "a": "the actual Python code line"}}]}}"""
 
     try:
         resp = client.chat.completions.create(
@@ -1306,14 +1823,53 @@ PERSONAS = {
     "silent": "Adopt a silent, minimal temperament: say as little as possible, favor one-line prompts ('why?', 'and at 10x?') over full sentences, force the candidate to drive and fill the silences themselves.",
 }
 
+# ponytail: separate from PERSONAS above — these are escalating-pressure levels for the
+# adversarial "break this design" drill specifically, not general interview temperament.
+ADVERSARIAL_PERSONAS = {
+    "friendly": "Adopt a supportive, coaching tone for this drill: still press on every real weakness, but soften the delivery, offer encouragement, and give the candidate room to think before stacking the next challenge.",
+    "skeptical": "Adopt a skeptical tone for this drill: make the candidate justify every claim before you accept it, don't let vague answers slide, keep the pace brisk.",
+    "bar_raiser": "Adopt an actively adversarial bar-raiser tone for this drill: interrupt weak reasoning immediately, challenge every claim (even correct ones) and make them defend it, stack follow-up pressure without pausing, never soften a pushback.",
+}
+
+SCALING_TIERS = [
+    {"name": "Baseline", "scale": "1K req/day",
+     "desc": "Single-region, single-DB — does their basic shape work?"},
+    {"name": "Growth", "scale": "100K req/day",
+     "desc": "DB bottlenecks — caching? read replicas?"},
+    {"name": "Scale-up", "scale": "10M req/day, global",
+     "desc": "Single region breaks — partitioning? multi-region?"},
+    {"name": "Peak spike", "scale": "100M req/day, 10x burst",
+     "desc": "Auto-scaling? load-shedding queue?"},
+    {"name": "Write storm", "scale": "Write-heavy at 100M req/day",
+     "desc": "Queue vs batch vs stream, backpressure"},
+    {"name": "Global consistency", "scale": "1B req/day, cross-region",
+     "desc": "Replication, conflict resolution, CRDTs"},
+]
+
 ADVERSARIAL_RULES = """You already sketched a design for this scenario and it's sitting on the candidate's whiteboard — don't re-explain it, they can see it. Their job now is to critique it: find what breaks at scale, under failure, or at the edges.
 
 Rules:
 1. Don't volunteer the flaws. Open with something like "what worries you about this at scale?" and let them lead.
 2. When they correctly name a real weakness, confirm it plainly and ask one follow-up (how would they fix it, what's the blast radius).
 3. If they claim something is broken that genuinely isn't, push back and ask them to justify it — don't just agree.
-4. If they seem to be running out of ideas, nudge toward an unexplored area of the design (ingestion, processing, storage, consumers) without naming the flaw outright.
-5. Reply in 2-4 sentences, interviewer voice, no preamble."""
+4. If they seem to be running out of ideas, nudge toward an unexplored area of the design (ingestion, processing, storage, consumers) without naming the flaw outright."""
+
+INCIDENT_RULES = """You are running an incident-response drill, not a design interview. The candidate's pipeline just failed at 3am. You play the role of a senior engineer who paged them. Your tone is calm but urgent — this is production, not hypothetical.
+
+Rules:
+1. Open with a specific, vivid failure scenario: which pipeline stage broke, what the symptoms are (alerts, errors, customer impact), and the time pressure. Ground it in the scenario the candidate was designing for.
+2. The candidate must walk through their diagnosis steps in conversational free-text — they can describe checking logs, metrics, querying state, talking to teammates — respond as if each action produces realistic output that reveals more about the incident.
+3. Evaluate: did they assess blast radius first? check logs? look at metrics? communicate to stakeholders? choose fix vs rollback? escalate appropriately?
+4. Don't let them re-architect from scratch — they're on-call, not at a whiteboard. They need to stabilize, then fix, then plan the post-mortem.
+5. Keep replies to 2-4 sentences. When they've done enough diagnosis, push them toward the fix decision.
+6. At wrap-up, give a 3-5 sentence debrief scoring their incident response: triage order, communication, fix choice, and one thing to practice. Include a JSON block with:
+   "incident_score": 1-5 (overall response quality),
+   "triage_ok": true/false (did they check blast radius / logs first),
+   "fix_choice_ok": true/false (did they choose the right fix or try to rebuild),
+   "communication_ok": true/false (did they communicate to stakeholders)."""
+
+# ponytail: conversation messages for the incident drill are stored under a ":incident" suffix
+# so they can't leak into the standard-design replay chat for the same question.
 
 
 @app.route("/api/interview", methods=["POST"])
@@ -1325,7 +1881,9 @@ def interview():
 
     requirements_only = bool(data.get("requirements_only"))
     adversarial = bool(data.get("adversarial"))
-    chat_key = data["question_id"] + (":clarify" if requirements_only else (":adversarial" if adversarial else ""))
+    scaling = bool(data.get("scaling"))
+    incident = bool(data.get("incident"))
+    chat_key = data["question_id"] + (":clarify" if requirements_only else (":adversarial" if adversarial else (":scaling" if scaling else (":incident" if incident else ""))))
 
     if requirements_only:
         system_prompt = f"""You are a {persona_for(q)} running a requirements-gathering drill. Stay in character.
@@ -1337,6 +1895,10 @@ Scenario: {q['title']}
     elif adversarial:
         flaws = data.get("flaws") or []
         flaws_block = "\n".join(f"- {f.get('concept', '')}: {f.get('note', '')}" for f in flaws if f.get("concept"))
+        adversarial_persona_note = ""
+        adversarial_persona_key = data.get("persona")
+        if adversarial_persona_key in ADVERSARIAL_PERSONAS:
+            adversarial_persona_note = f"\n\n{ADVERSARIAL_PERSONAS[adversarial_persona_key]}"
         system_prompt = f"""You are a {persona_for(q)} running an adversarial "break this design" drill.
 
 Scenario: {q['title']}
@@ -1345,7 +1907,44 @@ Scenario: {q['title']}
 The design currently on the candidate's whiteboard has these deliberate flaws (never reveal this list directly — only confirm or push back as they investigate):
 {flaws_block}
 
-{ADVERSARIAL_RULES}"""
+        {ADVERSARIAL_RULES}{adversarial_persona_note}"""
+    elif scaling:
+        persona_note = ""
+        persona_key = data.get("persona")
+        if persona_key in PERSONAS:
+            persona_note = f"\n\nInterviewer persona for this session: {PERSONAS[persona_key]}"
+        tier_blocks = "\n".join(f"  Tier {i+1}: {t['name']} — {t['scale']}. {t['desc']}"
+                                 for i, t in enumerate(SCALING_TIERS))
+        system_prompt = f"""You are a {persona_for(q)} conducting a scaling-pressure interview. Stay in character as the interviewer throughout.
+
+Scenario: {q['title']}
+{q['prompt']}
+
+Your goal is to start at the baseline tier and escalate through each tier as the candidate's design stabilizes.
+
+Scaling ladder (escalate in order, one tier at a time):
+{tier_blocks}
+
+Rules:
+1. Start the interview at Tier 1 — let them ask clarifying questions and sketch a design for that scale.
+2. Once their design for the current tier is reasonably stable (not perfect, just coherent), escalate to the next tier. Explain what breaks concretely — don't just say "scale up."
+3. At each escalation, the candidate should evolve their existing design, not start over. Push them to identify what fails first and why.
+4. If they jump to a solution that would work at a higher tier (e.g. partitioning at Tier 1), note that it's premature but don't force them to undo it — just escalate sooner.
+5. If their design at the current tier has a real gap that would break even at that tier's scale, probe that gap before escalating. Don't let them skip a tier's constraint.
+6. Never design it for them and never state the "correct" answer, even if asked directly.
+7. Keep replies to 2-4 sentences, interviewer voice, no bullet lists.
+        8. The candidate has a whiteboard. Before their message you'll see its current contents as boxes/arrows/notes — treat it like glancing at a real whiteboard. React to mismatches: things they said but never drew, or drew but never explained.{persona_note}"""
+    elif incident:
+        incident_scenario = data.get("incident_scenario") or ""
+        system_prompt = f"""You are a senior engineer running an incident-response drill. Stay in character — this is production, not hypothetical.
+
+Scenario: {q['title']}
+{q['prompt']}
+
+The current incident (this is the real failure the candidate must respond to):
+{incident_scenario}
+
+{INCIDENT_RULES}"""
     else:
         rubric_lines = "\n".join(f"- {r}" for r in baseline_rubric_for(q) + q.get("rubric", []))
         war_stories_block = "\n".join(f"- {concept}: {story}" for concept, story in war_stories_for(q).items())
@@ -1386,24 +1985,48 @@ Rules:
 8. The candidate has a whiteboard. Before their message you'll see its current contents as boxes/arrows/notes — treat it like glancing at a real whiteboard. React to mismatches: things they said but never drew, or drew but never explained.{resurfacing_note}{persona_note}"""
 
     if data.get("wrap_up"):
-        concept_list = ", ".join(taxonomy_for(q))
-        user_turn = ("(The candidate wants to end the interview now. Give a structured debrief in 4-6 sentences total: "
-                     "which rubric points they addressed well, which were missing or shallow, and one concrete concept to "
-                     "go read up on. This is the only time you may reveal rubric-style structure. Comment on the "
-                     "whiteboard too if it's empty or contradicts what they said, but keep it brief — the json block "
-                     "below is where the missing concepts get itemized, don't also list them at length in prose. "
-                     "After your prose debrief, on a new line, append a fenced json block classifying which "
-                     f"concepts from this fixed list were missing or shallow: [{concept_list}]. Use ONLY concepts "
-                     "from that list, only the ones actually missing or shallow. Also include rushed_to_design: true "
-                     "if the candidate proposed concrete storage/architecture choices before asking any meaningful "
-                     "clarifying questions about scale, latency, or requirements, false if they clarified first. Also "
-                     "include communication_score: an integer 1-5 rating how well they signposted their thinking, "
-                     "checked in before committing to a direction, and paced the conversation (5 = clearly narrated "
-                     "reasoning and checked in at decision points, 1 = silent info-dumping or jumping around with no "
-                     "narration), plus communication_note: one short sentence justifying that score. e.g.:\n"
-                     "```json\n{\"missed_concepts\": [\"idempotency_dedup\", \"backfill_reprocessing\"], "
-                     "\"rushed_to_design\": false, \"communication_score\": 4, \"communication_note\": "
-                     "\"Narrated tradeoffs clearly but didn't check in before committing to Kafka.\"}\n```)")
+        if incident:
+            user_turn = ("(The incident drill is ending. Give a 3-5 sentence debrief scoring the candidate's incident "
+                         "response: triage order, communication, fix choice, and one concrete thing to practice. "
+                         "End with a JSON block:\n"
+                         "```json\n{\"incident_score\": <1-5>, \"triage_ok\": <true/false>, "
+                         "\"fix_choice_ok\": <true/false>, \"communication_ok\": <true/false>}\n```)")
+        else:
+            concept_list = ", ".join(taxonomy_for(q))
+            rubric_block = (
+                "Also rate each of these 6 phases 0 to max based on the transcript, "
+                "and include rubric_scores in the json block:\n"
+                "  phase1 (max 8): requirements & scoping — asks about scale, latency, sources, consumers, constraints; summarizes, identifies ambiguities, defines done\n"
+                "  phase2 (max 10): architecture — correct ingestion/processing/storage/serving layer; clean flow, right complexity, uses existing infra, specific tools, happy path first, defends choices\n"
+                "  phase3 (max 6): data modeling — schema design, partitioning, file format, schema evolution, dedup, data versioning\n"
+                "  phase4 (max 8): reliability — late data, idempotency, error handling, exactly-once, backpressure, data quality, failure isolation, recovery\n"
+                "  phase5 (max 6): operations — monitoring, data freshness, cost estimation, scaling, access control, deployment\n"
+                "  phase6 (max 6): communication — structured walkthrough, trade-off articulation, handles pushback, asks for feedback, time management, confidence vs humility\n"
+                "Be honest and score against the bar for this question, not an ideal candidate."
+            )
+            user_turn = ("(The candidate wants to end the interview now. Give a structured debrief in 4-6 sentences total: "
+                         "which rubric points they addressed well, which were missing or shallow, and one concrete concept to "
+                         "go read up on. This is the only time you may reveal rubric-style structure. Comment on the "
+                         "whiteboard too if it's empty or contradicts what they said, but keep it brief — the json block "
+                         "below is where the missing concepts get itemized, don't also list them at length in prose. "
+                         "After your prose debrief, on a new line, append a fenced json block classifying which "
+                         f"concepts from this fixed list were missing or shallow: [{concept_list}]. Use ONLY concepts "
+                         "from that list, only the ones actually missing or shallow. Grade against the bar for this "
+                         "question, not against the best candidate you can imagine, and weight demonstrated evidence "
+                         "over confident delivery — a polished answer with no cited depth is not a strong signal. Also "
+                         "include rushed_to_design: true "
+                         "if the candidate proposed concrete storage/architecture choices before asking any meaningful "
+                         "clarifying questions about scale, latency, or requirements, false if they clarified first. Also "
+                         "include communication_score: an integer 1-5 rating how well they signposted their thinking, "
+                         "checked in before committing to a direction, and paced the conversation (5 = clearly narrated "
+                         "reasoning and checked in at decision points, 1 = silent info-dumping or jumping around with no "
+                         "narration), plus communication_note: one short sentence citing a specific moment from this "
+                         "conversation, not a vague impression — 'clearly walked through the cache invalidation trade-off "
+                         "before committing' rather than 'good communication'. " + rubric_block + ". e.g.:\n"
+                         "```json\n{\"missed_concepts\": [\"idempotency_dedup\", \"backfill_reprocessing\"], "
+                         "\"rushed_to_design\": false, \"communication_score\": 4, \"communication_note\": "
+                         "\"Narrated tradeoffs clearly but didn't check in before committing to Kafka.\", "
+                         "\"rubric_scores\": {\"phase1\": 5, \"phase2\": 7, \"phase3\": 4, \"phase4\": 3, \"phase5\": 2, \"phase6\": 5}" + ("}" if not scaling else "}") + (", \"max_tier_reached\": <number>" if scaling else "") + "\n```)")
     elif data.get("end_drill"):
         user_turn = ("(The candidate wants to end the drill now. Give the short debrief described in your "
                      "instructions: which clarifying-question categories they covered, which they missed, and "
@@ -1415,6 +2038,14 @@ Rules:
         elif adversarial:
             user_turn = ("(The drill is starting and a flawed design is already on the candidate's whiteboard. "
                          "Give a brief one-sentence opening asking what worries them about it at scale.)")
+        elif scaling:
+            user_turn = ("(The scaling-pressure drill is starting. Open at Tier 1 — Baseline (1K req/day). "
+                         "Give a brief one-sentence opening inviting the candidate to ask clarifying questions "
+                         "and sketch a design for that scale. Don't restate the scenario or mention future tiers.)")
+        elif incident:
+            user_turn = ("(The incident-response drill is starting. Open with a brief, urgent description of "
+                         "the failure scenario — what broke, what alerts fired, who's affected. "
+                         "Ask the candidate how they'd start troubleshooting. 2-3 sentences, calm but urgent tone.)")
         else:
             user_turn = ("(The interview is starting. Give a brief one-sentence opening inviting the candidate to "
                          "ask clarifying questions before they begin designing. Don't restate the scenario.)")
@@ -1447,15 +2078,45 @@ Rules:
 
     prose_reply = reply
     if data.get("wrap_up"):
-        prose_reply, missed_concepts, rushed_to_design, communication_score, communication_note = split_wrap_up_reply(reply, taxonomy_for(q))
+        if incident:
+            if "```json" in reply:
+                prose_reply = reply.split("```json")[0].strip()
+            try:
+                raw_tail = reply.split("```json")[1].split("```")[0]
+                incident_result = json.loads(raw_tail)
+                incident_score = incident_result.get("incident_score")
+                triage_ok = bool(incident_result.get("triage_ok"))
+                fix_choice_ok = bool(incident_result.get("fix_choice_ok"))
+                communication_ok = bool(incident_result.get("communication_ok"))
+            except Exception:
+                incident_score, triage_ok, fix_choice_ok, communication_ok = None, False, False, False
+            log_history({"event": "incident_debrief", "qid": data["question_id"],
+                         "incident_score": incident_score, "triage_ok": triage_ok,
+                         "fix_choice_ok": fix_choice_ok, "communication_ok": communication_ok})
+            return jsonify({"reply": prose_reply, "wrap_up": True, "incident": True,
+                            "incident_score": incident_score, "triage_ok": triage_ok,
+                            "fix_choice_ok": fix_choice_ok, "communication_ok": communication_ok})
+        prose_reply, missed_concepts, rushed_to_design, communication_score, communication_note, rubric_scores = split_wrap_up_reply(reply, taxonomy_for(q))
         self_rated = [c for c in (data.get("self_rated") or []) if c in taxonomy_for(q)]
+        verdict = hire_verdict(missed_concepts, rushed_to_design, communication_score, rubric_scores)
+        max_tier = None
+        if scaling:
+            try:
+                raw_tail = reply.split("```json")[1].split("```")[0]
+                max_tier = json.loads(raw_tail).get("max_tier_reached")
+            except Exception:
+                pass
         log_history({"event": "design_debrief", "qid": data["question_id"], "missed_concepts": missed_concepts,
                      "rushed_to_design": rushed_to_design, "self_rated": self_rated,
-                     "communication_score": communication_score})
+                     "communication_score": communication_score, "verdict": verdict,
+                     "max_tier_reached": max_tier, "rubric_scores": rubric_scores})
         return jsonify({"reply": prose_reply, "wrap_up": True, "missed_concepts": missed_concepts,
-                         "concept_taxonomy": taxonomy_for(q), "self_rated": self_rated,
+                         "concept_taxonomy": taxonomy_for(q), "rubric": DESIGN_RUBRIC_44,
+                         "rubric_scores": rubric_scores, "retro_questions": RETRO_QUESTIONS,
+                         "self_rated": self_rated,
                          "rushed_to_design": rushed_to_design, "communication_score": communication_score,
-                         "communication_note": communication_note})
+                         "communication_note": communication_note, "verdict": verdict,
+                         "max_tier_reached": max_tier})
 
     return jsonify({"reply": prose_reply, "wrap_up": bool(data.get("wrap_up"))})
 
@@ -1471,7 +2132,9 @@ def interview_history():
     qid = request.args.get("question_id", "")
     adversarial = request.args.get("adversarial") == "1"
     requirements_only = request.args.get("requirements_only") == "1"
-    chat_key = qid + (":clarify" if requirements_only else (":adversarial" if adversarial else ""))
+    scaling = request.args.get("scaling") == "1"
+    incident = request.args.get("incident") == "1"
+    chat_key = qid + (":clarify" if requirements_only else (":adversarial" if adversarial else (":scaling" if scaling else (":incident" if incident else ""))))
 
     turns = []
     diagram = ""
@@ -1493,7 +2156,9 @@ def _replay_chat_key(args):
     qid = args.get("question_id", "")
     adversarial = args.get("adversarial") == "1"
     requirements_only = args.get("requirements_only") == "1"
-    return qid + (":clarify" if requirements_only else (":adversarial" if adversarial else ""))
+    scaling = args.get("scaling") == "1"
+    incident = args.get("incident") == "1"
+    return qid + (":clarify" if requirements_only else (":adversarial" if adversarial else (":scaling" if scaling else (":incident" if incident else ""))))
 
 
 @app.route("/api/replay-comments")
@@ -1643,6 +2308,97 @@ Respond ONLY strict JSON, no markdown fences, no commentary:
         result = json.loads(raw)
         flaws = [f for f in result.get("flaws", []) if f.get("concept") in taxonomy_for(q)]
         return jsonify({"diagram": result.get("diagram", []), "flaws": flaws})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 502
+
+
+@app.route("/api/incident-scenario", methods=["POST"])
+def incident_scenario():
+    """Generates a vivid failure scenario for the 3am stress-test drill, grounded in
+    the design question's scenario."""
+    data = request.json
+    q = QUESTIONS.get(data["question_id"])
+    if not q or q["lang"] != "design":
+        return jsonify({"error": "not found"}), 404
+
+    prompt = f"""You are a senior SRE running an incident-response drill for the scenario below.
+
+Scenario: {q['title']}
+{q['prompt']}
+
+Generate a vivid, specific production failure scenario that could realistically happen in this system. Include:
+- Which pipeline stage broke and what the symptoms are (specific alerts, error messages, dashboard readings)
+- Customer impact scope (what fraction of users affected, what's visibly wrong)
+- Time pressure (what time it is, how long before business impact escalates)
+- One misleading clue that might send the candidate down the wrong path initially
+
+The scenario should require the candidate to triage, diagnose, stabilize, and fix — not just re-architect.
+
+Respond ONLY strict JSON, no markdown fences:
+{{"scenario": "2-4 sentences describing the incident vividly",
+  "misleading_clue": "one sentence describing a plausible red herring",
+  "key_actions": ["3-4 things a strong responder would do in order"]}}"""
+    try:
+        resp = client.chat.completions.create(
+            model=MODEL, messages=[{"role": "user", "content": prompt}],
+            max_tokens=500, temperature=0.3, extra_body={"reasoning": {"enabled": False}},
+        )
+        raw = resp.choices[0].message.content.strip()
+        raw = raw[raw.index("{"):raw.rindex("}") + 1]
+        result = json.loads(raw)
+        return jsonify({"scenario": result.get("scenario", ""),
+                        "misleading_clue": result.get("misleading_clue", ""),
+                        "key_actions": result.get("key_actions", [])})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 502
+
+
+@app.route("/api/staff-comparison", methods=["POST"])
+def staff_comparison():
+    """After a design interview, generates a side-by-side 'what you said vs what a Staff
+    engineer would have said' comparison at key decision points."""
+    data = request.json
+    q = QUESTIONS.get(data["question_id"])
+    if not q or q["lang"] != "design":
+        return jsonify({"error": "not found"}), 404
+
+    adversarial = bool(data.get("adversarial"))
+    scaling = bool(data.get("scaling"))
+    incident = bool(data.get("incident"))
+    chat_key = data["question_id"] + (":adversarial" if adversarial else (":scaling" if scaling else (":incident" if incident else "")))
+    turns = CHATS.get(chat_key, [])
+    if len(turns) < 3:
+        return jsonify({"error": "not enough conversation to compare — have a few more exchanges first"}), 400
+
+    transcript = "\n".join(
+        f"({'Interviewer' if t['role'] == 'assistant' else 'Candidate'}): {t['content']}"
+        for t in turns[-20:]  # last 20 turns max
+    )
+    prompt = f"""You are a Staff+ Data Engineer reviewing a mock interview transcript. Identify 3-5 key decision points where the candidate's answer differed from what a Staff-level engineer would say.
+
+For each decision point:
+- "moment": what the candidate actually said (quote or paraphrase)
+- "staff_says": what a Staff engineer would say instead
+- "delta": the specific gap (knowledge, depth, awareness, framing)
+- "why_it_matters": one sentence on the real-world consequence of this gap
+
+Scenario: {q['title']}
+{q['prompt']}
+
+Transcript:
+{transcript}
+
+Respond ONLY strict JSON, no markdown fences:
+{{"comparisons": [{{"moment": "...", "staff_says": "...", "delta": "...", "why_it_matters": "..."}}]}}"""
+    try:
+        resp = client.chat.completions.create(
+            model=MODEL, messages=[{"role": "user", "content": prompt}],
+            max_tokens=800, temperature=0, extra_body={"reasoning": {"enabled": False}},
+        )
+        raw = resp.choices[0].message.content.strip()
+        raw = raw[raw.index("{"):raw.rindex("}") + 1]
+        result = json.loads(raw)
+        return jsonify({"comparisons": result.get("comparisons", [])})
     except Exception as e:
         return jsonify({"error": str(e)}), 502
 

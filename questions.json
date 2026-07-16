@@ -4450,6 +4450,48 @@
     ]
   },
   {
+    "id": "design-5",
+    "lang": "design",
+    "title": "Change Data Capture Pipeline for a Sharded OLTP Store",
+    "prompt": "A payments company needs to replicate every row change from its sharded OLTP database into a downstream data warehouse in near-real-time, without ever double-counting a transaction even if the replication process crashes and restarts mid-stream. Design the CDC pipeline.",
+    "rubric": [
+      "Asked about acceptable replication lag, transaction volume, and what double-counting would actually break (e.g. a ledger balance) before designing",
+      "CDC mechanism choice justified (log-based CDC off the DB's write-ahead log/binlog vs. trigger-based vs. polling) with its tradeoffs acknowledged",
+      "Idempotent write strategy at the destination (upsert by transaction id, not blind append) so a crash-and-restart can't double-apply a change",
+      "Addressed how the pipeline tracks progress per shard (offsets/checkpoints) so a restart resumes exactly where it left off, not from the beginning or an arbitrary point",
+      "Addressed schema drift: what happens when a shard's table schema changes mid-stream",
+      "Failure handling: what happens when one shard's CDC stream falls behind the others"
+    ]
+  },
+  {
+    "id": "design-6",
+    "lang": "design",
+    "title": "Lakehouse Ingestion with Late-Arriving Mobile Events",
+    "prompt": "A mobile app buffers analytics events locally and syncs them whenever the device regains connectivity — sometimes hours or days late. Design the ingestion and aggregation pipeline so that daily aggregate reports (e.g. daily active users, revenue) are still correct even when a meaningful fraction of events for 'yesterday' arrive after today's report has already run.",
+    "rubric": [
+      "Asked how late is 'late' in practice (minutes vs days) and whether reports can be corrected retroactively before designing",
+      "Proposed an explicit watermark or allowed-lateness policy for closing an aggregation window, rather than assuming all of a day's events arrive by midnight",
+      "Addressed what happens to events that arrive after the watermark/lateness cutoff (dropped, added to a correction batch, or trigger a recompute)",
+      "Distinguished a fast best-effort report from a later corrected/final report if the design uses that pattern, and how consumers know which one they're looking at",
+      "Storage/format choice supports cheaply mutating historical partitions (e.g. a table format with upserts) rather than requiring a full rewrite for every late correction",
+      "Failure handling: what happens if a burst of very old events (e.g. a device offline for a month) arrives all at once"
+    ]
+  },
+  {
+    "id": "design-7",
+    "lang": "design",
+    "title": "Backfilling a Multi-Stage Pipeline After a Bug Fix",
+    "prompt": "A transformation step three stages into a five-stage daily pipeline (ingest → clean → enrich → aggregate → serve) had a bug for the last 30 days, corrupting output at every stage downstream of it. Design how the orchestration system detects this, backfills correctly, and reduces the chance the same class of bug propagates silently again.",
+    "rubric": [
+      "Asked whether all 30 days need reprocessing or just some, and whether downstream consumers can tolerate serving stale/corrected data during the backfill, before designing",
+      "Proposed a DAG-aware backfill (re-running only the buggy stage and everything downstream of it, per affected day) rather than reprocessing the entire pipeline from scratch",
+      "Addressed how the backfill avoids racing with the pipeline's regular daily run for the same day/partition",
+      "Addressed idempotency: reprocessing day N's data overwrites/replaces bad output rather than appending duplicate rows",
+      "Proposed a concrete detection mechanism (data quality checks between stages) that would have caught this sooner than 30 days",
+      "Failure handling: what happens if the backfill itself fails partway through the 30-day range"
+    ]
+  },
+  {
     "id": "tradeoff-1",
     "lang": "tradeoff",
     "title": "Exactly-Once Billing: Lambda or Kappa?",
@@ -4515,6 +4557,45 @@
     ]
   },
   {
+    "id": "tradeoff-6",
+    "lang": "tradeoff",
+    "title": "At-Least-Once Delivery: Dedup at the Consumer or the Broker?",
+    "concept_tag": "idempotency_dedup",
+    "prompt": "Your event broker guarantees at-least-once delivery, so consumers can receive the same message more than once (e.g. after a consumer crash and rebalance before committing an offset). You must pick ONE place to guarantee idempotent processing: dedup logic in each consumer (checking a processed-ids store before acting), or a broker/gateway layer that filters duplicates before consumers ever see them. State your choice and defend it.",
+    "key_points": [
+      "Picks consumer-side idempotency (each consumer stores processed ids and does an idempotent upsert) as the robust default, since a broker-side dedup layer can itself fail or introduce its own duplicate window — or defends broker-side dedup for a specific reason (e.g. many downstream consumers that can't be trusted to implement dedup correctly)",
+      "Explains the mechanism concretely: a unique event id plus an upsert/conditional-write pattern, not just 'we'll dedupe it'",
+      "Names the tradeoff: consumer-side pushes the correctness burden onto every consumer team (repeated effort, risk one team gets it wrong) vs. broker-side adds a stateful bottleneck and its own duplication risk",
+      "Acknowledges the processed-ids store itself needs a retention/expiry policy or it grows unbounded"
+    ]
+  },
+  {
+    "id": "tradeoff-7",
+    "lang": "tradeoff",
+    "title": "Schema Registry Enforcement: Reject at Write Time or Read Time?",
+    "concept_tag": "schema_evolution_compat",
+    "prompt": "Your team runs a schema registry for events published across dozens of independently-deployed services. You must pick ONE place to enforce schema compatibility: reject non-compatible schema changes at write time (a producer can't publish until the registry accepts the new schema), or allow any write and let consumers handle unexpected/incompatible messages at read time. State your choice and defend it.",
+    "key_points": [
+      "Picks write-time enforcement as the default (catches a breaking change before it reaches any consumer, at the cost of blocking a producer's deploy) — or defends read-time tolerance for a specific reason (e.g. consumers already handle unknown fields for other reasons, or the registry can't be a blocking dependency)",
+      "Distinguishes backward-compatible changes (e.g. adding an optional field) that should be allowed by default from breaking changes (removing/renaming a required field) that should be rejected",
+      "Explains what happens to old messages already on the log when the schema changes — read-time tolerance is still needed for historical data even under write-time enforcement",
+      "Names the cost of the chosen approach: write-time enforcement makes the registry a hard dependency for every deploy; read-time tolerance means bugs surface at runtime instead of deploy time"
+    ]
+  },
+  {
+    "id": "tradeoff-8",
+    "lang": "tradeoff",
+    "title": "Data Quality Checks: Block the Pipeline or Alert and Continue?",
+    "concept_tag": "data_quality_observability",
+    "prompt": "An upstream table starts feeding your pipeline null values in a column that's never had nulls before. You must pick ONE policy for what a data quality check does when it detects this kind of anomaly: hard-fail the pipeline run (block downstream from seeing the bad data) or let the run continue and just alert on-call. State your choice and defend it.",
+    "key_points": [
+      "Picks a policy based on blast radius/reversibility (e.g. hard-fail for anything feeding a financial or exec-facing metric, alert-and-continue for lower-stakes internal tables) rather than one blanket rule for everything",
+      "Explains the cost of hard-failing: it can cascade (a downstream job that depends on this one also misses its SLA) and needs a clear unblock/override path, not just 'stop'",
+      "Explains the cost of alert-and-continue: bad data reaches consumers and may need a costly backfill/correction later once someone acts on the alert",
+      "Names a concrete detection mechanism (e.g. null-rate/volume/schema anomaly thresholds compared against a rolling baseline), not just 'we'll monitor it'"
+    ]
+  },
+  {
     "id": "napkin-1",
     "lang": "napkin",
     "title": "Kafka Partition Count for Peak Clickstream Ingest",
@@ -4563,6 +4644,26 @@
     "answer_high": 30000,
     "unit": "events/sec",
     "explanation": "Naive worst case = 200 \u00d7 500 = 100,000 events/sec, but that assumes every producer peaks at the exact same instant, which real traffic rarely does. Using the given 20% concurrent-peak assumption: 0.2 \u00d7 200 \u00d7 500 \u2248 20,000 events/sec is the more realistic capacity-planning number \u2014 distinguishing theoretical worst-case from realistic correlated load is exactly what this drill is testing."
+  },
+  {
+    "id": "napkin-6",
+    "lang": "napkin",
+    "title": "Processed-Event ID Store Size for Exactly-Once Dedup",
+    "prompt": "Your pipeline ingests 50,000 events/sec at peak and guarantees idempotent processing by checking each event's UUID (16 bytes) against a processed-ids store before acting, retaining ids for a 24-hour dedup window. Estimate the store's size in GB needed to hold one day's worth of ids.",
+    "answer_low": 60,
+    "answer_high": 150,
+    "unit": "GB",
+    "explanation": "Naive raw math: 50,000 events/sec \u00d7 86,400 sec/day \u2248 4.32 billion events/day \u00d7 16 bytes/UUID \u2248 69GB just for the raw ids \u2014 before any KV-store per-key overhead (hash index entries typically add several bytes to tens of bytes per key), which pushes a real deployment closer to 100-150GB for a single day's window. At this scale a raw id-per-key store often isn't the right primitive at all \u2014 recognizing that a Bloom filter or similar probabilistic structure trades a small false-positive rate for a huge space savings is exactly the realization this drill is testing for."
+  },
+  {
+    "id": "napkin-7",
+    "lang": "napkin",
+    "title": "Raw Retention Storage for Kappa-Style Full Replayability",
+    "prompt": "To support a Kappa-style architecture, you want to retain 90 days of history on a Kafka topic so any bug can be fixed by replaying from the start of the retention window. The topic peaks at 50,000 events/sec (each event ~1KB), but average sustained throughput is roughly 40% of peak. Estimate the raw storage in TB needed for 90 days of retention, ignoring replication factor.",
+    "answer_low": 120,
+    "answer_high": 200,
+    "unit": "TB",
+    "explanation": "Average throughput \u2248 0.4 \u00d7 50,000 events/sec \u00d7 1KB \u2248 20MB/s. Over 90 days: 20MB/s \u00d7 86,400 sec/day \u00d7 90 days \u2248 155TB raw. This is before Kafka's typical replication factor of 3, which would roughly triple the real cluster footprint \u2014 the point of the drill is recognizing that a 'just replay from the log' architecture has a real, ongoing storage cost that scales with retention window, not a one-time or free decision."
   },
   {
     "id": "ai-design-1",
@@ -4622,6 +4723,197 @@
       "Versioning: prompts and eval results are tracked together so a regression can be bisected to a specific change",
       "Production monitoring: some signal (user feedback, sampled review, drift metrics) catches regressions that offline evals miss",
       "Rollout safety: how a prompt/model change ships (shadow testing, canary, gradual rollout) rather than all-at-once"
+    ]
+  },
+  {
+    "id": "design-8",
+    "lang": "design",
+    "title": "Real-Time Fraud Detection Pipeline",
+    "prompt": "A payment processor handling 5,000 credit-card transactions per second needs a fraud detection system that returns a risk score in under 100ms before each transaction is authorized. False positives block legitimate revenue; false negatives lose money. Design the pipeline.",
+    "rubric": [
+      "Identified that sub-100ms latency is the non-negotiable constraint and designed every component around it rather than treating it as one requirement among equals",
+      "Ingestion layer: Kafka or Kinesis partitioned by a key that enables locality (e.g. merchant_id) without creating hot partitions",
+      "Feature computation: stateful processing (Flink or similar) for velocity counts, amount deviation, geo-velocity — kept in a low-latency store (Redis) rather than recomputed per request",
+      "Scoring layer: lightweight model serving (ONNX, TF Serving) called synchronously from the authorization path, not a separate async job",
+      "Feedback loop: labeled review outcomes flow back into daily batch retraining, with a tunable threshold per merchant to control false-positive rates",
+      "Failure mode: what happens when the feature store or model server is unavailable — fail-open (authorize anyway) vs fail-closed (decline) and the revenue implications of each"
+    ]
+  },
+  {
+    "id": "design-9",
+    "lang": "design",
+    "title": "IoT Sensor Data Platform",
+    "prompt": "A company has 1 million IoT devices (industrial sensors, fleet GPS trackers) each sending a reading every 5 seconds — temperature, vibration, location. They need per-device anomaly detection (alert when a reading deviates 3-sigma from the rolling hourly mean), a real-time dashboard, and historical storage for 30 days of raw data. Design the platform.",
+    "rubric": [
+      "Asked about device protocol constraints (MQTT vs HTTP), payload size, and whether devices support backpressure or retry before designing",
+      "Ingestion: MQTT broker (EMQX, HiveMQ) as the device-facing endpoint bridged to Kafka, acknowledging that IoT devices use constrained protocols",
+      "Processing: stateful streaming (Flink/Spark) maintaining per-device rolling statistics (1M devices × ~1KB state = ~1GB, fits in RocksDB-backed state)",
+      "Alerting: anomaly detection triggers notifications without creating a notification-storm when 10K devices spike simultaneously — deduplication and rate-limiting strategy",
+      "Storage: time-series database (TimescaleDB, InfluxDB) for recent data partitioned by device_id + time, cold archive to Parquet on S3 for data older than 30 days",
+      "Failure mode: how the system handles a device that goes offline for 48 hours then reconnects and floods its backlog without starving other devices' processing"
+    ]
+  },
+  {
+    "id": "design-10",
+    "lang": "design",
+    "title": "Server Log Aggregation at Scale",
+    "prompt": "A SaaS company runs 10,000 servers each generating 50,000 log lines per second (500 bytes average). Engineers need to search error/warning logs from the last 7 days with sub-second latency, and occasionally forensically query debug logs from months ago. Design the log aggregation system.",
+    "rubric": [
+      "Started with the scale calculation (500M lines/sec, 250GB/sec ingestion) and let the numbers drive architectural decisions rather than ignoring throughput",
+      "Ingestion: lightweight agents (Fluent Bit over Fluentd for memory footprint) shipping to a large Kafka cluster with partitioning by service name and NVMe storage",
+      "Hot/cold tier design: errors and warnings indexed in Elasticsearch or ClickHouse (7-day retention, sub-second search); debug logs sampled or written to Parquet on S3 with Athena for forensic queries",
+      "Explicitly addressed what gets dropped at peak — at 250GB/sec, indexing everything is cost-prohibitive, so sampling or tiered retention is mandatory and justified",
+      "Processing: a streaming job (Flink) that parses, enriches (hostname, region, deploy version), and routes logs by severity with different quality-of-service guarantees per path",
+      "Failure mode: what happens when the Elasticsearch cluster falls behind or a broker fails during a sustained ingestion peak — backpressure, shedding, and replay strategy"
+    ]
+  },
+  {
+    "id": "design-11",
+    "lang": "design",
+    "title": "Food Delivery Order Processing State Machine",
+    "prompt": "A food delivery platform processes orders through a complex state machine: order placed → restaurant accepts → preparing → driver assigned → picked up → delivered. Each state transition is an event, multiple microservices are involved, and orders can fail at any step (restaurant rejects, driver cancels, food goes cold). Design the event-driven order processing system.",
+    "rubric": [
+      "Identified the core challenge as managing a distributed state machine with exactly-once guarantees across microservices rather than proposing a monolithic order table",
+      "Eventing layer: Kafka topics per state transition (OrderPlaced, OrderAccepted, DriverAssigned, etc.) with the Outbox Pattern to atomically commit DB writes and event publishes",
+      "State materialization: a streaming job (Flink) that reads the event log and materializes the current state of every active order into a fast serving store (Redis) for the customer tracking screen",
+      "Timeout handling: a scheduler or timer service publishes timeout events when a step doesn't complete within SLA (e.g. restaurant doesn't respond in 3 minutes → auto-cancel)",
+      "Failure mode: what happens if the driver app crashes mid-delivery — GPS heartbeat monitoring detects the gap and reassigns without duplicating the delivery",
+      "Exactly-once: acknowledged that true exactly-once across arbitrary services is impossible and proposed effectively-once through idempotent event handlers keyed on event ID"
+    ]
+  },
+  {
+    "id": "design-12",
+    "lang": "design",
+    "title": "Feature Store for Batch Training and Real-Time Inference",
+    "prompt": "An ML team needs a feature platform that serves both batch training (reading millions of historical feature vectors daily) and real-time inference (reading a single feature vector in under 10ms at p99). Features include streaming aggregations (logins in the last 24h) and batch computations (lifetime purchase total). Features must be consistent — a model trained on Tuesday must use the same feature values it would see at inference on Wednesday. Design the feature store.",
+    "rubric": [
+      "Identified the dual-serving-path constraint (offline for training, online for inference) and designed two distinct stores rather than forcing one store to serve both",
+      "Offline store: partitioned by entity_id + event_timestamp in Delta Lake or similar, supporting point-in-time-correct joins to prevent training-serving skew",
+      "Online store: Redis or DynamoDB keyed by entity_id holding only the latest feature values, with TTL-based expiry and sub-5ms read latency",
+      "Feature pipeline: streaming features computed by Flink dual-writing to both stores; batch features computed by Spark and backfilled to both stores with versioning",
+      "Consistency guarantee: explicitly addressed point-in-time joins so training data exactly matches what inference would have seen — the core correctness property of a feature store",
+      "Failure mode: what happens when the online store is unavailable during inference — fallback to default values, stale cache, or fail-open, and how each affects model accuracy"
+    ]
+  },
+  {
+    "id": "design-13",
+    "lang": "design",
+    "title": "Ride-Sharing Data Model for Analytics",
+    "prompt": "A ride-sharing company wants to build an analytics data model to understand driver onboarding conversion (signup → document approval → activation → first trip) and trip performance (request → offer → accept → pickup → complete). Data analysts need to query driver funnel metrics and trip conversion rates. Design the dimensional model.",
+    "rubric": [
+      "Enumerated core entities (Driver, Rider, Vehicle, Offer, Trip, Payment, Rating, Location) before designing any tables — scoped the model before diving into columns",
+      "SCD strategy justified: explained why each dimension uses Type 1, Type 2, or Type 3 based on query patterns (e.g. current status for driver onboarding is Type 1, historical address changes for regulatory reporting are Type 2)",
+      "Fact grain: stated the grain of each fact table explicitly (one row per trip request, one row per completed trip) and designed columns that respect that grain without fan-out",
+      "Driver onboarding funnel: modeled milestone timestamps (signup, docs_submitted, docs_approved, activated, first_trip) as columns in the driver dimension rather than a separate event table — justified by simple current-value query patterns",
+      "Trip conversion: demonstrated a SQL approach (LEFT JOIN offer→trip with CASE WHEN count logic) rather than hand-waving the metric definition",
+      "Missing dimension self-audit: identified geo/location as a needed dimension when prompted, and explained what queries it enables (trip density, high-profit regions)"
+    ]
+  },
+  {
+    "id": "tradeoff-9",
+    "lang": "tradeoff",
+    "title": "Synchronous Dual-Write vs. Log-Based Materialization for a Feature Store",
+    "concept_tag": "consistency_vs_latency",
+    "prompt": "Your feature store needs to keep the online store (Redis, sub-5ms reads) and offline store (Delta Lake, historical queries) consistent. Option A: the streaming job dual-writes to both stores synchronously — the feature is only considered written after both succeed. Option B: the streaming job writes only to Kafka; a separate consumer materializes the online store, and a batch job materializes the offline store from the same log. Which do you choose and why?",
+    "key_points": [
+      "Dual-write consistency: synchronous writes guarantee the online and offline stores are always consistent, but double the write latency and make the pipeline vulnerable to partial failures (one store down blocks the other)",
+      "Log-based materialization decouples the write paths — the online store can be updated in near-real-time while the offline store catches up on a batch schedule, and a Kafka outage doesn't block either",
+      "Read-your-write consistency is the real constraint: if a model trains at 2pm, does it need features from a 1:59pm event that's still propagating to the offline store?",
+      "Operational complexity: dual-write needs distributed transaction semantics or a saga; log-based needs idempotent consumers and handles replay naturally"
+    ]
+  },
+  {
+    "id": "tradeoff-10",
+    "lang": "tradeoff",
+    "title": "Fail-Open vs. Fail-Closed for Real-Time Fraud Scoring",
+    "concept_tag": "availability_vs_correctness",
+    "prompt": "Your fraud detection model server times out or returns an error during a 100ms transaction authorization window. Option A: fail-open — authorize the transaction anyway and flag it for async review. Option B: fail-closed — decline the transaction and let the customer retry. Which do you choose and why?",
+    "key_points": [
+      "Fail-open maximizes revenue and customer experience (legitimate transactions go through) but lets through every fraudulent transaction during the outage window",
+      "Fail-closed protects against fraud losses during the outage but blocks legitimate transactions, hurting merchant relationships and customer trust",
+      "The decision depends on fraud-to-false-positive cost ratio: for high-value finance (wire transfers) fail-closed is standard; for low-value e-commerce (coffee purchases) fail-open is common",
+      "A hybrid approach is tunable per merchant based on their historical fraud rate and transaction amount — high-risk merchants get fail-closed, low-risk get fail-open"
+    ]
+  },
+  {
+    "id": "tradeoff-11",
+    "lang": "tradeoff",
+    "title": "Per-Device vs. Aggregated Timers for IoT Anomaly Detection",
+    "concept_tag": "state_granularity",
+    "prompt": "For 1 million IoT devices, you need to detect when a device's reading deviates from its own recent history. Option A: maintain per-device rolling statistics in Flink state (1M entries, ~1GB of state). Option B: bucket devices by type/location and detect anomalies at the bucket level using aggregate statistics. Which do you choose and why?",
+    "key_points": [
+      "Per-device state is more accurate (catches individual device degradation) but costs ~1GB of Flink state plus checkpointing overhead at 1M keys",
+      "Bucket-level aggregation is cheaper in state and compute but misses individual device failures if only one device in a large bucket degrades",
+      "The right answer depends on what kind of failures matter: slow calibration drift (per-device needed) vs. plant-wide outages (bucket detects fine)",
+      "A tiered approach is often best: bucket-level for real-time alerting, per-device for offline investigation, with the Flink job doing bucketing and a separate batch job computing per-device stats"
+    ]
+  },
+  {
+    "id": "tradeoff-12",
+    "lang": "tradeoff",
+    "title": "Airflow Executor: Celery vs. Kubernetes vs. Local",
+    "concept_tag": "orchestration_architecture",
+    "prompt": "You need to pick an Airflow executor for a data platform running 500 DAGs with a mix of lightweight Python operators and heavy SparkSubmit operators. Option A: CeleryExecutor with a fixed pool of worker nodes. Option B: KubernetesExecutor with dynamic pod-per-task scaling. Option C: LocalExecutor on a single beefy instance. Which do you choose and why?",
+    "key_points": [
+      "CeleryExecutor offers predictable capacity with a fixed worker pool but suffers from static over-provisioning (paying for idle workers) or under-provisioning (backlogs during peak), and needs separate infrastructure (Redis/RabbitMQ) to manage",
+      "KubernetesExecutor spins a pod per task — ideal for heterogeneous workloads where a lightweight Python operator needs 0.5GB and a Spark operator needs 8GB, but adds K8s networking overhead, slower pod startup, and requires K8s expertise to tune",
+      "LocalExecutor is simple and free but runs everything on one node — a single memory-hungry task OOMs the scheduler and takes down unrelated DAGs, unsuitable beyond ~50 DAGs or any Spark workload",
+      "The right choice depends on workload diversity and team skills: Celery is the safe default for uniform-medium workloads, K8sExecutor wins for heterogeneous workloads with existing K8s investment, LocalExecutor is a dev-only choice"
+    ]
+  },
+  {
+    "id": "tradeoff-13",
+    "lang": "tradeoff",
+    "title": "COPY vs. MERGE for Incremental Warehouse Loads",
+    "concept_tag": "ingestion_strategy",
+    "prompt": "Loading 10M new rows daily into a 500M-row fact table. Option A: COPY (append new data into a new partition, then swap). Option B: MERGE INTO (upsert new rows into the existing table in place). Which do you choose and why?",
+    "key_points": [
+      "COPY + partition swap is idempotent, fast, and doesn't deadlock — you load into a staging table, validate, then swap the partition in a metadata-only operation. But it requires proper partitioning and means the table is briefly missing the newest partition during the swap",
+      "MERGE INTO is atomic and doesn't require partitioning but is slower (full table scan to find matches), risks deadlocks under concurrent loads, and is harder to roll back if the merge is wrong",
+      "COPY wins for large append-only fact tables with date-based partitioning (most common pattern), while MERGE is better for smaller dimension tables that need true upsert and can tolerate slower writes",
+      "Some warehouses (Snowflake, BigQuery) have materialized-table-swap that combines both — always worth mentioning as a 3rd option"
+    ]
+  },
+  {
+    "id": "design-14",
+    "lang": "design",
+    "title": "Identity Resolution Pipeline",
+    "prompt": "Three legacy systems each identify customers differently: the e-commerce platform uses email, the support tool uses a session cookie, and the mobile app uses a device ID. The same person appears under different identifiers across systems. The marketing team needs a unified customer 360 for campaign attribution, and the data team needs to merge analytics without double-counting. Design the identity resolution pipeline.",
+    "rubric": [
+      "Identified that identity resolution is a probabilistic/graph problem, not a simple JOIN — same person appearing as three different IDs requires pairwise matching with confidence scoring",
+      "Ingestion: collected all identifiers from every source into a single event stream keyed by whatever ID the source provides, preserving raw pairs for re-resolution",
+      "Resolution strategy: deterministic rules (matching email) for high-confidence links, probabilistic (name + address fuzzy match, device graph) for lower-confidence edges, with a manual review queue for borderline cases",
+      "Storage: an identity graph (Neo4j or a purpose-built ID service) mapping source IDs to canonical profiles, with versioning so historical queries can use the resolution that was live at the time",
+      "Reconciliation: a scheduled batch job that re-resolves the graph as new data arrives (an email added to a device-ID profile can merge two previously separate canonical profiles), with conflict-resolution rules for when profiles merge",
+      "Failure mode: what happens when two profiles auto-merge incorrectly — a rollback mechanism to split merged profiles without losing the event history that was attributed to the merged profile"
+    ]
+  },
+  {
+    "id": "design-15",
+    "lang": "design",
+    "title": "GDPR-Compliant Data Deletion Pipeline",
+    "prompt": "A data platform stores user activity across a data lake (Parquet on S3), a data warehouse (Snowflake), and a real-time serving layer (Redis). When a user exercises their right to be forgotten (GDPR Article 17), their personal data must be deleted from all storage tiers within 30 days. However, the business still needs aggregate analytics and must retain an audit trail proving deletion was performed. Design the deletion pipeline.",
+    "rubric": [
+      "Distinguished between hard delete (PII fields scrubbed) and soft delete (canonical user record replaced with a tombstone, aggregates preserved) rather than treating all data as equivalently deletable",
+      "Identified the core tension: deletion destroys the ability to retroactively compute correct aggregates including that user — proposed either pre-deletion snapshotting or accepting permanent aggregate approximation",
+      "Implementation: a deletion request queue (Kafka topic keyed by user ID) consumed by per-layer deletion jobs — S3 uses rewrite-with-exclusion, Snowflake uses UPDATE/DELETE with masking, Redis uses DEL with TTL confirmation",
+      "Audit trail: a deletion-log table recording what was deleted, when, and by which request ID, retained separately from user data and not subject to deletion itself",
+      "Verification: a post-deletion scan that confirms no residual PII for the deleted user exists in any layer, with periodic re-scans for backup/archive copies that may have been missed",
+      "Failure mode: what happens when a deletion job partially fails (S3 succeeds, Snowflake fails) — a compensating transaction or a retry queue with exactly-once semantics per layer"
+    ]
+  },
+  {
+    "id": "design-16",
+    "lang": "design",
+    "title": "Data Lake Access Control and Governance",
+    "prompt": "A company consolidated all its data into a single S3 data lake with a Databricks/Trino query layer. A marketing analyst accidentally queried the HR salary table because nothing prevented them from seeing it. The security team now demands a least-privilege access model: every user should see only the datasets their role entitles them to, and all access must be auditable. However, the data lake is unstructured — thousands of tables, no consistent tagging. Design the access control system.",
+    "rubric": [
+      "Identified that the hard problem is classification (knowing what data exists and what sensitivity level it has), not enforcement — without tagging, you can't write access rules",
+      "Classification strategy: automated (scan for PII patterns: email regex, salary column names, SSN patterns) plus a curator workflow for manual tagging, with a default-deny for unclassified data",
+      "Enforcement: three-layer — S3 bucket policies for coarse access, Unity Catalog / Lake Formation for table/column-level grants, and a query proxy that rewrites SELECT * to exclude masked columns",
+      "Audit: all queries logged with user identity, query text, rows returned, and timestamp, with an anomaly detector for access patterns outside normal baselines",
+      "Operations: self-serve access request workflow with automated approval for low-sensitivity data and manual approval for PII, all recorded in the audit log",
+      "Failure mode: what happens when a new table lands without a classification tag — deny-by-default prevents access, so a 'quarantine zone' with temporary 48-hour auto-access during classification processing"
     ]
   }
 ]

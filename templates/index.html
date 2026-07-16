@@ -428,6 +428,12 @@
     font-size: 12px; padding: 7px 14px; border-radius: 999px;
     box-shadow: var(--shadow); z-index: 5;
   }
+  #framework-hud {
+    position: absolute; top: 14px; left: 50%; transform: translateX(-50%);
+    background: var(--card-2); border: 1px solid var(--border); color: var(--text);
+    font-size: 12px; padding: 7px 14px; border-radius: 999px;
+    box-shadow: var(--shadow); z-index: 5;
+  }
   #chatpanel.collapsed { width: 44px !important; overflow: hidden; }
   #chatpanel.collapsed .chat-title, #chatpanel.collapsed .chat-subtitle,
   #chatpanel.collapsed #chatlog, #chatpanel.collapsed #replay-bar,
@@ -561,6 +567,14 @@
   .debrief-row input::placeholder { color: var(--text-faint); }
   #debrief-feedback:not(:empty) { padding: 7px 12px; font-size: 12px; }
   #debrief-feedback .line { padding: 3px 0; }
+#debug-code .dl { color: var(--text-dim); }
+#debug-code .dl.active { background: rgba(124,108,246,0.2); color: var(--text); border-radius: 2px; margin:0 -4px; padding:0 4px; }
+#debug-code .dl-num { color: var(--text-faint); margin-right: 10px; user-select:none; }
+#debug-vars-table .dv-row { display:flex; gap:8px; padding:4px 0; font-size:12.5px; border-bottom:1px solid var(--border-soft); font-family:JetBrains Mono,monospace; }
+#debug-vars-table .dv-row:last-child { border-bottom:none; }
+#debug-vars-table .dv-name { color: var(--accent-2); flex:0 0 auto; }
+#debug-vars-table .dv-val { color: var(--text); word-break:break-all; }
+#debug-vars-table .dv-empty { color: var(--text-faint); font-size:12px; font-family:Inter,sans-serif; }
   #debrief-feedback .line.ok { color: var(--success); }
   #debrief-feedback .line.bad { color: var(--error); }
   #debrief-feedback .line.pending { color: var(--text-faint); }
@@ -725,6 +739,23 @@
   }
   .debrief-checklist { margin: 6px 0 0 0; padding-top: 8px; border-top: 1px solid var(--border-soft); }
   .checklist-row { font-size: 12px; line-height: 1.6; color: var(--text-dim); }
+  .rubric-breakdown { margin: 8px 0 0 0; padding-top: 8px; border-top: 1px solid var(--border-soft); }
+  .rubric-phase { margin: 6px 0; }
+  .rubric-phase-header { font-size: 12px; font-weight: 600; display: flex; justify-content: space-between; }
+  .rubric-bar-bg { height: 6px; background: var(--card-2, #e0e0e0); border-radius: 3px; margin-top: 2px; overflow: hidden; }
+  .rubric-bar-fill { height: 100%; border-radius: 3px; transition: width 0.3s; }
+  .rubric-phase-items { font-size: 11px; color: var(--text-dim); margin: 4px 0 0 12px; line-height: 1.5; }
+  .rubric-phase-item { display: flex; align-items: center; gap: 4px; cursor: pointer; }
+  .rubric-phase-item .item-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+  .rubric-phase-item .item-dot.done { background: #22c55e; }
+  .rubric-phase-item .item-dot.partial { background: #eab308; }
+  .rubric-phase-item .item-dot.missed { background: #ef4444; }
+  .rubric-phase-item .item-dot.na { background: #6b7280; }
+  .rubric-total { font-size: 14px; font-weight: 700; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border-soft); text-align: center; }
+  .rubric-verdict { font-size: 18px; font-weight: 700; text-align: center; margin-top: 4px; }
+  .rubric-retro { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border-soft); }
+  .rubric-retro h4 { font-size: 12px; font-weight: 600; margin: 0 0 4px 0; text-transform: uppercase; letter-spacing: 0.02em; color: var(--text-dim); }
+  .rubric-retro-item { font-size: 11px; margin: 2px 0; color: var(--text-dim); }
 
   #chatinput { display: flex; gap: 8px; padding: 12px 14px 16px; border-top: 1px solid var(--border); }
   #chatinput input {
@@ -803,6 +834,37 @@
     transition: opacity 0.18s ease, transform 0.18s ease;
   }
   #fab-bubble.show { opacity: 1; transform: translateY(0); }
+
+  /* concept mapper */
+  #concept-mapper { background:var(--card); border:1px solid var(--border); border-radius:var(--radius); padding:12px 14px; display:none; }
+  #concept-mapper-nodes { display:flex; align-items:center; gap:0; }
+  .cm-node { flex:1; text-align:center; padding:8px 4px; border-radius:6px; font-size:11px; font-weight:600; cursor:pointer; transition:background 0.15s ease,color 0.15s ease; background:var(--card-2); color:var(--text-dim); border:1px solid var(--border-soft); user-select:none; }
+  .cm-node.active { background:var(--accent-soft); color:var(--accent); border-color:rgba(124,108,246,0.3); }
+  .cm-node.inactive { opacity:0.35; }
+  .cm-node:hover { border-color:var(--accent); }
+  .cm-arrow { color:var(--text-faint); font-size:16px; flex-shrink:0; margin:0 2px; }
+  #concept-mapper-detail { display:none; margin-top:10px; padding-top:10px; border-top:1px solid var(--border-soft); }
+  .cm-detail-item { margin-bottom:6px; font-size:12px; line-height:1.45; }
+  .cm-detail-label { color:var(--accent); font-weight:600; font-size:11px; text-transform:uppercase; letter-spacing:0.04em; }
+  .cm-detail-text { color:var(--text-dim); }
+
+  /* diff overlay */
+  .diff-line { display:flex; align-items:stretch; min-height:22px; }
+  .diff-line-num { flex:0 0 32px; color:var(--text-faint); text-align:right; padding:0 8px 0 0; user-select:none; font-size:11px; line-height:22px; }
+  .diff-line-code { flex:1; padding:0 4px; line-height:22px; white-space:pre-wrap; }
+  .diff-line.diff-add .diff-line-code { background:rgba(61,220,151,0.15); }
+  .diff-line.diff-remove .diff-line-code { background:rgba(255,107,107,0.15); }
+  .diff-line.diff-add .diff-line-num { color:var(--success); }
+  .diff-line.diff-remove .diff-line-num { color:var(--error); }
+  .diff-context-msg { padding:4px 12px; margin:2px 0; border-radius:4px; background:var(--accent-soft); color:var(--accent); font-size:11.5px; line-height:1.4; }
+
+  /* reversal panel */
+  .rev-bug-item { display:flex; align-items:center; gap:4px; padding:3px 4px; border-radius:4px; font-size:11px; color:var(--text-dim); cursor:pointer; }
+  .rev-bug-item.found { color:var(--success); }
+  .rev-bug-item .rev-bug-icon { flex-shrink:0; font-size:10px; }
+  .rev-chat-bubble { padding:6px 10px; border-radius:8px; font-size:12px; line-height:1.4; max-width:85%; }
+  .rev-chat-bubble.user { background:var(--accent-soft); color:var(--accent); align-self:flex-end; border-bottom-right-radius:3px; }
+  .rev-chat-bubble.candidate { background:var(--card-2); border:1px solid var(--border-soft); color:var(--text-dim); align-self:flex-start; border-bottom-left-radius:3px; }
 </style>
 </head>
 <body>
@@ -861,6 +923,10 @@
           </div>
         </details>
       </div>
+      <div id="concept-mapper" style="display:none;">
+        <div id="concept-mapper-nodes"></div>
+        <div id="concept-mapper-detail"></div>
+      </div>
     </div>
     <div id="main-right">
       <div id="empty-panel">
@@ -871,12 +937,14 @@
           <span id="editor-lang-label"></span>
           <div class="editor-actions">
             <button id="run-btn" class="btn btn-ghost" onclick="runSample()">▶ Run</button>
+            <button id="debug-btn" class="btn btn-ghost" onclick="startDebug()" style="display:none;" title="Step through your code line by line">🐞 Debug</button>
             <button id="hint-btn" class="btn btn-ghost" onclick="askHint()">💡 Hint</button>
             <button id="spotbug-btn" class="btn btn-ghost" onclick="startSpotBug()">🐛 Spot the bug</button>
             <button id="clarify-sql-btn" class="btn btn-ghost" onclick="toggleSqlClarify()">🎯 Clarify first</button>
             <button id="curveball-btn" class="btn btn-ghost" onclick="startCurveball()">🌀 Curveball</button>
             <button id="twist-btn" class="btn btn-ghost" onclick="askTwist()" disabled title="Solve it first">🔁 Twist</button>
             <button id="dryrun-btn" class="btn btn-ghost" onclick="askDryRun()" disabled title="Solve it first">👣 Dry run</button>
+            <button id="reverse-btn" class="btn btn-ghost" onclick="startReverse()" disabled title="Solve it first">🎭 Be the interviewer</button>
             <button id="submit-btn" class="btn btn-primary" onclick="submitCode()">Submit</button>
           </div>
         </div>
@@ -931,6 +999,7 @@
           <svg id="design-canvas" onmousedown="canvasMouseDown(event)" onmousemove="canvasMouseMove(event)" onmouseup="canvasMouseUp(event)" onmouseleave="canvasMouseUp(event)"></svg>
         </div>
         <div id="pacing-hud" style="display:none;"></div>
+        <div id="framework-hud" style="display:none;"></div>
       </div>
       <div id="tradeoff-card" style="display:none;">
         <div class="plan-row" style="justify-content:flex-end;">
@@ -964,7 +1033,44 @@
         <div id="napkin-feedback"></div>
         <div id="napkin-assumption-feedback" style="padding:0 12px 8px; font-size:12.5px; color:var(--text-dim);"></div>
       </div>
+      <div id="debug-panel" style="display:none; background:var(--card); border:1px solid var(--border); border-radius:var(--radius); overflow:hidden;">
+        <div style="display:flex; align-items:center; gap:10px; padding:8px 12px; background:var(--card-2); border-bottom:1px solid var(--border);">
+          <span style="font-weight:600; font-size:12.5px; color:var(--text);">🐞 Step-through debug</span>
+          <span id="debug-counter" style="margin-left:auto; font-family:JetBrains Mono,monospace; font-size:12px; color:var(--text-faint);"></span>
+          <button class="btn btn-ghost btn-icon" id="debug-prev" onclick="debugStep(-1)" disabled title="Previous step">◀</button>
+          <button class="btn btn-ghost btn-icon" id="debug-next" onclick="debugStep(1)" title="Next step">▶</button>
+          <button class="btn btn-ghost" id="debug-run-all" onclick="debugRunAll()" title="Run all steps">⏩ Run all</button>
+          <button class="btn btn-ghost" onclick="closeDebug()">✕</button>
+        </div>
+        <div style="display:flex; min-height:200px;">
+          <div id="debug-code" style="flex:0 0 55%; padding:10px 12px; font-family:JetBrains Mono,monospace; font-size:12.5px; line-height:1.6; white-space:pre-wrap; overflow:auto; background:var(--card-2); border-right:1px solid var(--border-soft);"></div>
+          <div id="debug-vars" style="flex:1; padding:10px 12px; overflow:auto;">
+            <div style="font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:0.06em; color:var(--text-faint); margin-bottom:8px;">Variables</div>
+            <div id="debug-vars-table"></div>
+          </div>
+        </div>
+      </div>
       <div id="results"></div>
+      <div id="diff-overlay" style="display:none; position:fixed; inset:0; z-index:150;">
+        <div id="diff-overlay-bg" style="position:absolute; inset:0; background:rgba(0,0,0,0.6);" onclick="closeDiff()"></div>
+        <div id="diff-overlay-content" style="position:absolute; top:5%; bottom:5%; left:10%; right:10%; background:var(--card); border:1px solid var(--border); border-radius:var(--radius); display:flex; flex-direction:column; box-shadow:var(--shadow);">
+          <div style="display:flex; align-items:center; gap:10px; padding:12px 16px; border-bottom:1px solid var(--border);">
+            <span style="font-weight:600; font-size:13.5px;">📊 Code diff — learn from your mistakes</span>
+            <button class="btn btn-ghost" onclick="closeDiff()" style="margin-left:auto;">✕ Close</button>
+          </div>
+          <div id="diff-overlay-body" style="flex:1; display:flex; min-height:0; overflow:hidden;">
+            <div style="flex:1; display:flex; flex-direction:column; border-right:1px solid var(--border-soft);">
+              <div style="padding:8px 12px; font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:0.06em; color:var(--text-faint); background:var(--card-2);">Your code</div>
+              <div id="diff-user-lines" style="flex:1; overflow:auto; font-family:'JetBrains Mono',monospace; font-size:12px; line-height:1.6; padding:8px 12px; white-space:pre;"></div>
+            </div>
+            <div style="flex:1; display:flex; flex-direction:column;">
+              <div style="padding:8px 12px; font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:0.06em; color:var(--text-faint); background:var(--card-2);">Solution</div>
+              <div id="diff-solution-lines" style="flex:1; overflow:auto; font-family:'JetBrains Mono',monospace; font-size:12px; line-height:1.6; padding:8px 12px; white-space:pre;"></div>
+            </div>
+          </div>
+          <div id="diff-context-bar" style="padding:6px 16px; border-top:1px solid var(--border); font-size:12px; color:var(--text-dim); min-height:28px;"></div>
+        </div>
+      </div>
       <div id="debrief-row" class="debrief-row" style="display:none">
         <input id="complexity-input" type="text" placeholder="Actual time/space complexity of your code…">
         <input id="edge-input" type="text" placeholder="Edge cases you'd test…">
@@ -973,6 +1079,24 @@
       </div>
       <div id="narration-readout" style="display:none; font-size:12px; color:var(--text-dim); padding:4px 12px;"></div>
       <div id="debrief-feedback"></div>
+      <div id="reversal-panel" style="display:none; background:var(--card); border:1px solid var(--border); border-radius:var(--radius); overflow:hidden;">
+        <div style="display:flex; align-items:center; gap:10px; padding:8px 12px; background:var(--card-2); border-bottom:1px solid var(--border);">
+          <span style="font-weight:600; font-size:12.5px;">🎭 Reverse interview — you're the interviewer</span>
+          <button class="btn btn-ghost" onclick="closeReverse()" style="margin-left:auto;">✕ Close</button>
+        </div>
+        <div style="padding:8px 12px 0; color:var(--text-faint); font-size:12px;">Review this candidate's code — ask them questions and find the bugs.</div>
+        <pre id="reversal-code" style="margin:8px 12px; padding:10px 12px; background:var(--card-2); border:1px solid var(--border); border-radius:6px; font-family:'JetBrains Mono',monospace; font-size:12.5px; white-space:pre-wrap; max-height:180px; overflow:auto;"></pre>
+        <div style="display:flex; gap:8px; padding:0 12px 8px;">
+          <div id="reversal-bugs" style="flex:0 0 180px; font-size:11px;"></div>
+          <div style="flex:1; display:flex; flex-direction:column; gap:6px;">
+            <div id="reversal-chat" style="display:flex; flex-direction:column; gap:6px; max-height:200px; overflow-y:auto; padding:4px 0;"></div>
+            <div style="display:flex; gap:6px;">
+              <input id="reversal-input" type="text" placeholder="Ask the candidate about their code…" style="flex:1; background:var(--card); border:1px solid var(--border); border-radius:6px; color:var(--text); padding:6px 8px; font-size:12px; font-family:inherit;" onkeydown="if (event.key==='Enter') sendReverse()">
+              <button class="btn btn-ghost" onclick="sendReverse()">Send</button>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   </main>
   <div id="resizer"></div>
@@ -1008,11 +1132,15 @@
     </div>
     <button id="wrapup-btn" class="btn btn-primary" style="display:none; margin:0 12px 8px;" onclick="wrapUpInterview()">Wrap up interview</button>
     <button id="refdesign-btn" class="btn btn-ghost" style="display:none; margin:0 12px 8px;" onclick="showReferenceDesign()">📐 Show reference design</button>
+    <button id="staffcomp-btn" class="btn btn-ghost" style="display:none; margin:0 12px 8px;" onclick="showStaffComparison()">👤 Staff engineer comparison</button>
     <div id="mode-group">
       <div class="mode-group-label">or practice a narrower mode</div>
       <button id="clarify-btn" class="btn btn-ghost" style="display:none;" onclick="startClarifyDrill()">🎯 Clarify-only drill</button>
       <button id="end-drill-btn" class="btn btn-ghost" style="display:none;" onclick="endClarifyDrill()">End drill</button>
       <button id="adversarial-btn" class="btn btn-ghost" style="display:none;" onclick="startAdversarialMode()">🧨 Break this design</button>
+      <button id="incident-btn" class="btn btn-ghost" style="display:none;" onclick="startIncidentMode()">🔥 3am stress test</button>
+      <button id="scaling-btn" class="btn btn-ghost" style="display:none;" onclick="startScalingMode()">↗ Scaling pressure</button>
+      <button id="framework-btn" class="btn btn-ghost" style="display:none;" onclick="toggleFrameworkMode()">⏱ Framework mode</button>
     </div>
     <button id="replay-btn" class="btn btn-ghost" style="display:none; margin:8px 12px 8px;" onclick="startReplay()">🕐 Replay session</button>
     <div id="chatinput">
@@ -1031,6 +1159,9 @@ let clarifyMode = false;
 let selectedPersona = '';
 let adversarialMode = false;
 let adversarialFlaws = [];
+let scalingMode = false;
+let incidentMode = false;
+let incidentScenario = '';
 let replayTurns = [];
 let replayComments = [];
 let mockLoop = null; // {ids: [...], stage: 0} — null when no loop is active
@@ -1637,6 +1768,7 @@ function saveCurrentState() {
     debriefFeedbackHTML: document.getElementById('debrief-feedback').outerHTML,
     shapes: JSON.parse(JSON.stringify(shapes)),
     persona: selectedPersona,
+    scaling: scalingMode,
     tradeoffInput: document.getElementById('tradeoff-input').value,
     tradeoffFeedbackHTML: document.getElementById('tradeoff-feedback').outerHTML,
     napkinInput: document.getElementById('napkin-input').value,
@@ -1718,6 +1850,69 @@ async function gradeSpotBug() {
   btn.disabled = false;
   el.className = res.ok ? 'ok' : 'bad';
   el.textContent = (res.ok ? '✓ ' : '✗ ') + res.feedback;
+}
+
+let reverseState = null;
+
+async function startReverse() {
+  const btn = document.getElementById('reverse-btn');
+  btn.disabled = true;
+  btn.textContent = 'Loading…';
+  const res = await (await fetch('/api/reverse', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({question_id: current.id})
+  })).json();
+  btn.disabled = false;
+  btn.textContent = '🎭 Be the interviewer';
+  if (res.error) { showToast('Could not start reverse interview: ' + res.error); return; }
+  reverseState = {qid: current.id};
+  const panel = document.getElementById('reversal-panel');
+  panel.style.display = 'block';
+  document.getElementById('reversal-code').textContent = res.code;
+  document.getElementById('reversal-input').value = '';
+  document.getElementById('reversal-chat').innerHTML = '';
+  renderBugs(res.bugs || []);
+  addRevChat('candidate', res.reply);
+}
+
+function closeReverse() {
+  document.getElementById('reversal-panel').style.display = 'none';
+  reverseState = null;
+}
+
+function renderBugs(bugs) {
+  const el = document.getElementById('reversal-bugs');
+  el.innerHTML = '<div style="font-weight:600; color:var(--text-dim); margin-bottom:4px; font-size:11px;">🐞 Bugs to find</div>';
+  bugs.forEach((b, i) => {
+    const d = document.createElement('div');
+    d.className = 'rev-bug-item' + (b.found ? ' found' : '');
+    d.innerHTML = `<span class="rev-bug-icon">${b.found ? '✅' : '⬜'}</span><span>${b.found ? 'Found:' : 'Hidden:'} ${b.note}</span>`;
+    el.appendChild(d);
+  });
+}
+
+function addRevChat(who, text) {
+  const el = document.getElementById('reversal-chat');
+  const d = document.createElement('div');
+  d.className = 'rev-chat-bubble ' + who;
+  d.textContent = text;
+  el.appendChild(d);
+  el.scrollTop = el.scrollHeight;
+}
+
+async function sendReverse() {
+  const input = document.getElementById('reversal-input');
+  const text = input.value.trim();
+  if (!text || !reverseState) return;
+  input.value = '';
+  addRevChat('user', text);
+  const res = await (await fetch('/api/reverse', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({question_id: reverseState.qid, message: text})
+  })).json();
+  if (res.error) { addRevChat('candidate', 'Error: ' + res.error); return; }
+  addRevChat('candidate', res.reply);
+  renderBugs(res.bugs || []);
 }
 
 let curveballActive = false;
@@ -2081,6 +2276,7 @@ async function loadList() {
     if (params.get('replay') === '1') {
       adversarialMode = params.get('adversarial') === '1';
       clarifyMode = params.get('requirements_only') === '1';
+      incidentMode = params.get('incident') === '1';
       startReplay();
     }
   } else if (!current) {
@@ -2166,12 +2362,16 @@ async function loadQuestion(id) {
   const isNapkin = q.lang === 'napkin';
   document.getElementById('editor-card').style.display = (isDesign || isTradeoff || isNapkin) ? 'none' : '';
   document.getElementById('concept-box').style.display = (isDesign || isTradeoff || isNapkin) ? 'none' : '';
+  if (isDesign || isTradeoff || isNapkin) document.getElementById('concept-mapper').style.display = 'none';
   if (isDesign || isTradeoff || isNapkin) document.getElementById('sample').style.display = 'none';
   document.getElementById('results').style.display = (isDesign || isTradeoff || isNapkin) ? 'none' : '';
   document.getElementById('design-canvas-card').style.display = isDesign ? 'flex' : 'none';
   document.getElementById('wrapup-btn').style.display = isDesign ? '' : 'none';
   document.getElementById('clarify-btn').style.display = isDesign ? '' : 'none';
   document.getElementById('adversarial-btn').style.display = isDesign ? '' : 'none';
+  document.getElementById('incident-btn').style.display = isDesign ? '' : 'none';
+  document.getElementById('scaling-btn').style.display = isDesign ? '' : 'none';
+  document.getElementById('framework-btn').style.display = isDesign ? '' : 'none';
   document.getElementById('replay-btn').style.display = isDesign ? '' : 'none';
   document.getElementById('chat-mic-btn').classList.toggle('primary-mic', isDesign);
   document.getElementById('end-drill-btn').style.display = 'none';
@@ -2184,6 +2384,9 @@ async function loadQuestion(id) {
   clarifyMode = false;
   adversarialMode = false;
   adversarialFlaws = [];
+  scalingMode = false;
+  incidentMode = false;
+  stopFrameworkMode();
 
   if (isTradeoff) {
     document.getElementById('trace-box').style.display = 'none';
@@ -2222,22 +2425,29 @@ async function loadQuestion(id) {
     setCanvasTool('select');
     if (cached) {
       selectedPersona = cached.persona || '';
+      scalingMode = !!cached.scaling;
       chatlog.innerHTML = cached.chatHTML;
     } else {
       selectedPersona = '';
+      scalingMode = false;
       chatlog.innerHTML = '';
-      renderPersonaPicker(id);
+      renderPersonaPicker('Pick an interviewer temperament to start:', PERSONA_OPTIONS, () => startInterview(id));
     }
     resetIdleTimer();
     return;
   }
 
   document.getElementById('editor-lang-label').textContent = q.lang === 'sql' ? 'SQL' : 'PYTHON';
+  document.getElementById('debug-btn').style.display = q.lang === 'python' ? '' : 'none';
   renderSample(q);
   renderConceptBox(q, isSolved(id));
   loadTrace(id);
+  loadConceptMapper(id);
   startTimerFor(id);
   document.getElementById('twist-btn').disabled = !isSolved(id);
+  const reverseBtn = document.getElementById('reverse-btn');
+  reverseBtn.style.display = q.lang === 'sql' || q.lang === 'python' ? '' : 'none';
+  reverseBtn.disabled = !isSolved(id);
   const dryrunBtn = document.getElementById('dryrun-btn');
   dryrunBtn.style.display = q.lang === 'python' ? '' : 'none';
   dryrunBtn.disabled = !isSolved(id);
@@ -2426,6 +2636,49 @@ async function loadTrace(qid) {
   renderTraceSteps(qid);
 }
 
+async function loadConceptMapper(qid) {
+  const el = document.getElementById('concept-mapper');
+  const res = await (await fetch('/api/concept-map', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({question_id: qid})
+  })).json();
+  if (res.error) { el.style.display = 'none'; return; }
+  el.style.display = 'block';
+  const nodesEl = document.getElementById('concept-mapper-nodes');
+  const detailEl = document.getElementById('concept-mapper-detail');
+  const solved = isSolved(qid);
+  const activeCount = res.active_count || (solved ? 5 : 3);
+  nodesEl.innerHTML = res.nodes.map((n, i) => {
+    const cls = i < activeCount ? 'active' : 'inactive';
+    const arrow = i < res.nodes.length - 1 ? '<span class="cm-arrow">→</span>' : '';
+    return `<span class="cm-node ${cls}" data-idx="${i}">${n}</span>${arrow}`;
+  }).join('');
+  nodesEl.querySelectorAll('.cm-node').forEach(el => {
+    el.addEventListener('click', () => {
+      const idx = parseInt(el.dataset.idx, 10);
+      const prev = detailEl.dataset.activeIdx;
+      if (prev === String(idx)) { detailEl.style.display = 'none'; detailEl.dataset.activeIdx = ''; return; }
+      detailEl.dataset.activeIdx = idx;
+      const d = res.details[res.nodes[idx]];
+      if (!d) { detailEl.style.display = 'none'; return; }
+      detailEl.innerHTML = '';
+      const items = [
+        {label: 'Why', text: d.why},
+        {label: 'What if', text: d.what_if},
+        {label: 'Intuition', text: d.intuition},
+      ];
+      items.forEach(item => {
+        if (!item.text) return;
+        const row = document.createElement('div');
+        row.className = 'cm-detail-item';
+        row.innerHTML = `<span class="cm-detail-label">${item.label}:</span> <span class="cm-detail-text">${item.text}</span>`;
+        detailEl.appendChild(row);
+      });
+      detailEl.style.display = 'block';
+    });
+  });
+}
+
 function renderSample(q) {
   const el = document.getElementById('sample');
   el.innerHTML = '';
@@ -2472,6 +2725,128 @@ function addMsg(role, text) {
   log.appendChild(d);
   log.scrollTop = log.scrollHeight;
   return d;
+}
+
+let debugSteps = [];
+let debugIdx = -1;
+let debugSource = [];
+
+async function startDebug() {
+  const btn = document.getElementById('debug-btn');
+  btn.disabled = true;
+  btn.textContent = 'Debugging…';
+  const res = await (await fetch('/api/debug', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({question_id: current.id, code: cm.getValue()})
+  })).json();
+  btn.disabled = false;
+  btn.textContent = '🐞 Debug';
+  if (res.error) { showToast('Debug error: ' + res.error); return; }
+  debugSteps = res.steps || [];
+  debugSource = res.source || [];
+  if (!debugSteps.length) { showToast('No steps captured — check that your function is named solve() and has code in it.'); return; }
+  debugIdx = -1;
+  document.getElementById('debug-panel').style.display = '';
+  document.getElementById('results').innerHTML = '';
+  document.getElementById('results').className = '';
+  document.getElementById('run-btn').disabled = true;
+  document.getElementById('submit-btn').disabled = true;
+  renderDebugCode();
+  debugStep(1);
+}
+
+function renderDebugCode() {
+  const el = document.getElementById('debug-code');
+  el.innerHTML = debugSource.map((line, i) =>
+    `<div class="dl" data-line="${i + 1}"><span class="dl-num">${String(i + 1).padStart(2, ' ')}</span>${escapeHtml(line) || ' '}</div>`
+  ).join('');
+}
+
+function debugStep(dir) {
+  const newIdx = Math.max(0, Math.min(debugSteps.length - 1, debugIdx + dir));
+  if (newIdx === debugIdx) return;
+  debugIdx = newIdx;
+  const step = debugSteps[debugIdx];
+  const total = debugSteps.length;
+  document.getElementById('debug-counter').textContent = `Step ${debugIdx + 1} / ${total}`;
+  document.getElementById('debug-prev').disabled = debugIdx === 0;
+  document.getElementById('debug-next').disabled = debugIdx >= total - 1;
+  document.getElementById('debug-run-all').disabled = debugIdx >= total - 1;
+
+  document.querySelectorAll('#debug-code .dl').forEach(el => el.classList.remove('active'));
+  const lineEl = document.querySelector(`#debug-code .dl[data-line="${step.line}"]`);
+  if (lineEl) lineEl.classList.add('active');
+
+  const varsEl = document.getElementById('debug-vars-table');
+  const locals = step.locals || {};
+  const keys = Object.keys(locals);
+  if (!keys.length) {
+    varsEl.innerHTML = '<div class="dv-empty">(no local variables yet)</div>';
+  } else {
+    varsEl.innerHTML = keys.map(k =>
+      `<div class="dv-row"><span class="dv-name">${escapeHtml(k)}</span><span class="dv-val">= ${escapeHtml(locals[k])}</span></div>`
+    ).join('');
+  }
+}
+
+function debugRunAll() {
+  debugIdx = debugSteps.length - 1;
+  const step = debugSteps[debugIdx];
+  document.getElementById('debug-counter').textContent = `Step ${debugIdx + 1} / ${debugSteps.length}`;
+  document.getElementById('debug-prev').disabled = false;
+  document.getElementById('debug-next').disabled = true;
+  document.getElementById('debug-run-all').disabled = true;
+  document.querySelectorAll('#debug-code .dl').forEach(el => el.classList.remove('active'));
+  const lineEl = document.querySelector(`#debug-code .dl[data-line="${step.line}"]`);
+  if (lineEl) lineEl.classList.add('active');
+  const varsEl = document.getElementById('debug-vars-table');
+  const last = debugSteps[debugIdx];
+  const locals = last.locals || {};
+  const keys = Object.keys(locals);
+  varsEl.innerHTML = keys.length
+    ? keys.map(k => `<div class="dv-row"><span class="dv-name">${escapeHtml(k)}</span><span class="dv-val">= ${escapeHtml(locals[k])}</span></div>`).join('')
+    : '<div class="dv-empty">(no local variables)</div>';
+}
+
+function closeDebug() {
+  document.getElementById('debug-panel').style.display = 'none';
+  document.getElementById('run-btn').disabled = false;
+  document.getElementById('submit-btn').disabled = false;
+  debugSteps = [];
+  debugIdx = -1;
+}
+
+async function showDiff(qid) {
+  const overlay = document.getElementById('diff-overlay');
+  overlay.style.display = '';
+  document.getElementById('diff-user-lines').textContent = 'Loading…';
+  document.getElementById('diff-solution-lines').textContent = 'Loading…';
+  document.getElementById('diff-context-bar').textContent = '';
+  const res = await (await fetch('/api/diff', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({question_id: qid, code: cm.getValue()})
+  })).json();
+  if (res.error) { document.getElementById('diff-user-lines').textContent = 'Error: ' + res.error; return; }
+  const diff = res.diff || [];
+  let userHtml = '', solHtml = '', contextBar = null;
+  diff.forEach((entry, i) => {
+    const num = i + 1;
+    const uMod = entry.context ? ' diff-remove' : '';
+    const sMod = entry.context ? ' diff-add' : '';
+    userHtml += `<div class="diff-line${uMod}"><span class="diff-line-num">${num}</span><span class="diff-line-code">${escapeHtml(entry.user)}</span></div>`;
+    solHtml += `<div class="diff-line${sMod}"><span class="diff-line-num">${num}</span><span class="diff-line-code">${escapeHtml(entry.solution)}</span></div>`;
+    if (entry.context) {
+      if (!contextBar) contextBar = '';
+      contextBar += `<div class="diff-context-msg">💡 ${escapeHtml(entry.context)}</div>`;
+    }
+  });
+  document.getElementById('diff-user-lines').innerHTML = userHtml;
+  document.getElementById('diff-solution-lines').innerHTML = solHtml;
+  document.getElementById('diff-context-bar').innerHTML = contextBar || '<span style="color:var(--text-faint);">No significant differences found.</span>';
+}
+
+function closeDiff() {
+  document.getElementById('diff-overlay').style.display = 'none';
 }
 
 async function runSample() {
@@ -2559,6 +2934,12 @@ async function submitCode() {
       body.appendChild(makeLabeled('your output', actualPre));
       body.appendChild(makeLabeled('expected output', expectedPre));
     }
+    const diffBtn = document.createElement('button');
+    diffBtn.className = 'btn btn-ghost';
+    diffBtn.textContent = '📊 Show diff';
+    diffBtn.onclick = () => showDiff(current.id);
+    diffBtn.style.marginTop = '8px';
+    body.appendChild(diffBtn);
   }
   if (body.childNodes.length) el.appendChild(body);
 
@@ -2681,6 +3062,79 @@ function renderCommunicationScore(textEl, score, note) {
   textEl.appendChild(row);
 }
 
+const VERDICT_ICONS = {'Strong Hire': '🟢', 'Hire': '🟡', 'No Hire': '🔴'};
+const RUBRIC_PHASE_COLORS = ['#3b82f6', '#8b5cf6', '#06b6d4', '#f97316', '#10b981', '#ec4899'];
+
+function renderRubricBreakdown(textEl, rubric, scores, verdict, retroQuestions) {
+  const wrap = document.createElement('div');
+  wrap.className = 'rubric-breakdown';
+  const phaseMaxes = rubric.phases.map(p => p.max);
+  let totalScore = 0, totalMax = 0;
+  rubric.phases.forEach((phase, i) => {
+    const score = scores[`phase${i+1}`];
+    if (score === undefined) return;
+    totalScore += score;
+    totalMax += phase.max;
+    const pct = Math.round(100 * score / phase.max);
+    const color = RUBRIC_PHASE_COLORS[i % RUBRIC_PHASE_COLORS.length];
+    const phaseDiv = document.createElement('div');
+    phaseDiv.className = 'rubric-phase';
+    phaseDiv.innerHTML = `
+      <div class="rubric-phase-header">
+        <span>${phase.name}</span>
+        <span>${score}/${phase.max} (${pct}%)</span>
+      </div>
+      <div class="rubric-bar-bg"><div class="rubric-bar-fill" style="width:${pct}%;background:${color};"></div></div>
+      <div class="rubric-phase-items" style="display:none;">
+        ${phase.items.map(item => {
+          let dotClass = 'na';
+          const itemPct = score / phase.max;
+          if (itemPct >= 0.8) dotClass = 'done';
+          else if (itemPct >= 0.4) dotClass = 'partial';
+          else dotClass = 'missed';
+          return `<div class="rubric-phase-item"><span class="item-dot ${dotClass}"></span>${item.desc}</div>`;
+        }).join('')}
+      </div>`;
+    phaseDiv.querySelector('.rubric-phase-header').onclick = () => {
+      const items = phaseDiv.querySelector('.rubric-phase-items');
+      items.style.display = items.style.display === 'none' ? '' : 'none';
+    };
+    wrap.appendChild(phaseDiv);
+  });
+  const totalPct = totalMax > 0 ? Math.round(100 * totalScore / totalMax) : 0;
+  const totalDiv = document.createElement('div');
+  totalDiv.className = 'rubric-total';
+  totalDiv.textContent = `Total: ${totalScore}/${totalMax} (${totalPct}%)`;
+  wrap.appendChild(totalDiv);
+  const verdictIcon = VERDICT_ICONS[verdict] || '';
+  const verdictDiv = document.createElement('div');
+  verdictDiv.className = 'rubric-verdict';
+  verdictDiv.textContent = `${verdictIcon} ${verdict}`;
+  wrap.appendChild(verdictDiv);
+  if (retroQuestions && retroQuestions.length) {
+    const retroDiv = document.createElement('div');
+    retroDiv.className = 'rubric-retro';
+    retroDiv.innerHTML = '<h4>Post-interview retro</h4>';
+    retroQuestions.forEach((r, i) => {
+      const row = document.createElement('div');
+      row.className = 'rubric-retro-item';
+      row.textContent = `${i+1}. ${r.q} — ${r.why}`;
+      retroDiv.appendChild(row);
+    });
+    wrap.appendChild(retroDiv);
+  }
+  textEl.appendChild(wrap);
+}
+
+function renderVerdict(textEl, verdict) {
+  if (!verdict) return;
+  const row = document.createElement('div');
+  row.className = 'checklist-row';
+  row.style.cssText = 'margin-top:6px; font-weight:600;';
+  row.textContent = `${VERDICT_ICONS[verdict] || ''} Read: ${verdict}`;
+  textEl.appendChild(row);
+}
+
 async function requestInterview(body) {
   const placeholder = addMsg('tutor', 'thinking…');
   const textEl = placeholder.querySelector('.msg-text');
@@ -2688,7 +3142,8 @@ async function requestInterview(body) {
     const r = await fetch('/api/interview', {
       method: 'POST', headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({...body, diagram: clarifyMode ? '' : serializeCanvasForLLM(), persona: selectedPersona,
-                             adversarial: adversarialMode, flaws: adversarialFlaws})
+                             adversarial: adversarialMode, flaws: adversarialFlaws, scaling: scalingMode || undefined,
+                             incident: incidentMode, incident_scenario: incidentScenario || undefined})
     });
     const res = await r.json();
     if (!r.ok || res.error) {
@@ -2696,10 +3151,32 @@ async function requestInterview(body) {
       textEl.textContent = 'error: ' + (res.error || r.status);
     } else {
       textEl.textContent = res.reply;
+      if (res.wrap_up && res.incident) {
+        const incidentEl = document.createElement('div');
+        incidentEl.className = 'debrief-checklist';
+        incidentEl.innerHTML = `
+          <div class="checklist-row">🔥 Incident score: ${res.incident_score || '?'}/5</div>
+          <div class="checklist-row">${res.triage_ok ? '✅' : '❌'} Triage: ${res.triage_ok ? 'checked blast radius / logs first' : 'did not triage properly'}</div>
+          <div class="checklist-row">${res.fix_choice_ok ? '✅' : '❌'} Fix: ${res.fix_choice_ok ? 'chose right fix (stabilize, not rebuild)' : 'fix choice was off'}</div>
+          <div class="checklist-row">${res.communication_ok ? '✅' : '❌'} Communication: ${res.communication_ok ? 'kept stakeholders informed' : 'did not communicate effectively'}</div>`;
+        textEl.appendChild(incidentEl);
+      }
       if (res.wrap_up && res.concept_taxonomy) {
         renderDebriefChecklist(textEl, res.missed_concepts || [], res.concept_taxonomy, res.self_rated || []);
         renderCommunicationScore(textEl, res.communication_score, res.communication_note);
+        renderVerdict(textEl, res.verdict);
+        if (res.rubric && res.rubric_scores) {
+          renderRubricBreakdown(textEl, res.rubric, res.rubric_scores, res.verdict, res.retro_questions);
+        }
+        if (res.max_tier_reached) {
+          const tierRow = document.createElement('div');
+          tierRow.className = 'checklist-row';
+          tierRow.style.cssText = 'margin-top:6px;';
+          tierRow.textContent = `↗ Scaling tier reached: ${res.max_tier_reached}/6`;
+          textEl.appendChild(tierRow);
+        }
         document.getElementById('refdesign-btn').style.display = '';
+        document.getElementById('staffcomp-btn').style.display = '';
       }
       speakTutor(res.reply);
       extractChips(res.reply);
@@ -2722,19 +3199,26 @@ const PERSONA_OPTIONS = [
   ['silent', '🤐 Silent'],
 ];
 
-function renderPersonaPicker(id) {
-  const placeholder = addMsg('tutor', 'Pick an interviewer temperament to start:');
+const ADVERSARIAL_PERSONA_OPTIONS = [
+  ['', 'Standard'],
+  ['friendly', '🙂 Friendly coach'],
+  ['skeptical', '🧐 Skeptical'],
+  ['bar_raiser', '🔥 Bar raiser'],
+];
+
+function renderPersonaPicker(promptText, options, onStart) {
+  const placeholder = addMsg('tutor', promptText);
   const textEl = placeholder.querySelector('.msg-text');
   const row = document.createElement('div');
   row.style.cssText = 'display:flex; flex-wrap:wrap; gap:6px; margin-top:8px;';
-  PERSONA_OPTIONS.forEach(([key, text]) => {
+  options.forEach(([key, text]) => {
     const btn = document.createElement('button');
     btn.className = 'btn btn-ghost';
     btn.textContent = text;
     btn.onclick = () => {
       selectedPersona = key;
       placeholder.remove();
-      startInterview(id);
+      onStart();
     };
     row.appendChild(btn);
   });
@@ -2743,6 +3227,7 @@ function renderPersonaPicker(id) {
 
 function wrapUpInterview() {
   clearPacingNudge();
+  stopFrameworkMode();
   const panel = document.getElementById('selfrate-panel');
   const opts = document.getElementById('selfrate-options');
   opts.innerHTML = '';
@@ -2866,6 +3351,7 @@ function restoreOwnDiagram() {
 
 function startClarifyDrill() {
   clarifyMode = true;
+  stopFrameworkMode();
   document.getElementById('design-canvas-card').style.display = 'none';
   document.getElementById('wrapup-btn').style.display = 'none';
   document.getElementById('clarify-btn').style.display = 'none';
@@ -2877,6 +3363,7 @@ function startClarifyDrill() {
 
 async function startAdversarialMode() {
   clearReqChips();
+  stopFrameworkMode();
   const btn = document.getElementById('adversarial-btn');
   btn.disabled = true;
   btn.textContent = 'Loading flawed design…';
@@ -2900,13 +3387,121 @@ async function startAdversarialMode() {
     document.getElementById('chatlog').innerHTML = '';
     document.getElementById('clarify-btn').style.display = 'none';
     document.getElementById('adversarial-btn').style.display = 'none';
-    addMsg('system', 'Adversarial drill started');
-    requestInterview({question_id: current.id, start: true});
-    resetIdleTimer();
+    selectedPersona = '';
+    renderPersonaPicker('Pick interviewer intensity for this drill:', ADVERSARIAL_PERSONA_OPTIONS, () => {
+      addMsg('system', 'Adversarial drill started');
+      requestInterview({question_id: current.id, start: true});
+      resetIdleTimer();
+    });
   } finally {
     btn.disabled = false;
     btn.textContent = '🧨 Break this design';
   }
+}
+
+async function startScalingMode() {
+  clearReqChips();
+  stopFrameworkMode();
+  scalingMode = true;
+  document.getElementById('chatlog').innerHTML = '';
+  shapes = [];
+  selectedShapeId = null;
+  renderCanvas();
+  document.getElementById('clarify-btn').style.display = 'none';
+  document.getElementById('adversarial-btn').style.display = 'none';
+  document.getElementById('scaling-btn').style.display = 'none';
+  selectedPersona = '';
+  renderPersonaPicker('Pick interviewer temperament:', PERSONA_OPTIONS, () => {
+    addMsg('system', 'Scaling-pressure drill started — starting at 1K req/day');
+    requestInterview({question_id: current.id, scaling: true, start: true});
+    resetIdleTimer();
+  });
+}
+
+async function startIncidentMode() {
+  clearReqChips();
+  stopFrameworkMode();
+  const btn = document.getElementById('incident-btn');
+  btn.disabled = true;
+  btn.textContent = 'Generating failure scenario…';
+  try {
+    const r = await fetch('/api/incident-scenario', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({question_id: current.id})
+    });
+    const res = await r.json();
+    if (!r.ok || res.error) {
+      addMsg('tutor', 'error: ' + (res.error || r.status));
+      btn.disabled = false;
+      btn.textContent = '🔥 3am stress test';
+      return;
+    }
+    incidentMode = true;
+    incidentScenario = res.scenario || '';
+    document.getElementById('chatlog').innerHTML = '';
+    document.getElementById('design-canvas-card').style.display = 'none';
+    document.getElementById('clarify-btn').style.display = 'none';
+    document.getElementById('adversarial-btn').style.display = 'none';
+    document.getElementById('incident-btn').style.display = 'none';
+    document.getElementById('scaling-btn').style.display = 'none';
+    document.getElementById('framework-btn').style.display = 'none';
+    document.getElementById('refdesign-btn').style.display = 'none';
+    document.getElementById('staffcomp-btn').style.display = 'none';
+    addMsg('system', '🔥 3am stress test started — you\'ve been paged');
+    requestInterview({question_id: current.id, incident: true, start: true});
+    resetIdleTimer();
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '🔥 3am stress test';
+  }
+}
+
+async function showStaffComparison() {
+  const btn = document.getElementById('staffcomp-btn');
+  btn.disabled = true;
+  const placeholder = addMsg('tutor', 'thinking…');
+  const textEl = placeholder.querySelector('.msg-text');
+  try {
+    const r = await fetch('/api/staff-comparison', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        question_id: current.id,
+        adversarial: adversarialMode ? '1' : '0',
+        scaling: scalingMode ? '1' : '0',
+        incident: incidentMode ? '1' : '0'
+      })
+    });
+    const res = await r.json();
+    if (!r.ok || res.error) {
+      placeholder.className += ' err';
+      textEl.textContent = 'error: ' + (res.error || r.status);
+    } else {
+      textEl.textContent = '👤 Staff engineer comparison:';
+      const comparisons = res.comparisons || [];
+      if (!comparisons.length) {
+        textEl.textContent = '👤 No clear deltas found — your answers were close to Staff-level on this one.';
+      } else {
+        const container = document.createElement('div');
+        container.style.cssText = 'margin:6px 0 0; display:flex; flex-direction:column; gap:10px;';
+        comparisons.forEach((c, i) => {
+          const card = document.createElement('div');
+          card.style.cssText = 'border:1px solid var(--border); border-radius:6px; padding:8px; background:var(--card-2);';
+          card.innerHTML = `
+            <div style="font-size:11px; font-weight:600; margin-bottom:4px;">${i+1}. ${c.delta}</div>
+            <div style="font-size:11px; color:var(--text-dim); margin-bottom:3px;"><span style="color:#ef4444;">You said:</span> ${c.moment}</div>
+            <div style="font-size:11px; color:var(--text-dim); margin-bottom:3px;"><span style="color:#22c55e;">Staff says:</span> ${c.staff_says}</div>
+            <div style="font-size:10px; color:var(--text-dim); font-style:italic;">${c.why_it_matters}</div>`;
+          container.appendChild(card);
+        });
+        textEl.appendChild(container);
+      }
+      btn.style.display = 'none';
+    }
+  } catch (e) {
+    placeholder.className += ' err';
+    textEl.textContent = 'error: ' + e.message;
+  }
+  btn.disabled = false;
 }
 
 function endClarifyDrill() {
@@ -2923,20 +3518,20 @@ function endClarifyDrill() {
 // ponytail: reuses parseDiagramLines (already built for reference-design + adversarial-mode)
 // to redraw each snapshot — no new diagram rendering code needed.
 async function startReplay() {
-  const r = await fetch(`/api/interview-history?question_id=${encodeURIComponent(current.id)}&adversarial=${adversarialMode ? '1' : '0'}&requirements_only=${clarifyMode ? '1' : '0'}`);
+  const r = await fetch(`/api/interview-history?question_id=${encodeURIComponent(current.id)}&adversarial=${adversarialMode ? '1' : '0'}&requirements_only=${clarifyMode ? '1' : '0'}&incident=${incidentMode ? '1' : '0'}`);
   const res = await r.json();
   replayTurns = res.turns || [];
   if (!replayTurns.length) {
     addMsg('tutor', 'Nothing to replay yet — have a few exchanges first.');
     return;
   }
-  const cr = await fetch(`/api/replay-comments?question_id=${encodeURIComponent(current.id)}&adversarial=${adversarialMode ? '1' : '0'}&requirements_only=${clarifyMode ? '1' : '0'}`);
+  const cr = await fetch(`/api/replay-comments?question_id=${encodeURIComponent(current.id)}&adversarial=${adversarialMode ? '1' : '0'}&requirements_only=${clarifyMode ? '1' : '0'}&incident=${incidentMode ? '1' : '0'}`);
   replayComments = (await cr.json()).comments || [];
   window.speechSynthesis && window.speechSynthesis.cancel();
   clearPacingNudge();
   savedChatHTMLBeforeReplay = document.getElementById('chatlog').innerHTML;
   savedShapesBeforeReplay = JSON.parse(JSON.stringify(shapes));
-  ['chatinput', 'wrapup-btn', 'clarify-btn', 'adversarial-btn', 'replay-btn', 'end-drill-btn'].forEach(id => {
+  ['chatinput', 'wrapup-btn', 'clarify-btn', 'adversarial-btn', 'incident-btn', 'scaling-btn', 'framework-btn', 'refdesign-btn', 'staffcomp-btn', 'replay-btn', 'end-drill-btn'].forEach(id => {
     const el = document.getElementById(id);
     el.dataset.replayPrevDisplay = el.style.display;
     el.style.display = 'none';
@@ -3055,7 +3650,7 @@ async function postReplayComment() {
   const res = await (await fetch('/api/replay-comment', {
     method: 'POST', headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({
-      question_id: current.id, adversarial: adversarialMode ? '1' : '0', requirements_only: clarifyMode ? '1' : '0',
+      question_id: current.id, adversarial: adversarialMode ? '1' : '0', requirements_only: clarifyMode ? '1' : '0', incident: incidentMode ? '1' : '0',
       turn_idx: idx, author, text
     })
   })).json();
@@ -3068,7 +3663,7 @@ async function postReplayComment() {
 function exitReplay() {
   document.getElementById('replay-bar').style.display = 'none';
   document.getElementById('replay-comments').style.display = 'none';
-  ['chatinput', 'wrapup-btn', 'clarify-btn', 'adversarial-btn', 'replay-btn', 'end-drill-btn'].forEach(id => {
+  ['chatinput', 'wrapup-btn', 'clarify-btn', 'adversarial-btn', 'incident-btn', 'scaling-btn', 'framework-btn', 'refdesign-btn', 'staffcomp-btn', 'replay-btn', 'end-drill-btn'].forEach(id => {
     const el = document.getElementById(id);
     el.style.display = el.dataset.replayPrevDisplay || '';
   });
@@ -3087,6 +3682,7 @@ function copyReplayLink() {
     replay: '1',
     adversarial: adversarialMode ? '1' : '0',
     requirements_only: clarifyMode ? '1' : '0',
+    incident: incidentMode ? '1' : '0',
   });
   const url = `${location.origin}${location.pathname}?${params.toString()}`;
   navigator.clipboard.writeText(url).then(
@@ -3168,6 +3764,57 @@ function armPacingNudge() {
 function clearPacingNudge() {
   clearTimeout(pacingTimer);
   document.getElementById('pacing-hud').style.display = 'none';
+}
+
+// ponytail: coach-only checkpoints, not an enforced timer — nudges phase transitions via
+// system messages, never blocks input or force-submits anything.
+const FRAMEWORK_PHASES = [
+  ['Requirements', 5 * 60], ['Scale estimate', 5 * 60], ['High-level design', 15 * 60],
+  ['Deep dive', 15 * 60], ['Wrap-up', 5 * 60],
+];
+let frameworkMode = false;
+let frameworkPhaseIdx = 0;
+let frameworkPhaseEndsAt = 0;
+let frameworkTicker = null;
+
+function toggleFrameworkMode() {
+  if (frameworkMode) { stopFrameworkMode(); return; }
+  frameworkMode = true;
+  frameworkPhaseIdx = 0;
+  frameworkPhaseEndsAt = Date.now() + FRAMEWORK_PHASES[0][1] * 1000;
+  document.getElementById('framework-btn').textContent = '⏱ Framework mode (on)';
+  addMsg('system', `Framework mode on — ${FRAMEWORK_PHASES.map(p => p[0]).join(' → ')}`);
+  frameworkTicker = setInterval(frameworkTick, 1000);
+  frameworkTick();
+}
+
+function stopFrameworkMode() {
+  frameworkMode = false;
+  clearInterval(frameworkTicker);
+  frameworkTicker = null;
+  document.getElementById('framework-hud').style.display = 'none';
+  const btn = document.getElementById('framework-btn');
+  if (btn) btn.textContent = '⏱ Framework mode';
+}
+
+function frameworkTick() {
+  const remaining = Math.round((frameworkPhaseEndsAt - Date.now()) / 1000);
+  if (remaining <= 0) {
+    frameworkPhaseIdx++;
+    if (frameworkPhaseIdx >= FRAMEWORK_PHASES.length) {
+      addMsg('system', "⏱ Time's up — wrap up when ready");
+      stopFrameworkMode();
+      return;
+    }
+    addMsg('system', `⏱ ${FRAMEWORK_PHASES[frameworkPhaseIdx - 1][0]} done — move to ${FRAMEWORK_PHASES[frameworkPhaseIdx][0]}`);
+    frameworkPhaseEndsAt = Date.now() + FRAMEWORK_PHASES[frameworkPhaseIdx][1] * 1000;
+  }
+  const [name] = FRAMEWORK_PHASES[frameworkPhaseIdx];
+  const mm = String(Math.floor(Math.max(0, remaining) / 60)).padStart(2, '0');
+  const ss = String(Math.max(0, remaining) % 60).padStart(2, '0');
+  const hud = document.getElementById('framework-hud');
+  hud.textContent = `⏱ ${name} — ${mm}:${ss}`;
+  hud.style.display = '';
 }
 
 const tutorFab = document.createElement('div');
