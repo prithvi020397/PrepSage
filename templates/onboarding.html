@@ -1,0 +1,176 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>PrepSage — Welcome</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0e1015;
+    --panel: #14161d;
+    --card: #1b1e27;
+    --border: rgba(255,255,255,0.08);
+    --text: #e7e9ee;
+    --text-dim: #9299ab;
+    --text-faint: #656c7e;
+    --accent: #7c6cf6;
+    --accent-2: #5ee6d8;
+    --accent-soft: rgba(124,108,246,0.14);
+    --success: #3ddc97;
+    --radius: 10px;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  body {
+    font-family: 'Inter', -apple-system, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 40px 48px;
+    max-width: 520px;
+    width: 100%;
+    box-shadow: 0 16px 48px rgba(0,0,0,0.4);
+  }
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 8px;
+  }
+  .logo {
+    width: 32px; height: 32px;
+    border-radius: 8px;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    display: flex; align-items: center; justify-content: center;
+    color: #0e1015; font-size: 13px; font-weight: 800;
+  }
+  .brand-text {
+    font-size: 20px; font-weight: 700;
+    background: linear-gradient(90deg, var(--accent), var(--accent-2));
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .subtitle {
+    color: var(--text-dim);
+    font-size: 14px;
+    line-height: 1.6;
+    margin-bottom: 32px;
+  }
+  .step {
+    margin-bottom: 24px;
+  }
+  .step label {
+    display: block;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-dim);
+    margin-bottom: 8px;
+  }
+  .step select, .step input {
+    width: 100%;
+    padding: 10px 14px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-family: inherit;
+    font-size: 14px;
+    outline: none;
+  }
+  .step select:focus, .step input:focus {
+    border-color: var(--accent);
+  }
+  .step select option { background: var(--panel); }
+  .actions {
+    margin-top: 32px;
+  }
+  button {
+    width: 100%;
+    padding: 12px;
+    background: linear-gradient(90deg, var(--accent), #6a5ce0);
+    color: #fff;
+    border: none;
+    border-radius: 10px;
+    font-family: inherit;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: filter 0.15s ease;
+  }
+  button:hover { filter: brightness(1.1); }
+  button:disabled { opacity: 0.4; cursor: not-allowed; }
+  .skip {
+    display: block;
+    text-align: center;
+    margin-top: 12px;
+    color: var(--text-faint);
+    font-size: 13px;
+    cursor: pointer;
+    text-decoration: none;
+  }
+  .skip:hover { color: var(--text-dim); }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="brand">
+    <div class="logo">PS</div>
+    <span class="brand-text">PrepSage</span>
+  </div>
+  <p class="subtitle">Interview prep that adapts to you. Let's set you up in 30 seconds.</p>
+
+  <div class="step">
+    <label>When's your interview?</label>
+    <input type="date" id="onboard-deadline">
+  </div>
+
+  <div class="step">
+    <label>What's your strongest area?</label>
+    <select id="onboard-strongest">
+      <option value="">Select...</option>
+      <option value="sql">SQL</option>
+      <option value="python">Python / Coding</option>
+      <option value="system_design">System Design</option>
+      <option value="tradeoffs">Architecture Tradeoffs</option>
+      <option value="nervous">Honestly, none yet</option>
+    </select>
+  </div>
+
+  <div class="step">
+    <label>What's your weakest area?</label>
+    <select id="onboard-weakest">
+      <option value="">Select...</option>
+      <option value="sql">SQL</option>
+      <option value="python">Python / Coding</option>
+      <option value="system_design">System Design</option>
+      <option value="tradeoffs">Architecture Tradeoffs</option>
+      <option value="nervous">Honestly, none yet</option>
+    </select>
+  </div>
+
+  <div class="actions">
+    <button onclick="saveOnboarding()">Get started</button>
+  </div>
+  <a class="skip" href="/dashboard">Skip — I'll figure it out</a>
+</div>
+<script>
+async function saveOnboarding() {
+  const body = {
+    deadline: document.getElementById('onboard-deadline').value,
+    strongest: document.getElementById('onboard-strongest').value,
+    weakest: document.getElementById('onboard-weakest').value,
+  };
+  await fetch('/api/onboarding', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)});
+  window.location.href = '/dashboard';
+}
+</script>
+</body>
+</html>

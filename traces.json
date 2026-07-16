@@ -1436,5 +1436,2955 @@
     ],
     "pattern": "Query Structure",
     "skeleton": "SELECT col FROM table WHERE condition"
+  },
+  "sql-62": {
+    "trace": [
+      {
+        "q": "What SQL keyword and column do you use to select only the tweet_id column?",
+        "a": "SELECT tweet_id"
+      },
+      {
+        "q": "Which table do you specify after FROM?",
+        "a": "FROM Tweets"
+      },
+      {
+        "q": "What condition checks that the content length is strictly greater than 15 characters?",
+        "a": "WHERE LENGTH(content) > 15"
+      }
+    ],
+    "pattern": "Query Structure",
+    "skeleton": "SELECT col FROM table WHERE condition"
+  },
+  "sql-63": {
+    "trace": [
+      {
+        "q": "What SQL clause groups rows by date_id and make_name?",
+        "a": "GROUP BY date_id, make_name"
+      },
+      {
+        "q": "How do you count distinct lead_id values for each group?",
+        "a": "COUNT(DISTINCT lead_id) AS unique_leads"
+      },
+      {
+        "q": "How do you count distinct partner_id values for each group?",
+        "a": "COUNT(DISTINCT partner_id) AS unique_partners"
+      },
+      {
+        "q": "What columns do you select in the SELECT clause?",
+        "a": "SELECT date_id, make_name, COUNT(DISTINCT lead_id) AS unique_leads, COUNT(DISTINCT partner_id) AS unique_partners"
+      },
+      {
+        "q": "How do you order the results by date_id and make_name?",
+        "a": "ORDER BY date_id, make_name"
+      }
+    ],
+    "pattern": "Group By / Aggregation",
+    "skeleton": "SELECT group_col, AGG_FUNC(value_col)"
+  },
+  "sql-64": {
+    "trace": [
+      {
+        "q": "What SQL clause do you use to count distinct follower_id for each user_id?",
+        "a": "COUNT(DISTINCT follower_id)"
+      },
+      {
+        "q": "What SQL clause groups rows by user_id to compute per-user counts?",
+        "a": "GROUP BY user_id"
+      },
+      {
+        "q": "What SQL clause orders the result by user_id?",
+        "a": "ORDER BY user_id"
+      },
+      {
+        "q": "What columns do you select in the SELECT clause to output user_id and the count?",
+        "a": "SELECT user_id, COUNT(DISTINCT follower_id) AS followers_count"
+      }
+    ],
+    "pattern": "Query Structure",
+    "skeleton": "SELECT col FROM table WHERE condition"
+  },
+  "sql-65": {
+    "trace": [
+      {
+        "q": "How do you write a self-join to match employees with their managers? Use 'e' for employees (reports) and 'm' for managers.",
+        "a": "FROM Employees e JOIN Employees m ON e.reports_to = m.employee_id"
+      },
+      {
+        "q": "How do you select the manager's employee_id in the SELECT clause?",
+        "a": "m.employee_id"
+      },
+      {
+        "q": "How do you count the number of direct reports per manager?",
+        "a": "COUNT(e.employee_id) AS reports_count"
+      },
+      {
+        "q": "How do you calculate the average age of direct reports, rounded to the nearest integer?",
+        "a": "ROUND(AVG(e.age), 0) AS average_age"
+      },
+      {
+        "q": "How do you group the results by each manager?",
+        "a": "GROUP BY m.employee_id, m.name"
+      }
+    ],
+    "pattern": "Group By / Aggregation",
+    "skeleton": "SELECT group_col, AGG_FUNC(value_col)"
+  },
+  "sql-66": {
+    "trace": [
+      {
+        "q": "What SQL clause selects the columns we need: event_day (aliased as day), emp_id, and the total time per employee per day?",
+        "a": "SELECT event_day AS day, emp_id, SUM(out_time - in_time) AS total_time"
+      },
+      {
+        "q": "Which table do we query from?",
+        "a": "FROM Employees"
+      },
+      {
+        "q": "What clause groups rows by employee and day so that SUM computes per employee per day?",
+        "a": "GROUP BY event_day, emp_id"
+      },
+      {
+        "q": "What clause orders the result by day first, then emp_id?",
+        "a": "ORDER BY day, emp_id"
+      }
+    ],
+    "pattern": "Query Structure",
+    "skeleton": "SELECT col FROM table WHERE condition"
+  },
+  "sql-67": {
+    "trace": [
+      {
+        "q": "What column do you select from the Products table?",
+        "a": "SELECT product_id"
+      },
+      {
+        "q": "Which table do you query from?",
+        "a": "FROM Products"
+      },
+      {
+        "q": "How do you filter for products that are both low fat and recyclable?",
+        "a": "WHERE low_fats = 'Y' AND recyclable = 'Y'"
+      }
+    ],
+    "pattern": "Query Structure",
+    "skeleton": "SELECT col FROM table WHERE condition"
+  },
+  "sql-68": {
+    "trace": [
+      {
+        "q": "How do you select employees whose primary_flag is 'Y'?",
+        "a": "SELECT employee_id, department_id FROM Employee WHERE primary_flag = 'Y'"
+      },
+      {
+        "q": "How do you find employees who have exactly one department row?",
+        "a": "SELECT employee_id FROM Employee GROUP BY employee_id HAVING COUNT(*) = 1"
+      },
+      {
+        "q": "How do you get the department_id for those single-department employees?",
+        "a": "SELECT employee_id, department_id FROM Employee WHERE employee_id IN (SELECT employee_id FROM Employee GROUP BY employee_id HAVING COUNT(*) = 1)"
+      },
+      {
+        "q": "How do you combine the two result sets into one output?",
+        "a": "UNION"
+      }
+    ],
+    "pattern": "Group By / Aggregation",
+    "skeleton": "SELECT group_col, AGG_FUNC(value_col)"
+  },
+  "sql-69": {
+    "trace": [
+      {
+        "q": "What SQL keyword combines the results of multiple SELECT queries into one result set?",
+        "a": "UNION ALL"
+      },
+      {
+        "q": "How do you select the product_id and store1 column, renaming store1 as 'price' and adding a literal string 'store1' as the store name?",
+        "a": "SELECT product_id, 'store1' AS store, store1 AS price FROM Products"
+      },
+      {
+        "q": "How do you filter out rows where store1 is NULL?",
+        "a": "WHERE store1 IS NOT NULL"
+      },
+      {
+        "q": "How do you order the final result by product_id first, then by store name?",
+        "a": "ORDER BY product_id, store"
+      }
+    ],
+    "pattern": "Query Structure",
+    "skeleton": "SELECT col FROM table WHERE condition"
+  },
+  "sql-70": {
+    "trace": [
+      {
+        "q": "What SQL construct do you use to choose between two values based on a condition, like returning salary or 0?",
+        "a": "CASE WHEN condition THEN salary ELSE 0 END"
+      },
+      {
+        "q": "In that CASE, what condition checks that employee_id is odd?",
+        "a": "employee_id % 2 = 1"
+      },
+      {
+        "q": "What condition checks that the name does NOT start with 'M'?",
+        "a": "name NOT LIKE 'M%'"
+      },
+      {
+        "q": "How do you combine both conditions so that both must be true for the bonus to equal salary?",
+        "a": "CASE WHEN employee_id % 2 = 1 AND name NOT LIKE 'M%' THEN salary ELSE 0 END"
+      },
+      {
+        "q": "What do you name this result column 'bonus' in the SELECT clause?",
+        "a": "AS bonus"
+      }
+    ],
+    "pattern": "Query Structure",
+    "skeleton": "SELECT col FROM table WHERE condition"
+  },
+  "sql-71": {
+    "trace": [
+      {
+        "q": "What SQL clause filters rows to only those from the year 2020?",
+        "a": "WHERE strftime('%Y', time_stamp) = '2020'"
+      },
+      {
+        "q": "What SQL function and column do you use to get the latest timestamp per user?",
+        "a": "MAX(time_stamp)"
+      },
+      {
+        "q": "What SQL clause groups rows by user to compute the latest timestamp per user?",
+        "a": "GROUP BY user_id"
+      },
+      {
+        "q": "What SQL clause sorts the final result by user_id?",
+        "a": "ORDER BY user_id"
+      },
+      {
+        "q": "What columns do you select in the final query?",
+        "a": "SELECT user_id, MAX(time_stamp) AS last_stamp"
+      }
+    ],
+    "pattern": "Query Structure",
+    "skeleton": "SELECT col FROM table WHERE condition"
+  },
+  "sql-72": {
+    "trace": [
+      {
+        "q": "What SQL construct selects a constant string 'Low Salary' as the category column?",
+        "a": "'Low Salary' AS category"
+      },
+      {
+        "q": "How do you count accounts where income < 20000 in a scalar subquery?",
+        "a": "(SELECT COUNT(*) FROM Accounts WHERE income < 20000) AS accounts_count"
+      },
+      {
+        "q": "What SQL keyword combines the three independent SELECT results into one result set?",
+        "a": "UNION ALL"
+      },
+      {
+        "q": "How do you write the second SELECT for 'Average Salary' with the correct income range condition?",
+        "a": "SELECT 'Average Salary' AS category, (SELECT COUNT(*) FROM Accounts WHERE income BETWEEN 20000 AND 50000) AS accounts_count"
+      },
+      {
+        "q": "How do you write the third SELECT for 'High Salary' with the correct income condition?",
+        "a": "SELECT 'High Salary' AS category, (SELECT COUNT(*) FROM Accounts WHERE income > 50000) AS accounts_count"
+      }
+    ],
+    "pattern": "Group By / Aggregation",
+    "skeleton": "SELECT group_col, AGG_FUNC(value_col)"
+  },
+  "sql-73": {
+    "trace": [
+      {
+        "q": "What SQL clause starts the query and selects the user_id from Signups?",
+        "a": "SELECT s.user_id"
+      },
+      {
+        "q": "How do you LEFT JOIN Confirmations on user_id so that users with no confirmations still appear?",
+        "a": "FROM Signups s LEFT JOIN Confirmations c ON s.user_id = c.user_id"
+      },
+      {
+        "q": "How do you compute the confirmation rate as confirmed count divided by total count, using NULLIF to avoid division by zero?",
+        "a": "COALESCE(ROUND(COUNT(CASE WHEN c.action = 'confirmed' THEN 1 END) * 1.0 / NULLIF(COUNT(c.action), 0), 2), 0) AS confirmation_rate"
+      },
+      {
+        "q": "What clause groups the results by user_id?",
+        "a": "GROUP BY s.user_id"
+      },
+      {
+        "q": "What clause orders the final output by user_id?",
+        "a": "ORDER BY s.user_id"
+      }
+    ],
+    "pattern": "Join",
+    "skeleton": "SELECT a.col, b.col FROM table_a a JOIN table_b b"
+  },
+  "sql-74": {
+    "trace": [
+      {
+        "q": "What SQL query finds employees who are in Employees but not in Salaries?",
+        "a": "SELECT employee_id FROM Employees WHERE employee_id NOT IN (SELECT employee_id FROM Salaries)"
+      },
+      {
+        "q": "What SQL query finds employees who are in Salaries but not in Employees?",
+        "a": "SELECT employee_id FROM Salaries WHERE employee_id NOT IN (SELECT employee_id FROM Employees)"
+      },
+      {
+        "q": "What SQL keyword combines the two result sets into one list?",
+        "a": "UNION"
+      },
+      {
+        "q": "How do you order the final result by employee_id?",
+        "a": "ORDER BY employee_id"
+      }
+    ],
+    "pattern": "Query Structure",
+    "skeleton": "SELECT col FROM table WHERE condition"
+  },
+  "sql-75": {
+    "trace": [
+      {
+        "q": "What SQL clause filters rows where manager_id is not null?",
+        "a": "WHERE manager_id IS NOT NULL"
+      },
+      {
+        "q": "What SQL clause filters rows where salary is less than 30000?",
+        "a": "AND salary < 30000"
+      },
+      {
+        "q": "What SQL clause filters rows where manager_id is not in the set of existing employee_ids?",
+        "a": "AND manager_id NOT IN (SELECT employee_id FROM Employees)"
+      },
+      {
+        "q": "What SQL clause orders the result by employee_id?",
+        "a": "ORDER BY employee_id"
+      },
+      {
+        "q": "What column do you select in the final query?",
+        "a": "SELECT employee_id"
+      }
+    ],
+    "pattern": "Subquery",
+    "skeleton": "SELECT col FROM table WHERE col = (SELECT ...)"
+  },
+  "sql-76": {
+    "trace": [
+      {
+        "q": "What SQL clause do you use to count only distinct subject_id values per teacher?",
+        "a": "COUNT(DISTINCT subject_id)"
+      },
+      {
+        "q": "How do you select the teacher_id and the count of distinct subjects, grouping by teacher?",
+        "a": "SELECT teacher_id, COUNT(DISTINCT subject_id) AS cnt"
+      },
+      {
+        "q": "What clause groups rows by teacher_id so the count is per teacher?",
+        "a": "GROUP BY teacher_id"
+      },
+      {
+        "q": "How do you order the result by teacher_id in ascending order?",
+        "a": "ORDER BY teacher_id"
+      }
+    ],
+    "pattern": "Query Structure",
+    "skeleton": "SELECT col FROM table WHERE condition"
+  },
+  "sql-77": {
+    "trace": [
+      {
+        "q": "What SQL clause groups rows by each transaction_date so we can compute per-day totals?",
+        "a": "GROUP BY transaction_date"
+      },
+      {
+        "q": "How do you sum amounts that are odd numbers (amount % 2 = 1) for the odd_total column?",
+        "a": "SUM(CASE WHEN amount % 2 = 1 THEN amount ELSE 0 END) AS odd_total"
+      },
+      {
+        "q": "How do you sum amounts that are even numbers (amount % 2 = 0) for the even_total column?",
+        "a": "SUM(CASE WHEN amount % 2 = 0 THEN amount ELSE 0 END) AS even_total"
+      },
+      {
+        "q": "What clause orders the result rows by transaction_date?",
+        "a": "ORDER BY transaction_date"
+      }
+    ],
+    "pattern": "Query Structure",
+    "skeleton": "SELECT col FROM table WHERE condition"
+  },
+  "sql-78": {
+    "trace": [
+      {
+        "q": "How do you select the columns sample_id, dna_sequence, and species from the Samples table?",
+        "a": "SELECT sample_id, dna_sequence, species"
+      },
+      {
+        "q": "How do you check if dna_sequence starts with 'ATG' and return 1 if true, 0 otherwise?",
+        "a": "CASE WHEN dna_sequence LIKE 'ATG%' THEN 1 ELSE 0 END AS has_start"
+      },
+      {
+        "q": "How do you check if dna_sequence ends with 'TAA', 'TAG', or 'TGA' and return 1 if true, 0 otherwise?",
+        "a": "CASE WHEN dna_sequence LIKE '%TAA' OR dna_sequence LIKE '%TAG' OR dna_sequence LIKE '%TGA' THEN 1 ELSE 0 END AS has_stop"
+      },
+      {
+        "q": "How do you check if dna_sequence contains 'ATAT' anywhere and return 1 if true, 0 otherwise?",
+        "a": "CASE WHEN dna_sequence LIKE '%ATAT%' THEN 1 ELSE 0 END AS has_atat"
+      },
+      {
+        "q": "How do you check if dna_sequence contains 3 or more consecutive 'G's and return 1 if true, 0 otherwise?",
+        "a": "CASE WHEN dna_sequence LIKE '%GGG%' THEN 1 ELSE 0 END AS has_ggg"
+      }
+    ],
+    "pattern": "Query Structure",
+    "skeleton": "SELECT col FROM table WHERE condition"
+  },
+  "sql-79": {
+    "trace": [
+      {
+        "q": "What condition ensures exactly one '@' symbol in the email?",
+        "a": "LENGTH(email) - LENGTH(REPLACE(email, '@', '')) = 1"
+      },
+      {
+        "q": "What condition checks that the part before '@' contains only letters, digits, or underscores (i.e., no disallowed characters)?",
+        "a": "email NOT GLOB '*[^A-Za-z0-9_]*@*'"
+      },
+      {
+        "q": "What condition checks that the part after '@' ends with '.com' and has a non-empty domain label before '.com' containing only letters?",
+        "a": "email GLOB '*@[A-Za-z][A-Za-z]*.com'"
+      },
+      {
+        "q": "How do you order the results by user_id ascending?",
+        "a": "ORDER BY user_id ASC"
+      }
+    ],
+    "pattern": "Query Structure",
+    "skeleton": "SELECT col FROM table WHERE condition"
+  },
+  "sql-80": {
+    "trace": [
+      {
+        "q": "What SQL clause filters rows based on a condition?",
+        "a": "WHERE"
+      },
+      {
+        "q": "What GLOB pattern matches 'SN' followed by exactly 4 digits, a hyphen, and exactly 4 more digits?",
+        "a": "description GLOB 'SN[0-9][0-9][0-9][0-9]-[0-9][0-9][0-9][0-9]'"
+      },
+      {
+        "q": "What additional NOT GLOB condition excludes descriptions where a 5th digit follows the second group of 4 digits?",
+        "a": "AND description NOT GLOB 'SN[0-9][0-9][0-9][0-9]-[0-9][0-9][0-9][0-9][0-9]*'"
+      },
+      {
+        "q": "How do you order the results by product_id in ascending order?",
+        "a": "ORDER BY product_id ASC"
+      }
+    ],
+    "pattern": "Query Structure",
+    "skeleton": "SELECT col FROM table WHERE condition"
+  },
+  "sql-81": {
+    "trace": [
+      {
+        "q": "What SQL clause groups rows by user_id so we can compute per-user averages?",
+        "a": "GROUP BY user_id"
+      },
+      {
+        "q": "How do you compute the average trial duration, using a conditional expression inside AVG?",
+        "a": "AVG(CASE WHEN activity_type = 'free_trial' THEN activity_duration END) AS trial_avg_duration"
+      },
+      {
+        "q": "How do you compute the average paid duration similarly?",
+        "a": "AVG(CASE WHEN activity_type = 'paid' THEN activity_duration END) AS paid_avg_duration"
+      },
+      {
+        "q": "How do you round each average to 2 decimal places?",
+        "a": "ROUND(AVG(CASE WHEN activity_type = 'free_trial' THEN activity_duration END), 2) AS trial_avg_duration, ROUND(AVG(CASE WHEN activity_type = 'paid' THEN activity_duration END), 2) AS paid_avg_duration"
+      },
+      {
+        "q": "What HAVING condition ensures the user has at least one free_trial and one paid row?",
+        "a": "HAVING COUNT(CASE WHEN activity_type = 'free_trial' THEN 1 END) > 0 AND COUNT(CASE WHEN activity_type = 'paid' THEN 1 END) > 0"
+      }
+    ],
+    "pattern": "Group By / Aggregation",
+    "skeleton": "SELECT group_col, AGG_FUNC(value_col)"
+  },
+  "sql-82": {
+    "trace": [
+      {
+        "q": "How do you start the query to join ProductPurchases with itself to find pairs of products bought by the same user?",
+        "a": "SELECT p1.product_id AS product1_id, p2.product_id AS product2_id"
+      },
+      {
+        "q": "What join condition ensures we pair products bought by the same user and avoid duplicate pairs and self-pairs?",
+        "a": "ON p1.user_id = p2.user_id AND p1.product_id < p2.product_id"
+      },
+      {
+        "q": "How do you add columns from ProductInfo to get categories for both products?",
+        "a": "JOIN ProductInfo pi1 ON p1.product_id = pi1.product_id JOIN ProductInfo pi2 ON p2.product_id = pi2.product_id"
+      },
+      {
+        "q": "What clause filters to pairs bought by at least 3 different customers?",
+        "a": "GROUP BY p1.product_id, p2.product_id HAVING COUNT(DISTINCT p1.user_id) >= 3"
+      },
+      {
+        "q": "How do you sort the results as required: customer_count descending, then product1_id ascending, then product2_id ascending?",
+        "a": "ORDER BY customer_count DESC, p1.product_id ASC, p2.product_id ASC"
+      }
+    ],
+    "pattern": "Join",
+    "skeleton": "SELECT a.col, b.col FROM table_a a JOIN table_b b"
+  },
+  "sql-83": {
+    "trace": [
+      {
+        "q": "What SQL construct do you use to assign each sale to a season based on the month of sale_date?",
+        "a": "CASE WHEN CAST(strftime('%m', sale_date) AS INTEGER) IN (12,1,2) THEN 'Winter' WHEN CAST(strftime('%m', sale_date) AS INTEGER) BETWEEN 3 AND 5 THEN 'Spring' WHEN CAST(strftime('%m', sale_date) AS INTEGER) BETWEEN 6 AND 8 THEN 'Summer' WHEN CAST(strftime('%m', sale_date) AS INTEGER) BETWEEN 9 AND 11 THEN 'Fall' END AS season"
+      },
+      {
+        "q": "How do you compute total quantity and total revenue per season and category?",
+        "a": "SUM(s.quantity) AS total_quantity, SUM(s.quantity * s.price) AS total_revenue"
+      },
+      {
+        "q": "What window function and ORDER BY clause ranks categories within each season by total quantity descending, then total revenue descending, then category name ascending?",
+        "a": "ROW_NUMBER() OVER (PARTITION BY season ORDER BY total_quantity DESC, total_revenue DESC, category ASC) AS rn"
+      },
+      {
+        "q": "How do you filter to keep only the top-ranked category per season after the window function?",
+        "a": "WHERE rn = 1"
+      },
+      {
+        "q": "What is the final ORDER BY clause to sort the output by season ascending?",
+        "a": "ORDER BY CASE season WHEN 'Winter' THEN 1 WHEN 'Spring' THEN 2 WHEN 'Summer' THEN 3 WHEN 'Fall' THEN 4 END"
+      }
+    ],
+    "pattern": "Window Function",
+    "skeleton": "SELECT col, RANK() OVER (...)"
+  },
+  "sql-84": {
+    "trace": [
+      {
+        "q": "What SQL clause filters borrowing_records to only rows where the book is still checked out (return_date is missing)?",
+        "a": "WHERE return_date IS NULL"
+      },
+      {
+        "q": "What SQL clause groups the filtered borrowing records by book_id so we can count how many copies are currently borrowed per book?",
+        "a": "GROUP BY book_id"
+      },
+      {
+        "q": "What expression in the SELECT list counts the number of currently borrowed copies for each book?",
+        "a": "COUNT(*) AS current_borrowers"
+      },
+      {
+        "q": "What HAVING condition ensures we only keep books where the number of currently borrowed copies equals the total copies?",
+        "a": "HAVING COUNT(*) = total_copies"
+      },
+      {
+        "q": "What ORDER BY clause sorts the result by current_borrowers descending, then title ascending?",
+        "a": "ORDER BY current_borrowers DESC, title ASC"
+      }
+    ],
+    "pattern": "Group By / Aggregation",
+    "skeleton": "SELECT group_col, AGG_FUNC(value_col)"
+  },
+  "sql-85": {
+    "trace": [
+      {
+        "q": "How do you extract the hour from order_timestamp to check if it falls in peak hours (11-13 or 18-20)?",
+        "a": "CAST(strftime('%H', order_timestamp) AS INTEGER) BETWEEN 11 AND 13 OR CAST(strftime('%H', order_timestamp) AS INTEGER) BETWEEN 18 AND 20"
+      },
+      {
+        "q": "What SQL clause groups orders by customer and computes total_orders, peak_hour_percentage, and average_rating?",
+        "a": "SELECT customer_id, COUNT(*) AS total_orders, ROUND(100.0 * SUM(CASE WHEN CAST(strftime('%H', order_timestamp) AS INTEGER) BETWEEN 11 AND 13 OR CAST(strftime('%H', order_timestamp) AS INTEGER) BETWEEN 18 AND 20 THEN 1 ELSE 0 END) / COUNT(*), 2) AS peak_hour_percentage, ROUND(AVG(order_rating), 2) AS average_rating FROM restaurant_orders GROUP BY customer_id"
+      },
+      {
+        "q": "How do you filter the grouped results to keep only customers with at least 3 total orders?",
+        "a": "HAVING COUNT(*) >= 3"
+      },
+      {
+        "q": "How do you add the condition that at least 60% of orders are peak-hour orders?",
+        "a": "AND 100.0 * SUM(CASE WHEN CAST(strftime('%H', order_timestamp) AS INTEGER) BETWEEN 11 AND 13 OR CAST(strftime('%H', order_timestamp) AS INTEGER) BETWEEN 18 AND 20 THEN 1 ELSE 0 END) / COUNT(*) >= 60"
+      },
+      {
+        "q": "How do you add the condition that at least 50% of orders have a non-NULL rating and the average of rated orders is at least 4.0?",
+        "a": "AND 100.0 * SUM(CASE WHEN order_rating IS NOT NULL THEN 1 ELSE 0 END) / COUNT(*) >= 50 AND AVG(order_rating) >= 4.0"
+      }
+    ],
+    "pattern": "Group By / Aggregation",
+    "skeleton": "SELECT group_col, AGG_FUNC(value_col)"
+  },
+  "sql-86": {
+    "trace": [
+      {
+        "q": "What SQL clause groups rows by customer_id so we can compute per-customer aggregates?",
+        "a": "GROUP BY customer_id"
+      },
+      {
+        "q": "How do you count only 'purchase' transactions per customer using a conditional SUM?",
+        "a": "SUM(CASE WHEN transaction_type = 'purchase' THEN 1 ELSE 0 END)"
+      },
+      {
+        "q": "How do you compute the refund rate as a decimal using two conditional SUMs?",
+        "a": "SUM(CASE WHEN transaction_type = 'refund' THEN 1 ELSE 0 END) * 1.0 / (SUM(CASE WHEN transaction_type = 'purchase' THEN 1 ELSE 0 END) + SUM(CASE WHEN transaction_type = 'refund' THEN 1 ELSE 0 END))"
+      },
+      {
+        "q": "How do you calculate the day span between the earliest and latest transaction_date using julianday?",
+        "a": "julianday(MAX(transaction_date)) - julianday(MIN(transaction_date))"
+      },
+      {
+        "q": "What HAVING clause combines all three loyalty conditions (purchase count >= 3, span >= 30, refund rate < 0.20)?",
+        "a": "HAVING SUM(CASE WHEN transaction_type = 'purchase' THEN 1 ELSE 0 END) >= 3 AND julianday(MAX(transaction_date)) - julianday(MIN(transaction_date)) >= 30 AND SUM(CASE WHEN transaction_type = 'refund' THEN 1 ELSE 0 END) * 1.0 / (SUM(CASE WHEN transaction_type = 'purchase' THEN 1 ELSE 0 END) + SUM(CASE WHEN transaction_type = 'refund' THEN 1 ELSE 0 END)) < 0.20"
+      }
+    ],
+    "pattern": "Group By / Aggregation",
+    "skeleton": "SELECT group_col, AGG_FUNC(value_col)"
+  },
+  "sql-87": {
+    "trace": [
+      {
+        "q": "What window function and clause assigns row number 1 to each user's most recent event?",
+        "a": "ROW_NUMBER() OVER (PARTITION BY user_id ORDER BY event_date DESC) AS rn"
+      },
+      {
+        "q": "How do you compute each user's highest monthly_amount across all their events?",
+        "a": "MAX(monthly_amount) OVER (PARTITION BY user_id) AS max_historical_amount"
+      },
+      {
+        "q": "How do you compute the number of days between a user's first and last event?",
+        "a": "JULIANDAY(MAX(event_date) OVER (PARTITION BY user_id)) - JULIANDAY(MIN(event_date) OVER (PARTITION BY user_id)) AS days_as_subscriber"
+      },
+      {
+        "q": "What WHERE condition filters to only the most recent event per user (rn=1) and excludes cancelled users?",
+        "a": "WHERE rn = 1 AND event_type != 'cancel'"
+      },
+      {
+        "q": "What HAVING clause checks the churn risk conditions: at least one downgrade, current amount < 50% of max, and days_as_subscriber >= 60?",
+        "a": "HAVING COUNT(CASE WHEN event_type = 'downgrade' THEN 1 END) >= 1 AND monthly_amount < 0.5 * max_historical_amount AND days_as_subscriber >= 60"
+      }
+    ],
+    "pattern": "Window Function",
+    "skeleton": "SELECT col, RANK() OVER (...)"
+  },
+  "sql-88": {
+    "trace": [
+      {
+        "q": "How do you select the earliest exam_date and its corresponding score for each student-subject pair?",
+        "a": "SELECT student_id, subject, MIN(exam_date) AS first_date, score AS first_score FROM Scores GROUP BY student_id, subject"
+      },
+      {
+        "q": "How do you select the latest exam_date and its corresponding score for each student-subject pair?",
+        "a": "SELECT student_id, subject, MAX(exam_date) AS last_date, score AS last_score FROM Scores GROUP BY student_id, subject"
+      },
+      {
+        "q": "What SQL construct joins the earliest-date subquery (aliased as 'first') with the latest-date subquery (aliased as 'last') on student_id and subject?",
+        "a": "FROM first JOIN last ON first.student_id = last.student_id AND first.subject = last.subject"
+      },
+      {
+        "q": "How do you filter to only include pairs where the student took at least 2 exams (i.e., first_date != last_date) and the last score is strictly higher than the first score?",
+        "a": "WHERE first.first_date != last.last_date AND last.last_score > first.first_score"
+      },
+      {
+        "q": "How do you compute the improvement and order the final output by student_id then subject?",
+        "a": "SELECT first.student_id, first.subject, first.first_score, last.last_score, (last.last_score - first.first_score) AS improvement ORDER BY first.student_id, first.subject"
+      }
+    ],
+    "pattern": "Join",
+    "skeleton": "SELECT a.col, b.col FROM table_a a JOIN table_b b"
+  },
+  "sql-89": {
+    "trace": [
+      {
+        "q": "How do you assign row numbers to each employee's reviews, numbering the most recent review as 1?",
+        "a": "ROW_NUMBER() OVER (PARTITION BY employee_id ORDER BY review_date DESC) AS rn"
+      },
+      {
+        "q": "How do you create a CTE that selects employee_id, review_date, rating, and the row number from performance_reviews?",
+        "a": "WITH ranked_reviews AS (SELECT employee_id, review_date, rating, ROW_NUMBER() OVER (PARTITION BY employee_id ORDER BY review_date DESC) AS rn FROM performance_reviews)"
+      },
+      {
+        "q": "How do you join the CTE to itself three times to get the 1st, 2nd, and 3rd most recent reviews on one row per employee?",
+        "a": "FROM ranked_reviews r1 JOIN ranked_reviews r2 ON r1.employee_id = r2.employee_id AND r1.rn = 1 AND r2.rn = 2 JOIN ranked_reviews r3 ON r1.employee_id = r3.employee_id AND r3.rn = 3"
+      },
+      {
+        "q": "How do you filter to only employees whose three most recent ratings are strictly increasing (oldest to newest)?",
+        "a": "WHERE r3.rating < r2.rating AND r2.rating < r1.rating"
+      },
+      {
+        "q": "How do you compute the improvement_score as the newest rating minus the oldest rating?",
+        "a": "r1.rating - r3.rating AS improvement_score"
+      }
+    ],
+    "pattern": "Window Function",
+    "skeleton": "SELECT col, RANK() OVER (...)"
+  },
+  "sql-90": {
+    "trace": [
+      {
+        "q": "What SQL clause starts the first CTE to get each patient's first Positive test date?",
+        "a": "WITH first_positive AS (SELECT patient_id, MIN(test_date) AS first_pos_date FROM covid_tests WHERE result = 'Positive' GROUP BY patient_id)"
+      },
+      {
+        "q": "What SQL clause starts the second CTE to get each patient's first Negative test date after their first Positive date?",
+        "a": ", first_negative AS (SELECT fp.patient_id, MIN(ct.test_date) AS first_neg_date FROM first_positive fp JOIN covid_tests ct ON fp.patient_id = ct.patient_id WHERE ct.result = 'Negative' AND ct.test_date > fp.first_pos_date GROUP BY fp.patient_id)"
+      },
+      {
+        "q": "How do you join the two CTEs with the patients table to get patient_name and age?",
+        "a": "SELECT p.patient_id, p.patient_name, p.age, julianday(fn.first_neg_date) - julianday(fp.first_pos_date) AS recovery_time FROM patients p JOIN first_positive fp ON p.patient_id = fp.patient_id JOIN first_negative fn ON p.patient_id = fn.patient_id"
+      },
+      {
+        "q": "How do you order the final result by recovery_time ascending, then patient_name ascending?",
+        "a": "ORDER BY recovery_time ASC, patient_name ASC"
+      }
+    ],
+    "pattern": "Query Structure",
+    "skeleton": "SELECT col FROM table WHERE condition"
+  },
+  "sql-91": {
+    "trace": [
+      {
+        "q": "What SQL expression computes the fuel efficiency for a single trip?",
+        "a": "distance_km / fuel_consumed"
+      },
+      {
+        "q": "What CASE expression assigns each trip to 'H1' if its month is between 1 and 6, and 'H2' otherwise?",
+        "a": "CASE WHEN CAST(strftime('%m', trip_date) AS INTEGER) BETWEEN 1 AND 6 THEN 'H1' ELSE 'H2' END"
+      },
+      {
+        "q": "How do you compute the average fuel efficiency for the first half of the year, using the CASE expression inside AVG?",
+        "a": "AVG(CASE WHEN CAST(strftime('%m', trip_date) AS INTEGER) BETWEEN 1 AND 6 THEN distance_km / fuel_consumed END) AS first_half_avg"
+      },
+      {
+        "q": "How do you compute the average fuel efficiency for the second half of the year, using the CASE expression inside AVG?",
+        "a": "AVG(CASE WHEN CAST(strftime('%m', trip_date) AS INTEGER) BETWEEN 7 AND 12 THEN distance_km / fuel_consumed END) AS second_half_avg"
+      },
+      {
+        "q": "What HAVING clause ensures the driver has trips in both halves (i.e., both averages are non-NULL)?",
+        "a": "HAVING first_half_avg IS NOT NULL AND second_half_avg IS NOT NULL"
+      }
+    ],
+    "pattern": "Group By / Aggregation",
+    "skeleton": "SELECT group_col, AGG_FUNC(value_col)"
+  },
+  "sql-92": {
+    "trace": [
+      {
+        "q": "What SQL expression collapses a meeting_date into a year-week bucket for grouping?",
+        "a": "strftime('%Y-%W', meeting_date)"
+      },
+      {
+        "q": "How do you compute total meeting hours per employee per week?",
+        "a": "SUM(m.duration_hours)"
+      },
+      {
+        "q": "What clause filters the grouped weekly totals to only those exceeding 20 hours?",
+        "a": "HAVING SUM(m.duration_hours) > 20"
+      },
+      {
+        "q": "How do you count how many weeks per employee cleared the 20-hour bar?",
+        "a": "COUNT(*) AS meeting_heavy_weeks"
+      },
+      {
+        "q": "What clause orders the final result by meeting_heavy_weeks descending, then employee_name ascending?",
+        "a": "ORDER BY meeting_heavy_weeks DESC, e.employee_name ASC"
+      }
+    ],
+    "pattern": "Group By / Aggregation",
+    "skeleton": "SELECT group_col, AGG_FUNC(value_col)"
+  },
+  "sql-93": {
+    "trace": [
+      {
+        "q": "What SQL clause assigns row numbers partitioned by store_id, ordering by price descending to identify the most expensive product per store?",
+        "a": "ROW_NUMBER() OVER (PARTITION BY store_id ORDER BY price DESC) AS rn_desc"
+      },
+      {
+        "q": "What SQL clause assigns row numbers partitioned by store_id, ordering by price ascending to identify the cheapest product per store?",
+        "a": "ROW_NUMBER() OVER (PARTITION BY store_id ORDER BY price ASC) AS rn_asc"
+      },
+      {
+        "q": "How do you filter to keep only the row where rn_desc = 1 (most expensive) and rn_asc = 1 (cheapest) per store, after joining the two subqueries?",
+        "a": "WHERE rn_desc.rn_desc = 1 AND rn_asc.rn_asc = 1"
+      },
+      {
+        "q": "What expression calculates the imbalance ratio (cheapest quantity divided by most-expensive quantity) rounded to 2 decimals?",
+        "a": "ROUND(cheapest.quantity * 1.0 / most_exp.quantity, 2) AS imbalance_ratio"
+      },
+      {
+        "q": "How do you order the final result by imbalance_ratio descending, then store_name ascending?",
+        "a": "ORDER BY imbalance_ratio DESC, s.store_name ASC"
+      }
+    ],
+    "pattern": "Window Function",
+    "skeleton": "SELECT col, RANK() OVER (...)"
+  },
+  "sql-94": {
+    "trace": [
+      {
+        "q": "What SQL clause groups reading sessions by book_id so we can compute per-book aggregates?",
+        "a": "GROUP BY rs.book_id"
+      },
+      {
+        "q": "How do you count sessions with rating >=4 and rating <=2 in the same SELECT, using conditional sums?",
+        "a": "SUM(CASE WHEN rs.session_rating >= 4 THEN 1 ELSE 0 END) AS high_cnt, SUM(CASE WHEN rs.session_rating <= 2 THEN 1 ELSE 0 END) AS low_cnt"
+      },
+      {
+        "q": "What HAVING clause ensures the book has at least one high-rated and one low-rated session?",
+        "a": "HAVING high_cnt > 0 AND low_cnt > 0"
+      },
+      {
+        "q": "How do you compute polarization_score as the fraction of extreme-rated sessions, rounded to 2 decimals?",
+        "a": "ROUND((high_cnt + low_cnt) * 1.0 / COUNT(*), 2) AS polarization_score"
+      },
+      {
+        "q": "How do you compute rating_spread as max rating minus min rating?",
+        "a": "MAX(rs.session_rating) - MIN(rs.session_rating) AS rating_spread"
+      }
+    ],
+    "pattern": "Group By / Aggregation",
+    "skeleton": "SELECT group_col, AGG_FUNC(value_col)"
+  },
+  "sql-95": {
+    "trace": [
+      {
+        "q": "What clause groups rows by user_id to compute per-user aggregates?",
+        "a": "GROUP BY user_id"
+      },
+      {
+        "q": "What aggregate functions and column alias count the number of prompts per user and compute the average tokens rounded to 2 decimals?",
+        "a": "COUNT(*) AS prompt_count, ROUND(AVG(tokens), 2) AS avg_tokens"
+      },
+      {
+        "q": "What HAVING condition ensures only users with at least 3 prompts are included?",
+        "a": "HAVING COUNT(*) >= 3"
+      },
+      {
+        "q": "What HAVING condition checks that at least one prompt uses more tokens than the user's own average, using the trick that max > avg when not all values are identical?",
+        "a": "AND MAX(tokens) > AVG(tokens)"
+      },
+      {
+        "q": "What ORDER BY clause sorts results by avg_tokens descending, then user_id ascending?",
+        "a": "ORDER BY avg_tokens DESC, user_id ASC"
+      }
+    ],
+    "pattern": "Group By / Aggregation",
+    "skeleton": "SELECT group_col, AGG_FUNC(value_col)"
+  },
+  "sql-96": {
+    "trace": [
+      {
+        "q": "How do you count reactions per user and per reaction type?",
+        "a": "SELECT user_id, reaction, COUNT(*) AS cnt FROM reactions GROUP BY user_id, reaction"
+      },
+      {
+        "q": "How do you compute the total number of reactions per user?",
+        "a": "SELECT user_id, COUNT(*) AS total FROM reactions GROUP BY user_id"
+      },
+      {
+        "q": "How do you join the per-reaction counts with the per-user totals and compute the ratio?",
+        "a": "SELECT r.user_id, r.reaction, r.cnt, t.total, ROUND(1.0 * r.cnt / t.total, 2) AS reaction_ratio FROM (SELECT user_id, reaction, COUNT(*) AS cnt FROM reactions GROUP BY user_id, reaction) r JOIN (SELECT user_id, COUNT(*) AS total FROM reactions GROUP BY user_id) t ON r.user_id = t.user_id"
+      },
+      {
+        "q": "How do you assign a row number to each reaction per user, ordered by count descending and reaction alphabetically, to pick the dominant reaction?",
+        "a": "ROW_NUMBER() OVER (PARTITION BY user_id ORDER BY cnt DESC, reaction ASC) AS rn"
+      },
+      {
+        "q": "How do you filter to only users with at least 5 distinct content items and keep only the dominant reaction with ratio >= 0.6, then order by ratio descending and user_id ascending?",
+        "a": "WHERE total >= 5 AND rn = 1 AND reaction_ratio >= 0.6 ORDER BY reaction_ratio DESC, user_id ASC"
+      }
+    ],
+    "pattern": "Window Function",
+    "skeleton": "SELECT col, RANK() OVER (...)"
+  },
+  "py-3": {
+    "trace": [
+      {
+        "q": "What line initializes the stack as an empty list?",
+        "a": "stack = []"
+      },
+      {
+        "q": "What line creates a mapping of closing brackets to their corresponding opening brackets?",
+        "a": "mapping = {')': '(', ']': '[', '}': '{'}"
+      },
+      {
+        "q": "What line starts the loop over each character in the string s?",
+        "a": "for char in s:"
+      },
+      {
+        "q": "What line checks if the current character is an opening bracket (i.e., in the mapping values)?",
+        "a": "if char in mapping.values():"
+      },
+      {
+        "q": "What line pushes the opening bracket onto the stack?",
+        "a": "stack.append(char)"
+      },
+      {
+        "q": "What line checks if the stack is empty or the top of the stack doesn't match the expected opening bracket for the current closing bracket?",
+        "a": "if not stack or stack.pop() != mapping[char]:"
+      },
+      {
+        "q": "What line returns False if the brackets are unbalanced during the loop?",
+        "a": "return False"
+      }
+    ],
+    "pattern": "Stack",
+    "skeleton": "stack = []"
+  },
+  "py-4": {
+    "trace": [
+      {
+        "q": "What line initializes the variable to track the minimum price seen so far?",
+        "a": "min_price = float('inf')"
+      },
+      {
+        "q": "What line initializes the variable to track the maximum profit found so far?",
+        "a": "max_profit = 0"
+      },
+      {
+        "q": "What line starts the loop over each price in the prices list?",
+        "a": "for price in prices:"
+      },
+      {
+        "q": "What line updates the minimum price if the current price is lower?",
+        "a": "if price < min_price: min_price = price"
+      },
+      {
+        "q": "What line calculates the potential profit if we sold at the current price?",
+        "a": "profit = price - min_price"
+      },
+      {
+        "q": "What line updates the maximum profit if the current profit is larger?",
+        "a": "if profit > max_profit: max_profit = profit"
+      },
+      {
+        "q": "What line returns the maximum profit after the loop ends?",
+        "a": "return max_profit"
+      }
+    ],
+    "pattern": "General Problem-Solving",
+    "skeleton": "for item in input:"
+  },
+  "py-5": {
+    "trace": [
+      {
+        "q": "What line initializes an empty list to store filtered characters?",
+        "a": "filtered = []"
+      },
+      {
+        "q": "What line starts a loop over each character in the input string s?",
+        "a": "for ch in s:"
+      },
+      {
+        "q": "What line checks if the character is alphanumeric?",
+        "a": "if ch.isalnum():"
+      },
+      {
+        "q": "What line appends the lowercase version of the character to the filtered list?",
+        "a": "filtered.append(ch.lower())"
+      },
+      {
+        "q": "What line joins the filtered list into a single string?",
+        "a": "clean = ''.join(filtered)"
+      },
+      {
+        "q": "What line returns whether the clean string equals its reverse?",
+        "a": "return clean == clean[::-1]"
+      }
+    ],
+    "pattern": "String",
+    "skeleton": "result = []"
+  },
+  "py-6": {
+    "trace": [
+      {
+        "q": "What line sorts the list in place?",
+        "a": "nums.sort()"
+      },
+      {
+        "q": "What line starts a loop over indices from 0 to len(nums)-2?",
+        "a": "for i in range(len(nums) - 1):"
+      },
+      {
+        "q": "What line checks if the current element equals the next element?",
+        "a": "if nums[i] == nums[i + 1]:"
+      },
+      {
+        "q": "What line returns True when a duplicate is found?",
+        "a": "return True"
+      },
+      {
+        "q": "What line returns False if no duplicates were found after the loop?",
+        "a": "return False"
+      }
+    ],
+    "pattern": "Sorting",
+    "skeleton": "arr.sort()"
+  },
+  "py-7": {
+    "trace": [
+      {
+        "q": "What line initializes the hashmap to count letters?",
+        "a": "seen = {}"
+      },
+      {
+        "q": "What line starts the loop over each character in string s?",
+        "a": "for c in s:"
+      },
+      {
+        "q": "What line increments the count for character c in the hashmap?",
+        "a": "seen[c] = seen.get(c, 0) + 1"
+      },
+      {
+        "q": "What line starts the loop over each character in string t?",
+        "a": "for c in t:"
+      },
+      {
+        "q": "What line checks if character c is not in the hashmap or its count is zero?",
+        "a": "if c not in seen or seen[c] == 0:"
+      },
+      {
+        "q": "What line returns False when a character is missing or count exhausted?",
+        "a": "return False"
+      },
+      {
+        "q": "What line decrements the count for character c in the hashmap?",
+        "a": "seen[c] -= 1"
+      },
+      {
+        "q": "What line returns True after processing all characters?",
+        "a": "return True"
+      }
+    ],
+    "pattern": "Hashmap",
+    "skeleton": "seen = {}"
+  },
+  "py-8": {
+    "trace": [
+      {
+        "q": "What line initializes the variable to hold the sum of numbers from 0 to n?",
+        "a": "total = len(nums) * (len(nums) + 1) // 2"
+      },
+      {
+        "q": "What line initializes the variable to hold the sum of the given list?",
+        "a": "actual = 0"
+      },
+      {
+        "q": "What line starts the loop over each number in nums?",
+        "a": "for num in nums:"
+      },
+      {
+        "q": "What line adds the current number to the actual sum?",
+        "a": "actual += num"
+      },
+      {
+        "q": "What line returns the difference between the expected total and the actual sum?",
+        "a": "return total - actual"
+      }
+    ],
+    "pattern": "General Problem-Solving",
+    "skeleton": "for item in input:"
+  },
+  "py-9": {
+    "trace": [
+      {
+        "q": "What line initializes the dp array with zeros of length n+1?",
+        "a": "dp = [0] * (n + 1)"
+      },
+      {
+        "q": "What line sets the base case for 0 stairs (1 way)?",
+        "a": "dp[0] = 1"
+      },
+      {
+        "q": "What line sets the base case for 1 stair (1 way)?",
+        "a": "dp[1] = 1"
+      },
+      {
+        "q": "What line starts the loop from 2 to n inclusive?",
+        "a": "for i in range(2, n + 1):"
+      },
+      {
+        "q": "What line computes dp[i] as sum of the two previous values?",
+        "a": "dp[i] = dp[i-1] + dp[i-2]"
+      },
+      {
+        "q": "What line returns the result for n stairs?",
+        "a": "return dp[n]"
+      }
+    ],
+    "pattern": "Dynamic Programming",
+    "skeleton": "dp = [0] * (n + 1)"
+  },
+  "py-10": {
+    "trace": [
+      {
+        "q": "What line initializes the dp array with zeros of length n+1?",
+        "a": "dp = [0] * (n + 1)"
+      },
+      {
+        "q": "What line starts the loop from 1 to n inclusive?",
+        "a": "for i in range(1, n + 1):"
+      },
+      {
+        "q": "What line computes the bit count for i using the recurrence?",
+        "a": "dp[i] = dp[i >> 1] + (i & 1)"
+      },
+      {
+        "q": "What line returns the dp list?",
+        "a": "return dp"
+      }
+    ],
+    "pattern": "Dynamic Programming",
+    "skeleton": "dp = [0] * (n + 1)"
+  },
+  "py-11": {
+    "trace": [
+      {
+        "q": "What line initializes the result list with 1s, same length as input?",
+        "a": "res = [1] * len(nums)"
+      },
+      {
+        "q": "What line initializes the running prefix product variable to 1?",
+        "a": "prefix = 1"
+      },
+      {
+        "q": "What line starts the left-to-right loop over indexes of nums?",
+        "a": "for i in range(len(nums)):"
+      },
+      {
+        "q": "What line stores the current prefix product in result at position i?",
+        "a": "res[i] = prefix"
+      },
+      {
+        "q": "What line updates the prefix product by multiplying with the current number?",
+        "a": "prefix *= nums[i]"
+      },
+      {
+        "q": "What line initializes the running suffix product variable to 1?",
+        "a": "suffix = 1"
+      },
+      {
+        "q": "What line starts the right-to-left loop over indexes in reverse?",
+        "a": "for i in range(len(nums) - 1, -1, -1):"
+      },
+      {
+        "q": "What line multiplies the current result element by the suffix product?",
+        "a": "res[i] *= suffix"
+      },
+      {
+        "q": "What line updates the suffix product by multiplying with the current number?",
+        "a": "suffix *= nums[i]"
+      },
+      {
+        "q": "What line returns the final result list?",
+        "a": "return res"
+      }
+    ],
+    "pattern": "General Problem-Solving",
+    "skeleton": "for item in input:"
+  },
+  "py-12": {
+    "trace": [
+      {
+        "q": "What line initializes the hashmap to store the last-seen index of each character?",
+        "a": "last_seen = {}"
+      },
+      {
+        "q": "What line initializes the variable to track the maximum length found?",
+        "a": "max_len = 0"
+      },
+      {
+        "q": "What line starts the loop over the string with index and character?",
+        "a": "for i, ch in enumerate(s):"
+      },
+      {
+        "q": "What line checks if the current character is already in the hashmap and its last index is within the current window?",
+        "a": "if ch in last_seen and last_seen[ch] >= window_start:"
+      },
+      {
+        "q": "What line moves the window start to just after the previous occurrence of the repeated character?",
+        "a": "window_start = last_seen[ch] + 1"
+      },
+      {
+        "q": "What line updates the hashmap with the current character's latest index?",
+        "a": "last_seen[ch] = i"
+      },
+      {
+        "q": "What line updates the maximum length with the current window size?",
+        "a": "max_len = max(max_len, i - window_start + 1)"
+      }
+    ],
+    "pattern": "Sliding Window",
+    "skeleton": "window_start, window_sum = 0, 0"
+  },
+  "py-13": {
+    "trace": [
+      {
+        "q": "What line converts the list to a set for O(1) lookups?",
+        "a": "nums_set = set(nums)"
+      },
+      {
+        "q": "What line initializes the variable to track the maximum run length?",
+        "a": "longest = 0"
+      },
+      {
+        "q": "What line starts the loop over each number in the set?",
+        "a": "for n in nums_set:"
+      },
+      {
+        "q": "What line checks if the current number is the start of a sequence (predecessor not in set)?",
+        "a": "if n - 1 not in nums_set:"
+      },
+      {
+        "q": "What line initializes a counter for the current run length?",
+        "a": "current = 1"
+      },
+      {
+        "q": "What line starts a while loop to extend the run while the next consecutive number exists?",
+        "a": "while n + current in nums_set:"
+      },
+      {
+        "q": "What line increments the current run length inside the while loop?",
+        "a": "current += 1"
+      },
+      {
+        "q": "What line updates the longest run length after the while loop?",
+        "a": "longest = max(longest, current)"
+      },
+      {
+        "q": "What line returns the final longest run length after the outer loop?",
+        "a": "return longest"
+      }
+    ],
+    "pattern": "General Problem-Solving",
+    "skeleton": "for item in input:"
+  },
+  "py-14": {
+    "trace": [
+      {
+        "q": "What line initializes the hashmap to store groups by sorted key?",
+        "a": "seen = {}"
+      },
+      {
+        "q": "What line starts the loop over each string in the input list?",
+        "a": "for s in strs:"
+      },
+      {
+        "q": "What line creates the sorted-character key for the current string?",
+        "a": "key = ''.join(sorted(s))"
+      },
+      {
+        "q": "What line checks if the key is already in the hashmap?",
+        "a": "if key not in seen:"
+      },
+      {
+        "q": "What line initializes a new list for that key if it's not present?",
+        "a": "seen[key] = []"
+      },
+      {
+        "q": "What line appends the original string to the list for that key?",
+        "a": "seen[key].append(s)"
+      },
+      {
+        "q": "What line returns all the grouped lists as a list of lists?",
+        "a": "return list(seen.values())"
+      }
+    ],
+    "pattern": "Hashmap",
+    "skeleton": "seen = {}"
+  },
+  "py-15": {
+    "trace": [
+      {
+        "q": "What line creates a frequency counter for each number in nums?",
+        "a": "freq = Counter(nums)"
+      },
+      {
+        "q": "What line initializes a list of empty buckets, one for each possible frequency (0 to len(nums))?",
+        "a": "buckets = [[] for _ in range(len(nums) + 1)]"
+      },
+      {
+        "q": "What line loops over each number and its count in the frequency dictionary?",
+        "a": "for num, count in freq.items():"
+      },
+      {
+        "q": "What line appends the number to the bucket at index equal to its count?",
+        "a": "buckets[count].append(num)"
+      },
+      {
+        "q": "What line initializes an empty list to collect the result?",
+        "a": "result = []"
+      },
+      {
+        "q": "What line loops from the highest frequency bucket down to the lowest?",
+        "a": "for i in range(len(buckets) - 1, 0, -1):"
+      },
+      {
+        "q": "What line extends the result with the current bucket and checks if we have enough elements?",
+        "a": "result.extend(buckets[i])\n        if len(result) >= k: break"
+      }
+    ],
+    "pattern": "Sorting",
+    "skeleton": "arr.sort()"
+  },
+  "py-16": {
+    "trace": [
+      {
+        "q": "What line initializes the farthest reachable index to 0?",
+        "a": "farthest = 0"
+      },
+      {
+        "q": "What line starts the loop over each index in the array?",
+        "a": "for i in range(len(nums)):"
+      },
+      {
+        "q": "What line checks if the current index is beyond the farthest reachable index?",
+        "a": "if i > farthest:"
+      },
+      {
+        "q": "What line returns False if the current index is unreachable?",
+        "a": "return False"
+      },
+      {
+        "q": "What line updates the farthest reachable index using the current position and jump length?",
+        "a": "farthest = max(farthest, i + nums[i])"
+      },
+      {
+        "q": "What line returns True after the loop completes (meaning the last index is reachable)?",
+        "a": "return True"
+      }
+    ],
+    "pattern": "Greedy",
+    "skeleton": "items.sort(key=fn)"
+  },
+  "py-17": {
+    "trace": [
+      {
+        "q": "What line sorts the intervals by their start value?",
+        "a": "intervals.sort(key=lambda x: x[0])"
+      },
+      {
+        "q": "What line initializes the result list with the first interval?",
+        "a": "merged = [intervals[0]]"
+      },
+      {
+        "q": "What line starts the loop over the remaining intervals?",
+        "a": "for start, end in intervals[1:]:"
+      },
+      {
+        "q": "What line gets the last merged interval's end value?",
+        "a": "last_end = merged[-1][1]"
+      },
+      {
+        "q": "What line checks if the current interval overlaps with the last merged one?",
+        "a": "if start <= last_end:"
+      },
+      {
+        "q": "What line merges the intervals by updating the last merged interval's end?",
+        "a": "merged[-1][1] = max(last_end, end)"
+      },
+      {
+        "q": "What line adds the current interval to the result if no overlap?",
+        "a": "merged.append([start, end])"
+      }
+    ],
+    "pattern": "Sorting",
+    "skeleton": "arr.sort()"
+  },
+  "py-18": {
+    "trace": [
+      {
+        "q": "What line initializes the result list to store the merged intervals?",
+        "a": "res = []"
+      },
+      {
+        "q": "What line starts the loop over each interval in intervals?",
+        "a": "for i, (start, end) in enumerate(intervals):"
+      },
+      {
+        "q": "What line checks if the current interval ends before the new interval starts?",
+        "a": "if end < newInterval[0]:"
+      },
+      {
+        "q": "What line appends the current interval to result when it ends before newInterval starts?",
+        "a": "res.append([start, end])"
+      },
+      {
+        "q": "What line checks if the current interval starts after the new interval ends (no overlap)?",
+        "a": "elif start > newInterval[1]:"
+      },
+      {
+        "q": "What line appends the merged newInterval and then the rest of the intervals, and returns?",
+        "a": "return res + [newInterval] + intervals[i:]"
+      },
+      {
+        "q": "What line merges the overlapping interval into newInterval by updating its bounds?",
+        "a": "newInterval = [min(newInterval[0], start), max(newInterval[1], end)]"
+      }
+    ],
+    "pattern": "Sorting",
+    "skeleton": "arr.sort()"
+  },
+  "py-19": {
+    "trace": [
+      {
+        "q": "What line sorts the intervals by end time?",
+        "a": "intervals.sort(key=lambda x: x[1])"
+      },
+      {
+        "q": "What line initializes the count of removed intervals to 0?",
+        "a": "removed = 0"
+      },
+      {
+        "q": "What line initializes the end time of the last kept interval to negative infinity?",
+        "a": "last_end = float('-inf')"
+      },
+      {
+        "q": "What line starts the loop over each interval?",
+        "a": "for start, end in intervals:"
+      },
+      {
+        "q": "What line checks if the current interval starts before the last kept interval's end?",
+        "a": "if start < last_end:"
+      },
+      {
+        "q": "What line increments the removal count when intervals overlap?",
+        "a": "removed += 1"
+      },
+      {
+        "q": "What line updates the last kept interval's end time when no overlap?",
+        "a": "last_end = end"
+      }
+    ],
+    "pattern": "Sorting",
+    "skeleton": "arr.sort()"
+  },
+  "py-20": {
+    "trace": [
+      {
+        "q": "What line initializes the left and right pointers for binary search?",
+        "a": "l, r = 0, len(nums) - 1"
+      },
+      {
+        "q": "What line starts the while loop that continues while left <= right?",
+        "a": "while l <= r:"
+      },
+      {
+        "q": "What line calculates the middle index?",
+        "a": "mid = (l + r) // 2"
+      },
+      {
+        "q": "What line checks if the middle element equals the target?",
+        "a": "if nums[mid] == target:"
+      },
+      {
+        "q": "What line returns the middle index when target is found?",
+        "a": "return mid"
+      },
+      {
+        "q": "What line checks if the left half is normally sorted?",
+        "a": "if nums[l] <= nums[mid]:"
+      },
+      {
+        "q": "What line checks if target lies in the left sorted half?",
+        "a": "if nums[l] <= target < nums[mid]:"
+      }
+    ],
+    "pattern": "Sorting",
+    "skeleton": "arr.sort()"
+  },
+  "py-21": {
+    "trace": [
+      {
+        "q": "What line initializes the left and right pointers for binary search?",
+        "a": "lo, hi = 0, len(nums) - 1"
+      },
+      {
+        "q": "What line starts the while loop that continues until the pointers meet?",
+        "a": "while lo < hi:"
+      },
+      {
+        "q": "What line calculates the middle index?",
+        "a": "mid = (lo + hi) // 2"
+      },
+      {
+        "q": "What line checks if the middle element is greater than the rightmost element?",
+        "a": "if nums[mid] > nums[hi]:"
+      },
+      {
+        "q": "What line moves the left pointer to mid + 1 when the minimum is to the right?",
+        "a": "lo = mid + 1"
+      },
+      {
+        "q": "What line moves the right pointer to mid when the minimum is at mid or to the left?",
+        "a": "else: hi = mid"
+      },
+      {
+        "q": "What line returns the minimum value after the loop ends?",
+        "a": "return nums[lo]"
+      }
+    ],
+    "pattern": "Sorting",
+    "skeleton": "arr.sort()"
+  },
+  "py-22": {
+    "trace": [
+      {
+        "q": "What line initializes the two pointers at the left and right ends of the array?",
+        "a": "left, right = 0, len(height) - 1"
+      },
+      {
+        "q": "What line initializes the variable to track the maximum area found?",
+        "a": "max_area = 0"
+      },
+      {
+        "q": "What line starts the while loop that continues until the pointers meet?",
+        "a": "while left < right:"
+      },
+      {
+        "q": "What line calculates the current area using the shorter height and the width?",
+        "a": "area = min(height[left], height[right]) * (right - left)"
+      },
+      {
+        "q": "What line updates the maximum area if the current area is larger?",
+        "a": "max_area = max(max_area, area)"
+      },
+      {
+        "q": "What line moves the pointer at the shorter side inward?",
+        "a": "if height[left] < height[right]: left += 1 else: right -= 1"
+      },
+      {
+        "q": "What line returns the maximum area after the loop ends?",
+        "a": "return max_area"
+      }
+    ],
+    "pattern": "Two-pointer",
+    "skeleton": "left, right = 0, len(arr) - 1"
+  },
+  "py-23": {
+    "trace": [
+      {
+        "q": "What line sorts the input array?",
+        "a": "nums.sort()"
+      },
+      {
+        "q": "What line initializes the result list?",
+        "a": "res = []"
+      },
+      {
+        "q": "What line starts the outer loop over indices of the sorted array?",
+        "a": "for i in range(len(nums)):"
+      },
+      {
+        "q": "What line skips duplicate values for the fixed element?",
+        "a": "if i > 0 and nums[i] == nums[i-1]: continue"
+      },
+      {
+        "q": "What line sets the two pointers for the remaining pair?",
+        "a": "l, r = i + 1, len(nums) - 1"
+      },
+      {
+        "q": "What line starts the while loop for the two-pointer search?",
+        "a": "while l < r:"
+      },
+      {
+        "q": "What line checks if the sum of the three numbers equals zero?",
+        "a": "if nums[i] + nums[l] + nums[r] == 0:"
+      }
+    ],
+    "pattern": "Sorting",
+    "skeleton": "arr.sort()"
+  },
+  "py-24": {
+    "trace": [
+      {
+        "q": "What line sorts the candidates array to enable early breaking?",
+        "a": "candidates.sort()"
+      },
+      {
+        "q": "What line initializes the result list to store all valid combinations?",
+        "a": "res = []"
+      },
+      {
+        "q": "What line defines the inner backtrack function with parameters for start index, current combination, and remaining target?",
+        "a": "def backtrack(start, comb, remain):"
+      },
+      {
+        "q": "What line checks if the remaining target is zero (base case for a valid combination)?",
+        "a": "if remain == 0:"
+      },
+      {
+        "q": "What line appends a copy of the current combination to the result list?",
+        "a": "res.append(comb[:])"
+      },
+      {
+        "q": "What line starts the loop from the start index to the end of candidates?",
+        "a": "for i in range(start, len(candidates)):"
+      },
+      {
+        "q": "What line checks if the current candidate exceeds the remaining target and breaks if so?",
+        "a": "if candidates[i] > remain: break"
+      }
+    ],
+    "pattern": "Sorting",
+    "skeleton": "arr.sort()"
+  },
+  "py-25": {
+    "trace": [
+      {
+        "q": "What line initializes the DP array with a large number (infinity) for all amounts from 0 to amount?",
+        "a": "dp = [float('inf')] * (amount + 1)"
+      },
+      {
+        "q": "What line sets the base case: 0 coins needed to make amount 0?",
+        "a": "dp[0] = 0"
+      },
+      {
+        "q": "What line starts the outer loop iterating over each coin in the coins list?",
+        "a": "for coin in coins:"
+      },
+      {
+        "q": "What line starts the inner loop iterating over amounts from the current coin up to the target amount?",
+        "a": "for a in range(coin, amount + 1):"
+      },
+      {
+        "q": "What line updates dp[a] to the minimum of its current value and dp[a - coin] + 1?",
+        "a": "dp[a] = min(dp[a], dp[a - coin] + 1)"
+      },
+      {
+        "q": "What line returns dp[amount] if it's not infinity, otherwise returns -1?",
+        "a": "return dp[amount] if dp[amount] != float('inf') else -1"
+      }
+    ],
+    "pattern": "Dynamic Programming",
+    "skeleton": "dp = [0] * (n + 1)"
+  },
+  "py-26": {
+    "trace": [
+      {
+        "q": "What line initializes the tails list to store the smallest possible tails of increasing subsequences?",
+        "a": "tails = []"
+      },
+      {
+        "q": "What line starts the loop over each number in the input list?",
+        "a": "for num in nums:"
+      },
+      {
+        "q": "What line finds the insertion index using binary search (use bisect module)?",
+        "a": "i = bisect.bisect_left(tails, num)"
+      },
+      {
+        "q": "What line replaces the element at index i with num (or appends if i equals length) using slice assignment?",
+        "a": "tails[i:i+1] = [num]"
+      },
+      {
+        "q": "What line returns the length of tails as the result?",
+        "a": "return len(tails)"
+      }
+    ],
+    "pattern": "Dynamic Programming",
+    "skeleton": "dp = [0] * (n + 1)"
+  },
+  "py-27": {
+    "trace": [
+      {
+        "q": "What line initializes the 2D DP table with dimensions (len(text1)+1) x (len(text2)+1) filled with zeros?",
+        "a": "dp = [[0] * (len(text2) + 1) for _ in range(len(text1) + 1)]"
+      },
+      {
+        "q": "What line starts the outer loop over indices of text1?",
+        "a": "for i in range(1, len(text1) + 1):"
+      },
+      {
+        "q": "What line starts the inner loop over indices of text2?",
+        "a": "for j in range(1, len(text2) + 1):"
+      },
+      {
+        "q": "What line checks if the current characters of text1 and text2 match?",
+        "a": "if text1[i-1] == text2[j-1]:"
+      },
+      {
+        "q": "What line updates dp[i][j] when characters match (extending the diagonal)?",
+        "a": "dp[i][j] = dp[i-1][j-1] + 1"
+      },
+      {
+        "q": "What line handles the else case by taking the max of dropping one character from either string?",
+        "a": "dp[i][j] = max(dp[i-1][j], dp[i][j-1])"
+      },
+      {
+        "q": "What line returns the final LCS length stored in the bottom-right cell?",
+        "a": "return dp[len(text1)][len(text2)]"
+      }
+    ],
+    "pattern": "Dynamic Programming",
+    "skeleton": "dp = [0] * (n + 1)"
+  },
+  "py-28": {
+    "trace": [
+      {
+        "q": "What line initializes the DP array with n+1 zeros?",
+        "a": "dp = [0] * (n + 1)"
+      },
+      {
+        "q": "What line sets the base case for the first house?",
+        "a": "dp[1] = nums[0]"
+      },
+      {
+        "q": "What line starts the loop from the second house to the end?",
+        "a": "for i in range(2, n + 1):"
+      },
+      {
+        "q": "What line computes the max of skipping or robbing the current house?",
+        "a": "dp[i] = max(dp[i-1], dp[i-2] + nums[i-1])"
+      },
+      {
+        "q": "What line returns the final answer?",
+        "a": "return dp[n]"
+      }
+    ],
+    "pattern": "Dynamic Programming",
+    "skeleton": "dp = [0] * (n + 1)"
+  },
+  "py-29": {
+    "trace": [
+      {
+        "q": "What line handles the single-house case by returning the only value?",
+        "a": "if len(nums) == 1: return nums[0]"
+      },
+      {
+        "q": "What line defines the helper function for the linear house robber problem?",
+        "a": "def rob_linear(houses):"
+      },
+      {
+        "q": "What line initializes the two variables for the dynamic programming in rob_linear?",
+        "a": "prev, curr = 0, 0"
+      },
+      {
+        "q": "What line starts the loop over each house amount in the linear case?",
+        "a": "for amount in houses:"
+      },
+      {
+        "q": "What line calculates the new maximum for the current house?",
+        "a": "prev, curr = curr, max(curr, prev + amount)"
+      },
+      {
+        "q": "What line returns the result from the linear robber function?",
+        "a": "return curr"
+      },
+      {
+        "q": "What line returns the maximum of the two linear cases (excluding first or last)?",
+        "a": "return max(rob_linear(nums[1:]), rob_linear(nums[:-1]))"
+      }
+    ],
+    "pattern": "General Problem-Solving",
+    "skeleton": "for item in input:"
+  },
+  "py-30": {
+    "trace": [
+      {
+        "q": "What line initializes the DP array with False values?",
+        "a": "dp = [False] * (n + 1)"
+      },
+      {
+        "q": "What line sets the base case that an empty prefix is segmentable?",
+        "a": "dp[0] = True"
+      },
+      {
+        "q": "What line starts the outer loop over the end index i?",
+        "a": "for i in range(1, n + 1):"
+      },
+      {
+        "q": "What line starts the inner loop over the start index j?",
+        "a": "for j in range(i):"
+      },
+      {
+        "q": "What line checks if the prefix up to j is segmentable and the substring s[j:i] is in wordDict?",
+        "a": "if dp[j] and s[j:i] in wordDict:"
+      },
+      {
+        "q": "What line marks dp[i] as True and breaks the inner loop?",
+        "a": "dp[i] = True\n            break"
+      },
+      {
+        "q": "What line returns the final result for the full string?",
+        "a": "return dp[n]"
+      }
+    ],
+    "pattern": "Dynamic Programming",
+    "skeleton": "dp = [0] * (n + 1)"
+  },
+  "py-31": {
+    "trace": [
+      {
+        "q": "What line initializes the DP array of length n+1 with zeros?",
+        "a": "dp = [0] * (n + 1)"
+      },
+      {
+        "q": "What line sets the base case for an empty string (dp[0] = 1)?",
+        "a": "dp[0] = 1"
+      },
+      {
+        "q": "What line starts the loop over the string indices from 1 to n?",
+        "a": "for i in range(1, n + 1):"
+      },
+      {
+        "q": "What line checks if the current single digit (s[i-1]) is not '0' and adds dp[i-1] to dp[i]?",
+        "a": "if s[i-1] != '0': dp[i] += dp[i-1]"
+      },
+      {
+        "q": "What line checks if the last two digits form a valid number between 10 and 26?",
+        "a": "if i >= 2 and 10 <= int(s[i-2:i]) <= 26:"
+      },
+      {
+        "q": "What line adds dp[i-2] to dp[i] when the two-digit pair is valid?",
+        "a": "dp[i] += dp[i-2]"
+      },
+      {
+        "q": "What line returns the final answer dp[n]?",
+        "a": "return dp[n]"
+      }
+    ],
+    "pattern": "Dynamic Programming",
+    "skeleton": "dp = [0] * (n + 1)"
+  },
+  "py-32": {
+    "trace": [
+      {
+        "q": "What line initializes the 1D DP array with 1s for the first row?",
+        "a": "dp = [1] * n"
+      },
+      {
+        "q": "What line starts the loop over rows from the second row onward?",
+        "a": "for i in range(1, m):"
+      },
+      {
+        "q": "What line starts the inner loop over columns from the second column onward?",
+        "a": "for j in range(1, n):"
+      },
+      {
+        "q": "What line updates dp[j] by adding the value from the left (dp[j-1])?",
+        "a": "dp[j] += dp[j-1]"
+      },
+      {
+        "q": "What line returns the final value at the bottom-right corner?",
+        "a": "return dp[-1]"
+      }
+    ],
+    "pattern": "Recursion",
+    "skeleton": "def solve(state):"
+  },
+  "py-33": {
+    "trace": [
+      {
+        "q": "What line initializes the count of 1-bits to zero?",
+        "a": "count = 0"
+      },
+      {
+        "q": "What line starts the loop that continues while n is not zero?",
+        "a": "while n:"
+      },
+      {
+        "q": "What line adds the least significant bit of n to the count?",
+        "a": "count += n & 1"
+      },
+      {
+        "q": "What line shifts n right by one bit to process the next bit?",
+        "a": "n >>= 1"
+      },
+      {
+        "q": "What line returns the final count after the loop ends?",
+        "a": "return count"
+      }
+    ],
+    "pattern": "Hashmap",
+    "skeleton": "seen = {}"
+  },
+  "py-34": {
+    "trace": [
+      {
+        "q": "What line initializes the result variable to 0?",
+        "a": "result = 0"
+      },
+      {
+        "q": "What line starts a loop that iterates 32 times?",
+        "a": "for _ in range(32):"
+      },
+      {
+        "q": "What line builds the result by shifting left and adding the low bit of n?",
+        "a": "result = (result << 1) | (n & 1)"
+      },
+      {
+        "q": "What line shifts n right by one to process the next bit?",
+        "a": "n >>= 1"
+      },
+      {
+        "q": "What line returns the final reversed bits result?",
+        "a": "return result"
+      }
+    ],
+    "pattern": "Hashmap",
+    "skeleton": "seen = {}"
+  },
+  "py-35": {
+    "trace": [
+      {
+        "q": "What line initializes the mask to 32 bits (0xFFFFFFFF)?",
+        "a": "MASK = 0xFFFFFFFF"
+      },
+      {
+        "q": "What line starts the while loop that continues until there is no carry?",
+        "a": "while b != 0:"
+      },
+      {
+        "q": "What line calculates the carry by ANDing a and b, then shifting left by 1, and masking to 32 bits?",
+        "a": "carry = (a & b) << 1 & MASK"
+      },
+      {
+        "q": "What line updates a to the sum without carry (XOR of a and b), masked to 32 bits?",
+        "a": "a = (a ^ b) & MASK"
+      },
+      {
+        "q": "What line updates b to the carry for the next iteration?",
+        "a": "b = carry"
+      },
+      {
+        "q": "What line returns a, handling negative numbers by converting back from 32-bit two's complement?",
+        "a": "return a if a <= 0x7FFFFFFF else ~(a ^ MASK)"
+      }
+    ],
+    "pattern": "Hashmap",
+    "skeleton": "seen = {}"
+  },
+  "py-36": {
+    "trace": [
+      {
+        "q": "What line initializes the four boundaries (top, bottom, left, right)?",
+        "a": "top, bottom, left, right = 0, rows - 1, 0, cols - 1"
+      },
+      {
+        "q": "What line creates the empty result list?",
+        "a": "res = []"
+      },
+      {
+        "q": "What line starts the while loop that continues while boundaries haven't crossed?",
+        "a": "while top <= bottom and left <= right:"
+      },
+      {
+        "q": "What line appends the top row from left to right?",
+        "a": "for i in range(left, right + 1): res.append(matrix[top][i])"
+      },
+      {
+        "q": "What line moves the top boundary down after tracing the top row?",
+        "a": "top += 1"
+      },
+      {
+        "q": "What line appends the right column from top to bottom?",
+        "a": "for i in range(top, bottom + 1): res.append(matrix[i][right])"
+      },
+      {
+        "q": "What line moves the right boundary left after tracing the right column?",
+        "a": "right -= 1"
+      }
+    ],
+    "pattern": "Matrix",
+    "skeleton": "rows, cols = len(matrix), len(matrix[0])"
+  },
+  "py-37": {
+    "trace": [
+      {
+        "q": "What line gets the number of rows (and columns) from the matrix?",
+        "a": "n = len(matrix)"
+      },
+      {
+        "q": "What line starts the outer loop for transposing (iterating over rows)?",
+        "a": "for i in range(n):"
+      },
+      {
+        "q": "What line starts the inner loop for transposing (iterating over columns from i+1)?",
+        "a": "for j in range(i+1, n):"
+      },
+      {
+        "q": "What line swaps the elements at (i, j) and (j, i) to transpose?",
+        "a": "matrix[i][j], matrix[j][i] = matrix[j][i], matrix[i][j]"
+      },
+      {
+        "q": "What line starts the loop to reverse each row?",
+        "a": "for i in range(n):"
+      },
+      {
+        "q": "What line reverses the current row in place?",
+        "a": "matrix[i].reverse()"
+      }
+    ],
+    "pattern": "Matrix",
+    "skeleton": "rows, cols = len(matrix), len(matrix[0])"
+  },
+  "py-38": {
+    "trace": [
+      {
+        "q": "What line gets the number of rows and columns?",
+        "a": "rows, cols = len(matrix), len(matrix[0])"
+      },
+      {
+        "q": "What line initializes a set to store rows that need to be zeroed?",
+        "a": "zero_rows = set()"
+      },
+      {
+        "q": "What line initializes a set to store columns that need to be zeroed?",
+        "a": "zero_cols = set()"
+      },
+      {
+        "q": "What line starts the first pass to record which rows and columns contain a zero?",
+        "a": "for r in range(rows):"
+      },
+      {
+        "q": "What line starts the inner loop over columns?",
+        "a": "for c in range(cols):"
+      },
+      {
+        "q": "What line checks if the current element is zero?",
+        "a": "if matrix[r][c] == 0:"
+      },
+      {
+        "q": "What line adds the current row and column to the sets?",
+        "a": "zero_rows.add(r); zero_cols.add(c)"
+      }
+    ],
+    "pattern": "Matrix",
+    "skeleton": "rows, cols = len(matrix), len(matrix[0])"
+  },
+  "py-39": {
+    "trace": [
+      {
+        "q": "What line initializes the hashmap to track character frequencies?",
+        "a": "freq = {}"
+      },
+      {
+        "q": "What line initializes the window start and max frequency variables?",
+        "a": "window_start, max_freq = 0, 0"
+      },
+      {
+        "q": "What line starts the loop over the string with index and character?",
+        "a": "for window_end, ch in enumerate(s):"
+      },
+      {
+        "q": "What line updates the frequency of the current character?",
+        "a": "freq[ch] = freq.get(ch, 0) + 1"
+      },
+      {
+        "q": "What line updates the max frequency seen so far in the window?",
+        "a": "max_freq = max(max_freq, freq[ch])"
+      },
+      {
+        "q": "What line checks if the window is invalid (needs shrinking)?",
+        "a": "if (window_end - window_start + 1) - max_freq > k:"
+      },
+      {
+        "q": "What line shrinks the window from the left and updates frequency?",
+        "a": "freq[s[window_start]] -= 1\n        window_start += 1"
+      }
+    ],
+    "pattern": "Sliding Window",
+    "skeleton": "window_start, window_sum = 0, 0"
+  },
+  "py-40": {
+    "trace": [
+      {
+        "q": "What line initializes the need-count map for characters in t?",
+        "a": "need = {}"
+      },
+      {
+        "q": "What line populates the need map with character frequencies from t?",
+        "a": "for ch in t: need[ch] = need.get(ch, 0) + 1"
+      },
+      {
+        "q": "What line initializes the sliding window pointers and tracking variables?",
+        "a": "left = 0; need_count = len(t); min_len = float('inf'); result_start = 0"
+      },
+      {
+        "q": "What line starts the loop over s with right index and character?",
+        "a": "for right, ch in enumerate(s):"
+      },
+      {
+        "q": "What line decrements need_count when a needed character is found in the window?",
+        "a": "if ch in need: need[ch] -= 1; if need[ch] >= 0: need_count -= 1"
+      },
+      {
+        "q": "What line shrinks the window from the left while it remains valid?",
+        "a": "while need_count == 0:"
+      },
+      {
+        "q": "What line updates the minimum window and moves left pointer?",
+        "a": "if right - left + 1 < min_len: min_len = right - left + 1; result_start = left; left_char = s[left]; if left_char in need: need[left_char] += 1; if need[left_char] > 0: need_count += 1; left += 1"
+      }
+    ],
+    "pattern": "Sliding Window",
+    "skeleton": "window_start, window_sum = 0, 0"
+  },
+  "py-41": {
+    "trace": [
+      {
+        "q": "What line initializes the count of palindromic substrings to zero?",
+        "a": "count = 0"
+      },
+      {
+        "q": "What line starts the outer loop over each possible center index?",
+        "a": "for center in range(2 * len(s) - 1):"
+      },
+      {
+        "q": "What line computes the left index from the center?",
+        "a": "left = center // 2"
+      },
+      {
+        "q": "What line computes the right index from the center?",
+        "a": "right = left + (center % 2)"
+      },
+      {
+        "q": "What line starts the while loop to expand outward while the substring is a palindrome?",
+        "a": "while left >= 0 and right < len(s) and s[left] == s[right]:"
+      },
+      {
+        "q": "What line increments the count for each successful expansion?",
+        "a": "count += 1"
+      },
+      {
+        "q": "What line moves the left pointer one step left and the right pointer one step right?",
+        "a": "left -= 1; right += 1"
+      }
+    ],
+    "pattern": "String",
+    "skeleton": "result = []"
+  },
+  "py-42": {
+    "trace": [
+      {
+        "q": "What line initializes the result variable to an empty string?",
+        "a": "result = \"\""
+      },
+      {
+        "q": "What line starts the outer loop iterating over each index in the string?",
+        "a": "for i in range(len(s)):"
+      },
+      {
+        "q": "What line calls the helper to expand around center for odd-length palindromes?",
+        "a": "odd = expand_around_center(s, i, i)"
+      },
+      {
+        "q": "What line calls the helper to expand around center for even-length palindromes?",
+        "a": "even = expand_around_center(s, i, i + 1)"
+      },
+      {
+        "q": "What line updates result to the longer of the current result and the odd palindrome?",
+        "a": "result = max(result, odd, even, key=len)"
+      },
+      {
+        "q": "What line returns the final longest palindromic substring?",
+        "a": "return result"
+      }
+    ],
+    "pattern": "String",
+    "skeleton": "result = []"
+  },
+  "py-43": {
+    "trace": [
+      {
+        "q": "What line creates a dummy head node with value 0?",
+        "a": "dummy = ListNode(0)"
+      },
+      {
+        "q": "What line initializes a pointer 'tail' to point to the dummy node?",
+        "a": "tail = dummy"
+      },
+      {
+        "q": "What line starts the while loop that runs while both lists are non-empty?",
+        "a": "while list1 and list2:"
+      },
+      {
+        "q": "What line checks if the current node in list1 has a smaller value than the one in list2?",
+        "a": "if list1.val < list2.val:"
+      },
+      {
+        "q": "What line attaches the current node of list1 to the tail and advances list1?",
+        "a": "tail.next, list1 = list1, list1.next"
+      },
+      {
+        "q": "What line attaches the current node of list2 to the tail and advances list2 (the else branch)?",
+        "a": "tail.next, list2 = list2, list2.next"
+      },
+      {
+        "q": "What line advances the tail pointer to the newly attached node?",
+        "a": "tail = tail.next"
+      }
+    ],
+    "pattern": "Linked List",
+    "skeleton": "prev, curr = None, head"
+  },
+  "py-44": {
+    "trace": [
+      {
+        "q": "What line creates a dummy node to simplify edge cases?",
+        "a": "dummy = ListNode(0, head)"
+      },
+      {
+        "q": "What line initializes the lead pointer to the dummy node?",
+        "a": "lead = dummy"
+      },
+      {
+        "q": "What line initializes the trailing pointer to the dummy node?",
+        "a": "trail = dummy"
+      },
+      {
+        "q": "What line advances the lead pointer n steps ahead?",
+        "a": "for _ in range(n): lead = lead.next"
+      },
+      {
+        "q": "What line moves both pointers together until lead reaches the last node?",
+        "a": "while lead.next: lead = lead.next; trail = trail.next"
+      },
+      {
+        "q": "What line removes the target node by skipping it?",
+        "a": "trail.next = trail.next.next"
+      },
+      {
+        "q": "What line returns the new head (skipping the dummy)?",
+        "a": "return dummy.next"
+      }
+    ],
+    "pattern": "Linked List",
+    "skeleton": "prev, curr = None, head"
+  },
+  "py-45": {
+    "trace": [
+      {
+        "q": "What line initializes the previous pointer to None and current pointer to head?",
+        "a": "prev, curr = None, head"
+      },
+      {
+        "q": "What line starts the while loop that continues until curr is None?",
+        "a": "while curr:"
+      },
+      {
+        "q": "What line saves the next node before overwriting curr.next?",
+        "a": "next_node = curr.next"
+      },
+      {
+        "q": "What line reverses the link by pointing curr.next to prev?",
+        "a": "curr.next = prev"
+      },
+      {
+        "q": "What line advances prev to the current node?",
+        "a": "prev = curr"
+      },
+      {
+        "q": "What line advances curr to the saved next node?",
+        "a": "curr = next_node"
+      },
+      {
+        "q": "What line returns the new head (prev after the loop)?",
+        "a": "return prev"
+      }
+    ],
+    "pattern": "Linked List",
+    "skeleton": "prev, curr = None, head"
+  },
+  "py-46": {
+    "trace": [
+      {
+        "q": "What line initializes the slow and fast pointers to the head?",
+        "a": "slow = fast = head"
+      },
+      {
+        "q": "What line starts the while loop that continues as long as fast and fast.next are not None?",
+        "a": "while fast and fast.next:"
+      },
+      {
+        "q": "What line advances the slow pointer by one step?",
+        "a": "slow = slow.next"
+      },
+      {
+        "q": "What line advances the fast pointer by two steps?",
+        "a": "fast = fast.next.next"
+      },
+      {
+        "q": "What line checks if slow and fast pointers meet, indicating a cycle?",
+        "a": "if slow == fast:"
+      },
+      {
+        "q": "What line returns True when a cycle is detected?",
+        "a": "return True"
+      },
+      {
+        "q": "What line returns False after the loop ends (no cycle)?",
+        "a": "return False"
+      }
+    ],
+    "pattern": "Linked List",
+    "skeleton": "prev, curr = None, head"
+  },
+  "py-47": {
+    "trace": [
+      {
+        "q": "What line initializes the slow and fast pointers to find the middle?",
+        "a": "slow = fast = head"
+      },
+      {
+        "q": "What line moves the pointers to find the middle of the list?",
+        "a": "while fast and fast.next:"
+      },
+      {
+        "q": "What line advances slow by one and fast by two?",
+        "a": "slow, fast = slow.next, fast.next.next"
+      },
+      {
+        "q": "What line sets the second half head after splitting?",
+        "a": "second = slow.next"
+      },
+      {
+        "q": "What line disconnects the first half from the second?",
+        "a": "slow.next = None"
+      },
+      {
+        "q": "What line starts the loop to reverse the second half?",
+        "a": "while second:"
+      },
+      {
+        "q": "What line stores the next node before reversing the link?",
+        "a": "next_node = second.next"
+      },
+      {
+        "q": "What line reverses the pointer of the current node?",
+        "a": "second.next = prev"
+      },
+      {
+        "q": "What line advances prev and second for the next iteration?",
+        "a": "prev, second = second, next_node"
+      },
+      {
+        "q": "What line initializes the merge pointers after reversal?",
+        "a": "first, second = head, prev"
+      },
+      {
+        "q": "What line starts the loop to merge the two halves?",
+        "a": "while second:"
+      },
+      {
+        "q": "What line stores the next nodes for both halves?",
+        "a": "first_next, second_next = first.next, second.next"
+      },
+      {
+        "q": "What line links the first node to the second half node?",
+        "a": "first.next = second"
+      },
+      {
+        "q": "What line links the second half node to the remaining first half?",
+        "a": "second.next = first_next"
+      },
+      {
+        "q": "What line advances both pointers for the next iteration?",
+        "a": "first, second = first_next, second_next"
+      }
+    ],
+    "pattern": "Linked List",
+    "skeleton": "prev, curr = None, head"
+  },
+  "py-48": {
+    "trace": [
+      {
+        "q": "What line checks if the current node is None (base case)?",
+        "a": "if root is None:"
+      },
+      {
+        "q": "What line returns 0 for a None node?",
+        "a": "return 0"
+      },
+      {
+        "q": "What line recursively computes the depth of the left subtree?",
+        "a": "left_depth = solve(root.left)"
+      },
+      {
+        "q": "What line recursively computes the depth of the right subtree?",
+        "a": "right_depth = solve(root.right)"
+      },
+      {
+        "q": "What line returns 1 plus the maximum of the two subtree depths?",
+        "a": "return 1 + max(left_depth, right_depth)"
+      }
+    ],
+    "pattern": "Recursion",
+    "skeleton": "def solve(state):"
+  },
+  "py-49": {
+    "trace": [
+      {
+        "q": "What line checks if both nodes are None (base case for equality)?",
+        "a": "if p is None and q is None:"
+      },
+      {
+        "q": "What line returns True when both are None?",
+        "a": "return True"
+      },
+      {
+        "q": "What line checks if either node is None (mismatch in shape)?",
+        "a": "if p is None or q is None:"
+      },
+      {
+        "q": "What line returns False for shape mismatch?",
+        "a": "return False"
+      },
+      {
+        "q": "What line checks if the values of the two nodes are different?",
+        "a": "if p.val != q.val:"
+      },
+      {
+        "q": "What line returns False for value mismatch?",
+        "a": "return False"
+      },
+      {
+        "q": "What line recursively checks left and right subtrees and returns the result?",
+        "a": "return solve(p.left, q.left) and solve(p.right, q.right)"
+      }
+    ],
+    "pattern": "Tree Traversal",
+    "skeleton": "def dfs(node):"
+  },
+  "py-50": {
+    "trace": [
+      {
+        "q": "What line checks if the current node is None (base case)?",
+        "a": "if node is None:"
+      },
+      {
+        "q": "What line returns None for the base case?",
+        "a": "return None"
+      },
+      {
+        "q": "What line swaps the left and right children of the current node?",
+        "a": "node.left, node.right = node.right, node.left"
+      },
+      {
+        "q": "What line recursively calls dfs on the left child?",
+        "a": "dfs(node.left)"
+      },
+      {
+        "q": "What line recursively calls dfs on the right child?",
+        "a": "dfs(node.right)"
+      },
+      {
+        "q": "What line returns the current node after swapping?",
+        "a": "return node"
+      },
+      {
+        "q": "What line calls the dfs helper on the root and returns the result?",
+        "a": "return dfs(root)"
+      }
+    ],
+    "pattern": "Tree Traversal",
+    "skeleton": "def dfs(node):"
+  },
+  "py-51": {
+    "trace": [
+      {
+        "q": "What line initializes the queue with the root node?",
+        "a": "queue = [root]"
+      },
+      {
+        "q": "What line initializes the result list to store level values?",
+        "a": "result = []"
+      },
+      {
+        "q": "What line starts the while loop that continues while the queue is not empty?",
+        "a": "while queue:"
+      },
+      {
+        "q": "What line snapshots the current queue length to process one full level?",
+        "a": "level_size = len(queue)"
+      },
+      {
+        "q": "What line initializes an empty list for the current level's values?",
+        "a": "level_vals = []"
+      },
+      {
+        "q": "What line starts the inner for loop to process each node in the current level?",
+        "a": "for _ in range(level_size):"
+      },
+      {
+        "q": "What line pops the front node from the queue and appends its value to level_vals?",
+        "a": "node = queue.pop(0); level_vals.append(node.val)"
+      }
+    ],
+    "pattern": "Recursion",
+    "skeleton": "def solve(state):"
+  },
+  "py-52": {
+    "trace": [
+      {
+        "q": "What line defines the recursive helper function with the current node and its allowed value range?",
+        "a": "def dfs(node, low=float('-inf'), high=float('inf')):"
+      },
+      {
+        "q": "What line checks if the current node is None (empty subtree) and returns True if so?",
+        "a": "if not node: return True"
+      },
+      {
+        "q": "What line checks whether the node's value violates the lower bound or upper bound?",
+        "a": "if not (low < node.val < high): return False"
+      },
+      {
+        "q": "What line recursively checks the left subtree, updating the upper bound to the current node's value?",
+        "a": "return dfs(node.left, low, node.val) and dfs(node.right, node.val, high)"
+      },
+      {
+        "q": "What line starts the validation by calling the recursive helper on the root node?",
+        "a": "return dfs(root)"
+      }
+    ],
+    "pattern": "Tree Traversal",
+    "skeleton": "def dfs(node):"
+  },
+  "py-53": {
+    "trace": [
+      {
+        "q": "What's the first step?",
+        "a": "Identify the core operation."
+      }
+    ],
+    "pattern": "Tree Traversal",
+    "skeleton": "def dfs(node):"
+  },
+  "py-54": {
+    "trace": [
+      {
+        "q": "What line initializes the current node to the root?",
+        "a": "curr = root"
+      },
+      {
+        "q": "What line starts the loop that continues as long as curr is not None?",
+        "a": "while curr:"
+      },
+      {
+        "q": "What line checks if both p and q are less than the current node's value?",
+        "a": "if p.val < curr.val and q.val < curr.val:"
+      },
+      {
+        "q": "What line moves to the left child?",
+        "a": "curr = curr.left"
+      },
+      {
+        "q": "What line checks if both p and q are greater than the current node's value?",
+        "a": "elif p.val > curr.val and q.val > curr.val:"
+      },
+      {
+        "q": "What line moves to the right child?",
+        "a": "curr = curr.right"
+      },
+      {
+        "q": "What line returns the current node as the LCA when the split occurs?",
+        "a": "else: return curr"
+      }
+    ],
+    "pattern": "Tree Traversal",
+    "skeleton": "def dfs(node):"
+  },
+  "py-55": {
+    "trace": [
+      {
+        "q": "What line checks if root is None (base case for recursion)?",
+        "a": "if not root: return False"
+      },
+      {
+        "q": "What line checks if the tree rooted at root exactly matches subRoot using a helper?",
+        "a": "if is_same(root, subRoot): return True"
+      },
+      {
+        "q": "What line recursively checks the left child of root?",
+        "a": "return solve(root.left, subRoot) or solve(root.right, subRoot)"
+      },
+      {
+        "q": "What line defines the helper function is_same(p, q) that checks if two trees are identical?",
+        "a": "def is_same(p, q):"
+      },
+      {
+        "q": "What line in is_same checks if both nodes are None?",
+        "a": "if not p and not q: return True"
+      },
+      {
+        "q": "What line in is_same checks if one node is None or values differ?",
+        "a": "if not p or not q or p.val != q.val: return False"
+      },
+      {
+        "q": "What line in is_same recursively checks left and right subtrees?",
+        "a": "return is_same(p.left, q.left) and is_same(p.right, q.right)"
+      }
+    ],
+    "pattern": "Recursion",
+    "skeleton": "def solve(state):"
+  },
+  "py-56": {
+    "trace": [
+      {
+        "q": "What line creates a hashmap mapping each value in inorder to its index for O(1) lookups?",
+        "a": "inorder_index = {val: i for i, val in enumerate(inorder)}"
+      },
+      {
+        "q": "What line defines the recursive helper function that takes the current bounds of preorder and inorder slices?",
+        "a": "def dfs(pre_start, pre_end, in_start, in_end):"
+      },
+      {
+        "q": "What line checks if the current slice is empty (base case) and returns None?",
+        "a": "if pre_start > pre_end or in_start > in_end: return None"
+      },
+      {
+        "q": "What line gets the root value from the first element of the current preorder slice?",
+        "a": "root_val = preorder[pre_start]"
+      },
+      {
+        "q": "What line finds the index of the root value in the inorder list using the hashmap?",
+        "a": "root_idx = inorder_index[root_val]"
+      },
+      {
+        "q": "What line calculates the number of nodes in the left subtree?",
+        "a": "left_size = root_idx - in_start"
+      },
+      {
+        "q": "What line creates the root TreeNode and recursively builds its left and right children?",
+        "a": "root = TreeNode(root_val, dfs(pre_start+1, pre_start+left_size, in_start, root_idx-1), dfs(pre_start+left_size+1, pre_end, root_idx+1, in_end))"
+      },
+      {
+        "q": "What line returns the root of the constructed tree from the main solve function?",
+        "a": "return dfs(0, len(preorder)-1, 0, len(inorder)-1)"
+      }
+    ],
+    "pattern": "Tree Traversal",
+    "skeleton": "def dfs(node):"
+  },
+  "py-57": {
+    "trace": [
+      {
+        "q": "What's the first step?",
+        "a": "Identify the core operation."
+      }
+    ],
+    "pattern": "Tree Traversal",
+    "skeleton": "def dfs(node):"
+  },
+  "py-58": {
+    "trace": [
+      {
+        "q": "What line imports the heapq module for min-heap operations?",
+        "a": "import heapq"
+      },
+      {
+        "q": "What line initializes an empty min-heap list?",
+        "a": "heap = []"
+      },
+      {
+        "q": "What line starts a loop over each linked list in the input lists?",
+        "a": "for i, lst in enumerate(lists):"
+      },
+      {
+        "q": "What line pushes the first node of each non-empty list into the heap with a tie-breaking counter?",
+        "a": "heapq.heappush(heap, (lst.val, i, lst))"
+      },
+      {
+        "q": "What line creates a dummy head node to simplify building the result list?",
+        "a": "dummy = ListNode(0)"
+      },
+      {
+        "q": "What line initializes a pointer to the current node, starting at dummy?",
+        "a": "curr = dummy"
+      },
+      {
+        "q": "What line starts the while loop that continues until the heap is empty?",
+        "a": "while heap:"
+      },
+      {
+        "q": "What line pops the smallest node from the heap?",
+        "a": "val, i, node = heapq.heappop(heap)"
+      },
+      {
+        "q": "What line appends the popped node to the result list?",
+        "a": "curr.next = node"
+      },
+      {
+        "q": "What line advances the current pointer to the newly added node?",
+        "a": "curr = curr.next"
+      },
+      {
+        "q": "What line checks if the popped node has a next node?",
+        "a": "if node.next:"
+      },
+      {
+        "q": "What line pushes the next node of the same list into the heap?",
+        "a": "heapq.heappush(heap, (node.next.val, i, node.next))"
+      },
+      {
+        "q": "What line returns the head of the merged list (skipping the dummy)?",
+        "a": "return dummy.next"
+      }
+    ],
+    "pattern": "Linked List",
+    "skeleton": "prev, curr = None, head"
+  },
+  "py-59": {
+    "trace": [
+      {
+        "q": "What line initializes the DP array with length n+1 filled with zeros?",
+        "a": "dp = [0] * (n + 1)"
+      },
+      {
+        "q": "What line sets the best sum to the first element's value?",
+        "a": "best = nums[0]"
+      },
+      {
+        "q": "What line starts the loop from index 1 to n-1?",
+        "a": "for i in range(1, n):"
+      },
+      {
+        "q": "What line computes the maximum of extending the subarray or starting fresh?",
+        "a": "dp[i] = max(nums[i], dp[i-1] + nums[i])"
+      },
+      {
+        "q": "What line updates the best sum seen so far?",
+        "a": "best = max(best, dp[i])"
+      },
+      {
+        "q": "What line returns the best sum after the loop?",
+        "a": "return best"
+      }
+    ],
+    "pattern": "Dynamic Programming",
+    "skeleton": "dp = [0] * (n + 1)"
+  },
+  "py-60": {
+    "trace": [
+      {
+        "q": "What line initializes the running max, running min, and overall result to the first element?",
+        "a": "max_prod = min_prod = result = nums[0]"
+      },
+      {
+        "q": "What line starts the loop over the remaining elements?",
+        "a": "for i in range(1, len(nums)):"
+      },
+      {
+        "q": "What line stores the current number in a variable?",
+        "a": "n = nums[i]"
+      },
+      {
+        "q": "What line computes the new running max as the max of n, n * max_prod, and n * min_prod?",
+        "a": "new_max = max(n, n * max_prod, n * min_prod)"
+      },
+      {
+        "q": "What line computes the new running min as the min of n, n * max_prod, and n * min_prod?",
+        "a": "new_min = min(n, n * max_prod, n * min_prod)"
+      },
+      {
+        "q": "What line updates max_prod and min_prod with the new values?",
+        "a": "max_prod, min_prod = new_max, new_min"
+      },
+      {
+        "q": "What line updates the overall result to be the max of result and max_prod?",
+        "a": "result = max(result, max_prod)"
+      }
+    ],
+    "pattern": "General Problem-Solving",
+    "skeleton": "for item in input:"
+  },
+  "py-61": {
+    "trace": [
+      {
+        "q": "What line defines the backtracking helper function inside solve?",
+        "a": "def backtrack(r, c, idx):"
+      },
+      {
+        "q": "What line checks if the current index equals the length of the word (meaning we found the whole word)?",
+        "a": "if idx == len(word): return True"
+      },
+      {
+        "q": "What line checks if the current cell is out of bounds or doesn't match the needed character?",
+        "a": "if r < 0 or r >= len(board) or c < 0 or c >= len(board[0]) or board[r][c] != word[idx]: return False"
+      },
+      {
+        "q": "What line temporarily marks the current cell as visited (e.g., with an empty string)?",
+        "a": "temp, board[r][c] = board[r][c], ''"
+      },
+      {
+        "q": "What line recursively explores all four adjacent directions?",
+        "a": "found = backtrack(r+1, c, idx+1) or backtrack(r-1, c, idx+1) or backtrack(r, c+1, idx+1) or backtrack(r, c-1, idx+1)"
+      },
+      {
+        "q": "What line restores the original character after backtracking?",
+        "a": "board[r][c] = temp"
+      },
+      {
+        "q": "What line starts the outer loop over all board cells to try each as a starting point?",
+        "a": "for r in range(len(board)):"
+      }
+    ],
+    "pattern": "Backtracking",
+    "skeleton": "def backtrack(path, remaining):"
+  },
+  "py-62": {
+    "trace": [
+      {
+        "q": "What line initializes the deque for BFS?",
+        "a": "from collections import deque"
+      },
+      {
+        "q": "What line gets the number of rows and columns of the grid?",
+        "a": "rows, cols = len(grid), len(grid[0])"
+      },
+      {
+        "q": "What line initializes the island count to zero?",
+        "a": "count = 0"
+      },
+      {
+        "q": "What line starts the outer loop over each row?",
+        "a": "for r in range(rows):"
+      },
+      {
+        "q": "What line starts the inner loop over each column?",
+        "a": "for c in range(cols):"
+      },
+      {
+        "q": "What line checks if the current cell is land ('1')?",
+        "a": "if grid[r][c] == '1':"
+      },
+      {
+        "q": "What line increments the island count and starts BFS from this cell?",
+        "a": "count += 1; queue = deque([(r, c)])"
+      }
+    ],
+    "pattern": "BFS/DFS",
+    "skeleton": "from collections import deque"
+  },
+  "py-63": {
+    "trace": [
+      {
+        "q": "What line initializes the state array for all courses (0 = unvisited, 1 = on stack, 2 = done)?",
+        "a": "state = [0] * numCourses"
+      },
+      {
+        "q": "What line defines the recursive DFS helper function that takes a course index?",
+        "a": "def dfs(course):"
+      },
+      {
+        "q": "What line checks if the current course is already on the recursion stack (cycle detected)?",
+        "a": "if state[course] == 1:"
+      },
+      {
+        "q": "What line returns False when a cycle is detected?",
+        "a": "return False"
+      },
+      {
+        "q": "What line marks the current course as being on the recursion stack?",
+        "a": "state[course] = 1"
+      },
+      {
+        "q": "What line loops over all neighbors (prerequisites) of the current course?",
+        "a": "for prereq in prerequisites[course]:"
+      },
+      {
+        "q": "What line recursively calls dfs on the neighbor and returns False if a cycle is found?",
+        "a": "if not dfs(prereq): return False"
+      }
+    ],
+    "pattern": "Recursion",
+    "skeleton": "def solve(state):"
+  },
+  "py-64": {
+    "trace": [
+      {
+        "q": "What line initializes the hashmap to map original nodes to their clones?",
+        "a": "clones = {}"
+      },
+      {
+        "q": "What line initializes the stack for DFS traversal?",
+        "a": "stack = [node]"
+      },
+      {
+        "q": "What line creates the clone of the starting node and stores it in the map?",
+        "a": "clones[node] = Node(node.val)"
+      },
+      {
+        "q": "What line starts the while loop that processes nodes from the stack?",
+        "a": "while stack:"
+      },
+      {
+        "q": "What line pops the current node from the stack?",
+        "a": "cur = stack.pop()"
+      },
+      {
+        "q": "What line starts the loop over the current node's neighbors?",
+        "a": "for neighbor in cur.neighbors:"
+      },
+      {
+        "q": "What line checks if the neighbor has not been cloned yet?",
+        "a": "if neighbor not in clones:"
+      }
+    ],
+    "pattern": "BFS/DFS",
+    "skeleton": "from collections import deque"
+  },
+  "py-65": {
+    "trace": [
+      {
+        "q": "What line initializes the set for cells reachable from the Pacific Ocean?",
+        "a": "pacific = set()"
+      },
+      {
+        "q": "What line initializes the set for cells reachable from the Atlantic Ocean?",
+        "a": "atlantic = set()"
+      },
+      {
+        "q": "What line gets the number of rows and columns from the heights grid?",
+        "a": "rows, cols = len(heights), len(heights[0])"
+      },
+      {
+        "q": "What line starts a loop over all border cells to perform DFS from the Pacific side?",
+        "a": "for r in range(rows):"
+      },
+      {
+        "q": "What line starts the DFS function definition that explores uphill neighbors?",
+        "a": "def dfs(r, c, visited, prev_height):"
+      },
+      {
+        "q": "What line checks if the current cell is out of bounds or already visited or too low?",
+        "a": "if r < 0 or r >= rows or c < 0 or c >= cols or (r, c) in visited or heights[r][c] < prev_height:"
+      },
+      {
+        "q": "What line adds the current cell to the visited set and recursively explores its four neighbors?",
+        "a": "visited.add((r, c)); dfs(r+1, c, visited, heights[r][c]); dfs(r-1, c, visited, heights[r][c]); dfs(r, c+1, visited, heights[r][c]); dfs(r, c-1, visited, heights[r][c])"
+      }
+    ],
+    "pattern": "General Problem-Solving",
+    "skeleton": "for item in input:"
+  },
+  "py-66": {
+    "trace": [
+      {
+        "q": "What line builds the trie from the list of words?",
+        "a": "trie = {}; for w in words: t = trie; for c in w: t = t.setdefault(c, {}); t['#'] = w"
+      },
+      {
+        "q": "What line initializes the result list to collect found words?",
+        "a": "res = []"
+      },
+      {
+        "q": "What line starts the nested loops over all board cells?",
+        "a": "for i in range(len(board)): for j in range(len(board[0])):"
+      },
+      {
+        "q": "What line defines the backtracking helper function inside solve?",
+        "a": "def backtrack(i, j, node):"
+      },
+      {
+        "q": "What line checks if the current board cell is out of bounds or already visited?",
+        "a": "if i < 0 or i >= len(board) or j < 0 or j >= len(board[0]) or board[i][j] == '#': return"
+      },
+      {
+        "q": "What line checks if the current character is not in the current trie node?",
+        "a": "if board[i][j] not in node: return"
+      },
+      {
+        "q": "What line marks the cell as visited, recurses in four directions, and restores the cell?",
+        "a": "tmp, board[i][j] = board[i][j], '#'; backtrack(i+1,j,node[tmp]); backtrack(i-1,j,node[tmp]); backtrack(i,j+1,node[tmp]); backtrack(i,j-1,node[tmp]); board[i][j] = tmp"
+      }
+    ],
+    "pattern": "Backtracking",
+    "skeleton": "def backtrack(path, remaining):"
   }
 }

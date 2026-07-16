@@ -9,7 +9,7 @@ import tempfile
 from datetime import datetime, timedelta
 
 from dotenv import load_dotenv
-from flask import Flask, jsonify, request, render_template
+from flask import Flask, jsonify, request, render_template, redirect
 from openai import OpenAI
 
 load_dotenv()
@@ -438,22 +438,30 @@ def topic_for(q):
     return "other-" + q["lang"]
 
 
+def _atomic_json(path, data):
+    """Write JSON atomically: write to temp file, then rename. Prevents corruption on crash."""
+    tmp = path + ".tmp"
+    with open(tmp, "w") as f:
+        json.dump(data, f)
+    os.replace(tmp, path)
+
+
 def save_progress():
-    json.dump(PROGRESS, open(PROGRESS_FILE, "w"))
+    _atomic_json(PROGRESS_FILE, PROGRESS)
 
 
 def log_history(entry):
     entry["ts"] = datetime.now().isoformat()
     HISTORY.append(entry)
-    json.dump(HISTORY, open(HISTORY_FILE, "w"))
+    _atomic_json(HISTORY_FILE, HISTORY)
 
 
 def save_chats():
-    json.dump(CHATS, open(CHATS_FILE, "w"))
+    _atomic_json(CHATS_FILE, CHATS)
 
 
 def save_replay_comments():
-    json.dump(REPLAY_COMMENTS, open(REPLAY_COMMENTS_FILE, "w"))
+    _atomic_json(REPLAY_COMMENTS_FILE, REPLAY_COMMENTS)
 
 
 def split_wrap_up_reply(reply, taxonomy=CONCEPT_TAXONOMY):
@@ -601,7 +609,39 @@ def run_python_case(harness, code):
 
 @app.route("/")
 def index():
+    # Show onboarding for new users (no progress, no deadline set)
+    has_progress = any(is_solved(qid) for qid in PROGRESS if qid in QUESTIONS)
+    has_deadline = isinstance(PROGRESS.get("_deadline"), dict) and PROGRESS["_deadline"].get("date")
+    if not has_progress and not has_deadline:
+        return redirect("/onboarding")
+    return redirect("/dashboard")
+
+
+@app.route("/practice")
+def practice():
     return render_template("index.html", concept_taxonomies={"data": CONCEPT_TAXONOMY, "ai": CONCEPT_TAXONOMY_AI})
+
+
+@app.route("/onboarding")
+def onboarding():
+    return render_template("onboarding.html")
+
+
+@app.route("/api/onboarding", methods=["POST"])
+def save_onboarding():
+    data = request.json or {}
+    deadline = data.get("deadline", "").strip()
+    strongest = data.get("strongest", "").strip()
+    weakest = data.get("weakest", "").strip()
+    if deadline:
+        try:
+            datetime.fromisoformat(deadline)
+            PROGRESS["_deadline"] = {"date": deadline}
+        except ValueError:
+            pass
+    PROGRESS["_onboarding"] = {"strongest": strongest, "weakest": weakest}
+    save_progress()
+    return jsonify({"ok": True})
 
 
 @app.route("/dashboard")
