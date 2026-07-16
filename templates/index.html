@@ -209,6 +209,41 @@
   .q-item.due:hover { background: rgba(230,180,34,0.13); }
   .q-browse-hint { font-size: 11px; color: var(--text-faint); padding: 12px 12px 4px; line-height: 1.5; border-top: 1px solid var(--border-soft); margin-top: 8px; }
 
+  /* ---- Feature Compass: legible feature map (icon + label, grouped families) ---- */
+  .cc-compass { margin: 22px 0 4px; text-align: left; }
+  .cc-compass-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em; color: var(--text-faint); text-align: center; margin-bottom: 12px; }
+  .cc-families { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; }
+  .cc-family { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 12px 11px; display: flex; flex-direction: column; gap: 8px; transition: border-color 0.12s ease; }
+  .cc-family:hover { border-color: var(--accent); }
+  .cc-family-head { display: flex; align-items: center; gap: 7px; }
+  .cc-family-ico { display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; border-radius: 7px; background: var(--accent-soft); color: var(--accent); flex-shrink: 0; }
+  .cc-family-ico svg { width: 15px; height: 15px; }
+  .cc-family-name { font-size: 12.5px; font-weight: 600; color: var(--text); }
+  .cc-family-tools { display: flex; flex-direction: column; gap: 5px; }
+  .cc-tool { display: flex; align-items: center; gap: 7px; font-size: 11.5px; color: var(--text-dim); cursor: default; }
+  .cc-tool svg { width: 13px; height: 13px; color: var(--text-faint); flex-shrink: 0; }
+  .cc-tool .cc-tool-act { color: var(--accent); cursor: pointer; margin-left: auto; font-size: 11px; opacity: 0; transition: opacity 0.12s ease; }
+  .cc-family:hover .cc-tool .cc-tool-act { opacity: 1; }
+  .cc-tool-info { position: relative; }
+  .cc-tool-info .cc-tip { display: none; position: absolute; bottom: 130%; left: 0; width: 210px; background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; font-size: 11.5px; color: var(--text-dim); line-height: 1.45; z-index: 30; box-shadow: var(--shadow); }
+  .cc-tool-info:hover .cc-tip { display: block; }
+  .cc-tool-info .cc-tip b { color: var(--text); font-weight: 600; }
+
+  /* ---- inline SVG icon helpers (replace emoji buttons) ---- */
+  .icon { width: 15px; height: 15px; display: inline-block; vertical-align: -2px; }
+  .icon-sm { width: 13px; height: 13px; }
+  button .icon { margin-right: 5px; }
+
+  /* ---- overflow "More drills" menu ---- */
+  .more-drills-wrap { position: relative; display: inline-block; }
+  .drills-menu { display: none; position: absolute; top: calc(100% + 6px); left: 0; z-index: 40; background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 6px; box-shadow: var(--shadow); min-width: 220px; }
+  .drills-menu.open { display: block; }
+  .drills-menu .dm-item { display: flex; align-items: center; gap: 8px; width: 100%; text-align: left; padding: 8px 9px; border-radius: 7px; background: transparent; border: none; color: var(--text-dim); font-size: 12.5px; cursor: pointer; font-family: inherit; }
+  .drills-menu .dm-item:hover { background: var(--card); color: var(--text); }
+  .drills-menu .dm-item svg { width: 14px; height: 14px; color: var(--accent); flex-shrink: 0; }
+  .drills-menu .dm-sep { height: 1px; background: var(--border-soft); margin: 5px 2px; }
+  .drills-menu .dm-group { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-faint); padding: 4px 9px 2px; }
+
   .q-section-header {
     position: sticky;
     top: 0;
@@ -462,7 +497,7 @@
   }
   .canvas-tools { display: flex; gap: 6px; align-items: center; }
   .tool-btn.active { background: var(--accent); color: #0e1015; border-color: var(--accent); }
-  #clarify-sql-btn.active { background: var(--accent); color: #0e1015; border-color: var(--accent); }
+  #clarify-menu.active, #more-drills-btn.active { background: var(--accent); color: #0e1015; border-color: var(--accent); }
   #curveball-card { border: 1px dashed var(--warn); border-radius: 8px; margin: 0 12px 10px; padding: 10px 12px; background: rgba(245,197,66,0.06); }
   #tool-mic.active { background: var(--accent); color: #0e1015; border-color: var(--accent); }
   @keyframes micPulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(124,108,246,0.5); } 50% { box-shadow: 0 0 0 6px rgba(124,108,246,0); } }
@@ -926,6 +961,34 @@
 </style>
 </head>
 <body>
+<!-- inline SVG icon sprite (Lucide-style, single stroke) — replaces emoji feature buttons -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <g id="i-target"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.5"/></g>
+    <g id="i-loop"><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/><path d="M3 21v-5h5"/></g>
+    <g id="i-bandage"><path d="M12 3v6"/><path d="M12 15v6"/><path d="M3 12h6"/><path d="M15 12h6"/><rect x="7.5" y="7.5" width="9" height="9" rx="2" transform="rotate(45 12 12)"/></g>
+    <g id="i-play"><polygon points="6 4 20 12 6 20 6 4"/></g>
+    <g id="i-bug"><rect x="8" y="8" width="8" height="11" rx="4"/><path d="M8 12H4"/><path d="M20 12h-4"/><path d="M9 8l-2-3"/><path d="M15 8l2-3"/><path d="M12 8V5"/></g>
+    <g id="i-bulb"><path d="M9 18h6"/><path d="M10 21h4"/><path d="M12 3a6 6 0 0 0-4 10.5c.7.7 1 1.3 1 2.5h6c0-1.2.3-1.8 1-2.5A6 6 0 0 0 12 3Z"/></g>
+    <g id="i-wand"><path d="M15 4V2"/><path d="M15 10V8"/><path d="M12 7h2"/><path d="M18 7h2"/><path d="M3 21l10-10"/><path d="M14 7l7 7"/></g>
+    <g id="i-psy"><path d="M4 19V5"/><path d="M4 19c2 0 3-2 4-2s1 2 3 2 2-2 4-2 1 2 3 2"/></g>
+    <g id="i-rewind"><polygon points="11 5 3 12 11 19 11 5"/><polygon points="20 5 12 12 20 19 20 5"/></g>
+    <g id="i-shoe"><path d="M3 17h13a3 3 0 0 0 3-3v-1l-4-4-5 4v7"/><path d="M3 17v-4l4-1"/></g>
+    <g id="i-mask"><path d="M3 7c3 0 5 2 9 2s6-2 9-2 1 9-9 9-12-9-9-9Z"/></g>
+    <g id="i-fire"><path d="M12 3c1 3 4 4 4 8a4 4 0 0 1-8 0c0-2 1-3 2-4 1 1.5 1.5 2 2 2 0-2-1-4-2-6Z"/></g>
+    <g id="i-shield"><path d="M12 3l7 3v6c0 5-3 8-7 9-4-1-7-4-7-9V6Z"/></g>
+    <g id="i-zap"><polygon points="13 2 4 14 11 14 10 22 20 9 13 9 13 2"/></g>
+    <g id="i-repeat"><polyline points="17 2 21 6 17 10"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 22 3 18 7 14"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></g>
+    <g id="i-theater"><path d="M3 7h18"/><path d="M3 7l2 13h14l2-13"/><path d="M9 7V4h6v3"/></g>
+    <g id="i-scale"><path d="M12 3v18"/><path d="M5 7h14"/><path d="M5 7l-3 6a3 3 0 0 0 6 0L5 7Z"/><path d="M19 7l-3 6a3 3 0 0 0 6 0l-3-6Z"/></g>
+    <g id="i-chart"><path d="M3 3v18h18"/><path d="M7 15l3-4 3 3 5-7"/></g>
+    <g id="i-timer"><circle cx="12" cy="13" r="8"/><path d="M12 13V9"/><path d="M9 2h6"/></g>
+    <g id="i-grid"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></g>
+    <g id="i-arrow"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="13 6 19 12 13 18"/></g>
+    <g id="i-more"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></g>
+    <g id="i-check"><polyline points="4 12 10 18 20 6"/></g>
+  </defs>
+</svg>
 <div id="topbar">
   <a class="brand" href="/dashboard" title="Back to your dashboard"><span class="logo-mark">L↻OP</span><span class="brand-text">The Loop</span></a>
   <span class="tagline">Interview prep that adapts to you, with a tutor watching your back</span>
@@ -995,23 +1058,27 @@
             <div class="cc-greeting" id="cc-greeting">Let's get into a loop.</div>
             <div class="cc-momentum" id="cc-momentum"></div>
           </div>
-          <button class="btn btn-primary btn-lg cc-start" onclick="startPractice()">▶ Start Practice</button>
+          <button class="btn btn-primary btn-lg cc-start" onclick="startPractice()"><svg class="icon" style="margin-right:7px;"><use href="#i-play"/></svg>Start Practice</button>
           <div class="cc-lanes">
             <button class="cc-lane" onclick="startPractice('focused')">
-              <span class="cc-lane-ico">🎯</span>
+              <span class="cc-lane-ico"><svg class="icon" style="width:18px;height:18px;"><use href="#i-target"/></svg></span>
               <span class="cc-lane-title">Focused rep</span>
               <span class="cc-lane-sub">One smart-picked question</span>
             </button>
             <button class="cc-lane" onclick="startMockLoop()">
-              <span class="cc-lane-ico">🔁</span>
+              <span class="cc-lane-ico"><svg class="icon" style="width:18px;height:18px;"><use href="#i-loop"/></svg></span>
               <span class="cc-lane-title">Mock loop</span>
               <span class="cc-lane-sub">SQL → design → tradeoff</span>
             </button>
             <button class="cc-lane" onclick="startPractice('weak')">
-              <span class="cc-lane-ico">🩹</span>
+              <span class="cc-lane-ico"><svg class="icon" style="width:18px;height:18px;"><use href="#i-bandage"/></svg></span>
               <span class="cc-lane-title">Weak-area drill</span>
               <span class="cc-lane-sub">Your recurring misses</span>
             </button>
+          </div>
+          <div class="cc-compass">
+            <div class="cc-compass-title">Your toolkit — 5 families, 20+ drills</div>
+            <div class="cc-families" id="cc-families"></div>
           </div>
           <div class="cc-standings" id="cc-standings"></div>
           <p class="cc-or">or pick any question from the sidebar →</p>
@@ -1021,16 +1088,24 @@
         <div class="editor-toolbar">
           <span id="editor-lang-label"></span>
           <div class="editor-actions">
-            <button id="run-btn" class="btn btn-ghost" onclick="runSample()">▶ Run</button>
-            <button id="debug-btn" class="btn btn-ghost" onclick="startDebug()" style="display:none;" title="Step through your code line by line">🐞 Debug</button>
-            <button id="hint-btn" class="btn btn-ghost" onclick="askHint()">💡 Hint</button>
-            <button id="spotbug-btn" class="btn btn-ghost" onclick="startSpotBug()">🐛 Spot the bug</button>
-            <button id="clarify-sql-btn" class="btn btn-ghost" onclick="toggleSqlClarify()">🎯 Clarify first</button>
-            <button id="curveball-btn" class="btn btn-ghost" onclick="startCurveball()">🌀 Curveball</button>
-            <button id="twist-btn" class="btn btn-ghost" onclick="askTwist()" disabled title="Solve it first">🔁 Twist</button>
-            <button id="dryrun-btn" class="btn btn-ghost" onclick="askDryRun()" disabled title="Solve it first">👣 Dry run</button>
-            <button id="reverse-btn" class="btn btn-ghost" onclick="startReverse()" disabled title="Solve it first">🎭 Be the interviewer</button>
-            <button id="submit-btn" class="btn btn-primary" onclick="submitCode()">Submit</button>
+            <button id="run-btn" class="btn btn-ghost" onclick="runSample()"><svg class="icon"><use href="#i-play"/></svg>Run</button>
+            <button id="hint-btn" class="btn btn-ghost" onclick="askHint()"><svg class="icon"><use href="#i-bulb"/></svg>Hint</button>
+            <button id="submit-btn" class="btn btn-primary" onclick="submitCode()"><svg class="icon"><use href="#i-check"/></svg>Submit</button>
+            <div class="more-drills-wrap">
+              <button class="btn btn-ghost" id="more-drills-btn" onclick="toggleDrillsMenu()" title="Pressure & interview drills"><svg class="icon"><use href="#i-more"/></svg>More drills</button>
+              <div class="drills-menu" id="drills-menu">
+                <div class="dm-group">Pressure drills</div>
+                <button class="dm-item" onclick="startSpotBug()"><svg class="icon"><use href="#i-bug"/></svg>Spot the bug</button>
+                <button class="dm-item" id="clarify-menu" onclick="toggleSqlClarify()"><svg class="icon"><use href="#i-target"/></svg>Clarify first</button>
+                <button class="dm-item" onclick="startCurveball()"><svg class="icon"><use href="#i-zap"/></svg>Curveball</button>
+                <button class="dm-item" id="twist-menu" onclick="askTwist()" disabled><svg class="icon"><use href="#i-repeat"/></svg>Twist</button>
+                <button class="dm-item" id="dryrun-menu" onclick="askDryRun()" disabled><svg class="icon"><use href="#i-shoe"/></svg>Dry run</button>
+                <button class="dm-item" id="reverse-menu" onclick="startReverse()" disabled><svg class="icon"><use href="#i-mask"/></svg>Be the interviewer</button>
+                <div class="dm-sep"></div>
+                <div class="dm-group">Step-by-step</div>
+                <button class="dm-item" id="debug-menu" onclick="startDebug()"><svg class="icon"><use href="#i-psy"/></svg>Debug (step through)</button>
+              </div>
+            </div>
           </div>
         </div>
         <div class="plan-row">
@@ -1712,6 +1787,21 @@ function liveTargetField() {
 }
 
 let canvasVoiceNote = false;
+function toggleDrillsMenu() {
+  const menu = document.getElementById('drills-menu');
+  const btn = document.getElementById('more-drills-btn');
+  const open = menu.classList.toggle('open');
+  btn.classList.toggle('active', open);
+}
+
+document.addEventListener('click', (e) => {
+  const wrap = document.querySelector('.more-drills-wrap');
+  if (wrap && !wrap.contains(e.target)) {
+    document.getElementById('drills-menu').classList.remove('open');
+    document.getElementById('more-drills-btn').classList.remove('active');
+  }
+});
+
 function toggleCanvasVoiceNote() {
   canvasVoiceNote = !canvasVoiceNote;
   const btn = document.getElementById('tool-mic');
@@ -1956,15 +2046,15 @@ async function checkApproach() {
 let spotBugNote = null;
 
 async function startSpotBug() {
-  const btn = document.getElementById('spotbug-btn');
+  const btn = document.getElementById('spotbug-menu');
   btn.disabled = true;
-  btn.textContent = 'Loading…';
+  btn.innerHTML = '<svg class="icon"><use href="#i-bug"/></svg>Loading…';
   const res = await (await fetch('/api/spot-bug', {
     method: 'POST', headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({question_id: current.id})
   })).json();
   btn.disabled = false;
-  btn.textContent = '🐛 Spot the bug';
+  btn.innerHTML = '<svg class="icon"><use href="#i-bug"/></svg>Spot the bug';
   if (res.error) { showToast('Could not generate a code-review drill: ' + res.error); return; }
   spotBugNote = res.bug_note;
   document.getElementById('spotbug-code').textContent = res.code;
@@ -1998,15 +2088,15 @@ async function gradeSpotBug() {
 let reverseState = null;
 
 async function startReverse() {
-  const btn = document.getElementById('reverse-btn');
+  const btn = document.getElementById('reverse-menu');
   btn.disabled = true;
-  btn.textContent = 'Loading…';
+  btn.innerHTML = '<svg class="icon"><use href="#i-mask"/></svg>Loading…';
   const res = await (await fetch('/api/reverse', {
     method:'POST', headers:{'Content-Type':'application/json'},
     body:JSON.stringify({question_id: current.id})
   })).json();
   btn.disabled = false;
-  btn.textContent = '🎭 Be the interviewer';
+  btn.innerHTML = '<svg class="icon"><use href="#i-mask"/></svg>Be the interviewer';
   if (res.error) { showToast('Could not start reverse interview: ' + res.error); return; }
   reverseState = {qid: current.id};
   const panel = document.getElementById('reversal-panel');
@@ -2061,15 +2151,15 @@ async function sendReverse() {
 let curveballActive = false;
 
 async function startCurveball() {
-  const btn = document.getElementById('curveball-btn');
+  const btn = document.getElementById('curveball-menu');
   btn.disabled = true;
-  btn.textContent = 'Loading…';
+  btn.innerHTML = '<svg class="icon"><use href="#i-zap"/></svg>Loading…';
   const res = await (await fetch('/api/curveball', {
     method: 'POST', headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({question_id: current.id})
   })).json();
   btn.disabled = false;
-  btn.textContent = '🌀 Curveball';
+  btn.innerHTML = '<svg class="icon"><use href="#i-zap"/></svg>Curveball';
   if (res.error) { showToast('Could not generate a curveball: ' + res.error); return; }
   curveballActive = true;
   document.getElementById('curveball-twist').textContent = '🌀 Interviewer: ' + res.twist;
@@ -2108,7 +2198,7 @@ function toggleSqlClarify() {
   sqlClarifyMode = true;
   sqlClarifyAsked = 0;
   document.getElementById('sample').style.display = 'none';
-  document.getElementById('clarify-sql-btn').classList.add('active');
+  document.getElementById('clarify-menu').classList.add('active');
   renderSqlClarifyGate();
   addMsg('system', "Clarify-first mode — I'll ask about the schema and edge cases before coding");
 }
@@ -2126,7 +2216,7 @@ function revealSqlClarify() {
   sqlClarifyMode = false;
   if (current) renderSample(current);
   document.getElementById('clarify-gate').style.display = 'none';
-  document.getElementById('clarify-sql-btn').classList.remove('active');
+  document.getElementById('clarify-menu').classList.remove('active');
 }
 
 function closeSqlClarify() {
@@ -2134,7 +2224,7 @@ function closeSqlClarify() {
   sqlClarifyAsked = 0;
   if (current) renderSample(current);
   document.getElementById('clarify-gate').style.display = 'none';
-  document.getElementById('clarify-sql-btn').classList.remove('active');
+  document.getElementById('clarify-menu').classList.remove('active');
 }
 
 async function gradeTradeoff() {
@@ -2518,6 +2608,61 @@ function updateProgress() {
   document.getElementById('solved-bar').style.width = (total ? solved / total * 100 : 0) + '%';
 }
 
+const FEATURE_FAMILIES = [
+  {name: 'Solve', icon: 'i-play', tools: [
+    {label: 'Run', icon: 'i-play', tip: 'Run your code against the sample case to check it before submitting.'},
+    {label: 'Submit', icon: 'i-check', tip: 'Submit — graded against all hidden test cases. Passing locks in the concept.'},
+    {label: 'Debug', icon: 'i-psy', tip: 'Step through your Python line-by-line and watch variables change.'},
+    {label: 'Diff', icon: 'i-grid', tip: 'After a fail, see your code side-by-side with the ideal solution.'},
+  ]},
+  {name: 'Coach', icon: 'i-bulb', tools: [
+    {label: 'Hint', icon: 'i-bulb', tip: 'Stuck? Get a nudge grounded in the concept — never the full answer.'},
+    {label: 'Trace', icon: 'i-grid', tip: 'Build the solution line-by-line with a scaffolded code-translation drill.'},
+    {label: 'Plan check', icon: 'i-check', tip: 'State your approach + complexity first; the tutor grades it.'},
+    {label: 'Concept map', icon: 'i-chart', tip: 'See how Problem → Approach → Pattern → Skeleton → Solution connect.'},
+  ]},
+  {name: 'Pressure', icon: 'i-zap', tools: [
+    {label: 'Curveball', icon: 'i-zap', tip: 'Mid-solve the interviewer changes the requirement — adapt your code.'},
+    {label: 'Twist', icon: 'i-repeat', tip: 'Once solved, a follow-up variation on the same problem.'},
+    {label: 'Dry run', icon: 'i-shoe', tip: 'Trace your own code by hand on a sample input.'},
+    {label: 'Spot the bug', icon: 'i-bug', tip: 'Review someone else’s buggy code and find the flaw.'},
+  ]},
+  {name: 'Interview sim', icon: 'i-mask', tools: [
+    {label: 'Clarify first', icon: 'i-target', tip: 'Hide the schema and ask clarifying questions before coding.'},
+    {label: 'Adversarial', icon: 'i-shield', tip: 'Break your own design — find what fails at scale.'},
+    {label: 'Incident', icon: 'i-fire', tip: '3am on-call: diagnose and stabilize a failing pipeline.'},
+    {label: 'Scaling', icon: 'i-scale', tip: 'Pressure-test the design across 6 growth tiers.'},
+  ]},
+  {name: 'Mock', icon: 'i-loop', tools: [
+    {label: 'Mock loop', icon: 'i-loop', tip: 'Chain a SQL/Python + design + tradeoff interview back-to-back.'},
+    {label: 'Tradeoff', icon: 'i-scale', tip: 'Pick a side and defend it against the tutor.'},
+    {label: 'Napkin math', icon: 'i-timer', tip: 'Estimate a back-of-envelope system metric under time pressure.'},
+    {label: 'Takeaways', icon: 'i-bulb', tip: 'After each solve, get 3 things worth remembering.'},
+  ]},
+];
+
+function renderFeatureCompass() {
+  const wrap = document.getElementById('cc-families');
+  if (!wrap) return;
+  wrap.innerHTML = FEATURE_FAMILIES.map(f => `
+    <div class="cc-family">
+      <div class="cc-family-head">
+        <span class="cc-family-ico"><svg class="icon"><use href="#${f.icon}"/></svg></span>
+        <span class="cc-family-name">${f.name}</span>
+      </div>
+      <div class="cc-family-tools">
+        ${f.tools.map(t => `
+          <div class="cc-tool">
+            <span class="cc-tool-info">
+              <svg class="icon"><use href="#${t.icon}"/></svg>
+              <span class="cc-tip"><b>${t.label}.</b> ${t.tip}</span>
+            </span>
+            <span>${t.label}</span>
+          </div>`).join('')}
+      </div>
+    </div>`).join('');
+}
+
 function renderEmptyState(qs) {
   const total = qs.length;
   const sqlCount = qs.filter(q => q.lang === 'sql').length;
@@ -2549,6 +2694,7 @@ function renderEmptyState(qs) {
   const panel = document.getElementById('empty-panel');
   panel.style.display = '';
   document.getElementById('command-center').style.display = '';
+  renderFeatureCompass();
 }
 
 async function loadQuestion(id) {
@@ -2652,17 +2798,16 @@ async function loadQuestion(id) {
   }
 
   document.getElementById('editor-lang-label').textContent = q.lang === 'sql' ? 'SQL' : 'PYTHON';
-  document.getElementById('debug-btn').style.display = q.lang === 'python' ? '' : 'none';
+  document.getElementById('debug-menu').style.display = q.lang === 'python' ? '' : 'none';
   renderSample(q);
   renderConceptBox(q, isSolved(id));
   loadTrace(id);
   loadConceptMapper(id);
   startTimerFor(id);
-  document.getElementById('twist-btn').disabled = !isSolved(id);
-  const reverseBtn = document.getElementById('reverse-btn');
-  reverseBtn.style.display = q.lang === 'sql' || q.lang === 'python' ? '' : 'none';
+  document.getElementById('twist-menu').disabled = !isSolved(id);
+  const reverseBtn = document.getElementById('reverse-menu');
   reverseBtn.disabled = !isSolved(id);
-  const dryrunBtn = document.getElementById('dryrun-btn');
+  const dryrunBtn = document.getElementById('dryrun-menu');
   dryrunBtn.style.display = q.lang === 'python' ? '' : 'none';
   dryrunBtn.disabled = !isSolved(id);
   cm.setOption('mode', q.lang === 'sql' ? 'text/x-sql' : 'python');
@@ -3047,15 +3192,16 @@ let debugIdx = -1;
 let debugSource = [];
 
 async function startDebug() {
-  const btn = document.getElementById('debug-btn');
+  const btn = document.getElementById('debug-menu');
   btn.disabled = true;
-  btn.textContent = 'Debugging…';
+  btn.innerHTML = '<svg class="icon"><use href="#i-psy"/></svg>Debugging…';
   const res = await (await fetch('/api/debug', {
     method: 'POST', headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({question_id: current.id, code: cm.getValue()})
   })).json();
   btn.disabled = false;
-  btn.textContent = '🐞 Debug';
+  btn.disabled = false;
+  btn.innerHTML = '<svg class="icon"><use href="#i-psy"/></svg>Debug (step through)';
   if (res.error) { showToast('Debug error: ' + res.error); return; }
   debugSteps = res.steps || [];
   debugSource = res.source || [];
@@ -3236,8 +3382,8 @@ async function submitCode() {
     markSolved(current.id);
     stopTimer(current.id);
     renderConceptBox(current, true);
-    document.getElementById('twist-btn').disabled = false;
-    if (current.lang === 'python') document.getElementById('dryrun-btn').disabled = false;
+    document.getElementById('twist-menu').disabled = false;
+    if (current.lang === 'python') document.getElementById('dryrun-menu').disabled = false;
     document.getElementById('debrief-row').style.display = 'flex';
   } else if (!res.error) {
     if (current.lang === 'sql') {
