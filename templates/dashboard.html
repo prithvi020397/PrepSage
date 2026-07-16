@@ -84,6 +84,84 @@
     vertical-align: -5px;
   }
   .logo-mark svg { width: 14px; height: 14px; }
+  .btn { font-family: inherit; font-size: 12.5px; font-weight: 600; cursor: pointer; }
+  .btn-ghost {
+    background: var(--card-2); color: var(--text-dim); border: 1px solid var(--border);
+    border-radius: 6px; padding: 7px 14px;
+  }
+  .btn-ghost:hover { border-color: var(--accent); color: var(--text); }
+  .danger-btn { border-color: rgba(255,107,107,0.5); color: var(--error); }
+  .danger-btn:hover { border-color: var(--error); color: var(--error); background: rgba(255,107,107,0.08); }
+  /* resume card */
+  .resume-upload { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .resume-upload input[type="file"] { display: none; }
+  .resume-upload label {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 8px 14px; background: var(--card-2); border: 1px dashed var(--border);
+    border-radius: 8px; color: var(--text-dim); font-size: 12.5px; cursor: pointer;
+    transition: border-color 0.15s, color 0.15s;
+  }
+  .resume-upload label:hover { border-color: var(--accent); color: var(--text); }
+  .resume-skills { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; }
+  .resume-skill-tag {
+    padding: 3px 8px; background: var(--accent-soft); border-radius: 4px;
+    font-size: 11px; color: var(--accent); font-weight: 500;
+  }
+  .resume-domain-tag {
+    padding: 3px 8px; background: rgba(94,230,216,0.12); border-radius: 4px;
+    font-size: 11px; color: var(--accent-2); font-weight: 500;
+  }
+  .gap-row { display: flex; align-items: center; gap: 10px; padding: 6px 0; font-size: 13px; }
+  .gap-label { width: 170px; flex-shrink: 0; color: var(--text-dim); }
+  .gap-bar-track { flex: 1; height: 8px; background: var(--card-2); border-radius: 4px; overflow: hidden; }
+  .gap-bar-fill { height: 100%; border-radius: 4px; }
+  .gap-count { width: 60px; text-align: right; font-size: 12px; }
+  .talk-btn {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 5px 10px; background: transparent; border: 1px solid var(--border);
+    border-radius: 5px; color: var(--accent-2); font-size: 11.5px; cursor: pointer;
+    font-family: inherit; transition: border-color 0.15s;
+  }
+  .talk-btn:hover { border-color: var(--accent-2); }
+  .confirm-btn {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 4px 9px; background: transparent; border: 1px solid var(--border);
+    border-radius: 5px; color: var(--success); font-size: 11px; cursor: pointer;
+    font-family: inherit; transition: border-color 0.15s, color 0.15s; white-space: nowrap;
+  }
+  .confirm-btn:hover { border-color: var(--success); }
+  /* danger zone card — spatially separated, intentional, not buried */
+  .danger-zone {
+    border: 1px solid rgba(255,107,107,0.35);
+    border-radius: 12px; background: rgba(255,107,107,0.04);
+    padding: 16px 18px;
+  }
+  .dz-title { font-size: 11px; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase; color: var(--error); margin-bottom: 6px; }
+  .dz-desc { font-size: 12.5px; color: var(--text-dim); line-height: 1.5; margin-bottom: 12px; max-width: 640px; }
+  /* confirmation modal */
+  .modal-scrim {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: none;
+    align-items: center; justify-content: center; z-index: 1000; padding: 20px;
+  }
+  .modal-scrim.open { display: flex; }
+  .modal {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 14px;
+    max-width: 420px; width: 100%; padding: 22px; box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+  }
+  .modal h3 { margin: 0 0 8px; font-size: 16px; color: var(--text); }
+  .modal p { margin: 0 0 14px; font-size: 13px; color: var(--text-dim); line-height: 1.55; }
+  .modal input {
+    width: 100%; box-sizing: border-box; padding: 9px 12px; margin-bottom: 14px;
+    background: var(--card); border: 1px solid var(--border); border-radius: 6px;
+    color: var(--text); font-family: inherit; font-size: 13px;
+  }
+  .modal input:focus { outline: none; border-color: var(--error); }
+  .modal-actions { display: flex; gap: 8px; justify-content: flex-end; }
+  .btn-danger-solid {
+    background: var(--error); color: #0e1015; border: none; border-radius: 6px;
+    padding: 8px 16px; font-weight: 600; cursor: pointer;
+  }
+  .btn-danger-solid:disabled { opacity: 0.4; cursor: not-allowed; }
 </style>
 </head>
 <body>
@@ -109,6 +187,263 @@
         <div class="sub">complexity + edge-case checks after passing</div>
       </div>
     </div>
+
+    <div class="card">
+      <div class="section-title">📄 Resume</div>
+      {% if resume_loaded %}
+        <div class="sub" style="margin-bottom:8px;">Uploaded {{ resume.uploaded_at[:10] }} — {{ resume.skills | length }} skills, {{ resume.projects | length }} projects</div>
+        <div class="resume-skills">
+          {% for s in resume.skills[:10] %}
+            {% if s is mapping %}
+              <span class="resume-skill-tag" style="{{ 'border:1px solid var(--success);' if s.depth == 'deep' else ('border:1px solid var(--warn);' if s.depth == 'moderate' else '') }}" title="{{ s.context or '' }}">{{ s.name }}{% if s.depth == 'deep' %} ★{% endif %}</span>
+            {% else %}
+              <span class="resume-skill-tag">{{ s }}</span>
+            {% endif %}
+          {% endfor %}
+        </div>
+        {% if resume.domains %}
+        <div class="resume-skills" style="margin-top:5px;">
+          {% for d in resume.domains[:4] %}
+            <span class="resume-domain-tag">{{ d }}</span>
+          {% endfor %}
+        </div>
+        {% endif %}
+        {% if resume.projects %}
+        <div style="margin-top:10px;">
+          {% for p in resume.projects[:4] %}
+            <div style="font-size:12.5px; color:var(--text-dim); margin-bottom:8px; padding:8px 10px; background:var(--card-2); border-radius:6px; border-left:3px solid {{ 'var(--success)' if p.specificity == 'high' else ('var(--warn)' if p.specificity == 'low' else 'var(--text-faint)') }};">
+              <div style="display:flex; align-items:center; gap:6px;">
+                <strong style="color:var(--text);">{{ p.name }}</strong>
+                <span style="font-size:10px; color:{{ 'var(--success)' if p.specificity == 'high' else 'var(--warn)' }}; text-transform:uppercase; letter-spacing:0.04em;">{{ p.specificity or 'unknown' }} specificity</span>
+              </div>
+              <div style="margin-top:3px;">{{ p.description or p.one_liner }}</div>
+              <div style="display:flex; align-items:center; gap:6px; margin-top:5px; flex-wrap:wrap;">
+                {% for t in (p.tech or [])[:4] %}
+                  <span style="padding:2px 6px; background:var(--accent-soft); border-radius:3px; font-size:10px; color:var(--accent);">{{ t }}</span>
+                {% endfor %}
+                <button class="talk-btn" onclick="talkAbout('{{ p.name }}', '{{ p.description or p.one_liner }}', '{{ (p.tech or []) | join(', ') }}')">🎙 Talk about this</button>
+              </div>
+            </div>
+          {% endfor %}
+        </div>
+        {% endif %}
+        <div style="margin-top:10px;">
+          <label for="resume-reupload" style="font-size:11.5px; color:var(--text-faint); cursor:pointer;">
+            Re-upload resume
+          </label>
+          <input type="file" id="resume-reupload" accept=".pdf,.docx,.doc,.txt" style="display:none;" onchange="uploadResume(this)">
+        </div>
+      {% else %}
+        <div class="sub" style="margin-bottom:10px;">Upload your resume to personalize questions, spot gaps, and practice talking about your projects.</div>
+        <div class="resume-upload">
+          <label for="resume-upload-input">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            Upload PDF or DOCX
+          </label>
+          <input type="file" id="resume-upload-input" accept=".pdf,.docx,.doc,.txt" onchange="uploadResume(this)">
+          <span id="resume-status" class="sub"></span>
+        </div>
+      {% endif %}
+    </div>
+
+    <div class="card" style="border-color: rgba(124,108,246,0.3);">
+      <div class="section-title" style="color:var(--accent);">🎯 Job description</div>
+      {% if jd_loaded %}
+        <div class="sub" style="margin-bottom:8px;">Uploaded {{ jd.uploaded_at[:10] }} — <strong style="color:var(--text);">{{ jd.role_title }}</strong> ({{ jd.seniority }}) · {{ jd.domain }}</div>
+        {% if jd.tool_keywords %}
+        <div class="resume-skills" style="margin-bottom:6px;">
+          <span class="sub" style="margin-right:6px;">Tools named:</span>
+          {% for t in jd.tool_keywords[:10] %}
+            <span class="resume-skill-tag" style="border:1px solid var(--border); color:var(--text-dim);">{{ t }}</span>
+          {% endfor %}
+        </div>
+        {% endif %}
+        <div class="sub" style="margin-top:6px; font-style:italic;">{{ jd.signal_framing }}</div>
+        <div style="margin-top:10px;">
+          <label for="jd-reupload" style="font-size:11.5px; color:var(--text-faint); cursor:pointer;">Re-upload JD</label>
+          <input type="file" id="jd-reupload" accept=".pdf,.docx,.doc,.txt" style="display:none;" onchange="uploadJD(this)">
+        </div>
+      {% else %}
+        <div class="sub" style="margin-bottom:10px;">Upload the JD to map its <strong>concepts</strong> against your resume — we match paradigms (streaming, cloud), not tool names.</div>
+        <div class="resume-upload">
+          <label for="jd-upload-input">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            Upload JD (PDF/DOCX)
+          </label>
+          <input type="file" id="jd-upload-input" accept=".pdf,.docx,.doc,.txt" onchange="uploadJD(this)">
+          <span id="jd-status" class="sub"></span>
+        </div>
+      {% endif %}
+    </div>
+
+    {% if jd_loaded %}
+    <div class="card" style="border-color: rgba(94,230,216,0.3);">
+      <div class="section-title" style="color:var(--accent-2);">🧭 Role readiness — your path to {{ jd.role_title }}</div>
+      <div class="sub" style="margin-bottom:12px;">{{ role_readiness.framing_note }}</div>
+      <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(150px,1fr)); gap:12px; margin-bottom:12px;">
+        <div>
+          <div class="label">Concept coverage</div>
+          <div class="big">{{ role_readiness.coverage }}<span class="unit">%</span></div>
+          <div class="sub">concepts covered or translatable
+            {% if role_readiness.self_reported_count %}· <span style="color:var(--warn);">{{ role_readiness.proven_coverage }}% proven, {{ role_readiness.self_reported_count }} self-reported</span>{% endif %}
+          </div>
+        </div>
+        {% if role_readiness.claim_readiness is not none %}
+        <div>
+          <div class="label">Claim validation</div>
+          <div class="big">{{ role_readiness.claim_readiness }}<span class="unit">%</span></div>
+          <div class="sub">resume skills proven in practice</div>
+        </div>
+        {% endif %}
+        {% if role_readiness.practice_mastery is not none %}
+        <div>
+          <div class="label">Practice mastery</div>
+          <div class="big">{{ role_readiness.practice_mastery }}<span class="unit">%</span></div>
+          <div class="sub">SQL/Python pass rate</div>
+        </div>
+        {% endif %}
+      </div>
+
+      {% if role_readiness.translations %}
+      <div class="sub" style="margin-bottom:6px; color:var(--success); font-weight:600;">✅ Translations — same concept, different tool (you're further along than it looks)</div>
+      {% for t in role_readiness.translations %}
+      <div class="gap-row">
+        <div class="gap-label">{{ t.concept.replace('_',' ') }}</div>
+        <div style="font-size:12px; color:var(--text-dim);">{{ t.your_tool }} → {{ t.jd_tool }}</div>
+      </div>
+      {% endfor %}
+      {% endif %}
+
+      {% if role_readiness.real_gaps %}
+      <div class="sub" style="margin:10px 0 6px; color:var(--warn); font-weight:600;">🎯 Real gaps — where to focus</div>
+      {% for g in role_readiness.real_gaps %}
+      <div class="gap-row">
+        <div class="gap-label">{{ (g.raw or g.concept).replace('_',' ') }}</div>
+        <div style="font-size:12px; color:var(--text-dim); flex:1;">{{ g.evidence }}</div>
+        <span class="gap-count" style="color: var(--error); width:auto; margin-right:8px;">{{ 'must-have' if g.importance == 'must_have' else 'nice' }}</span>
+        <button class="confirm-btn" onclick="confirmConcept(this, '{{ g.concept }}')">✓ I've done this</button>
+      </div>
+      {% endfor %}
+      {% endif %}
+
+      {% if role_readiness.self_reported %}
+      <div class="sub" style="margin:12px 0 6px; color:var(--warn); font-weight:600;">🔶 Self-reported — you say you've handled these (verify in practice)</div>
+      {% for s in role_readiness.self_reported %}
+      <div class="gap-row">
+        <div class="gap-label">{{ (s.raw or s.concept).replace('_',' ') }}</div>
+        <div style="font-size:12px; color:var(--text-dim); flex:1;">Self-attested — not yet proven by practice</div>
+        <button class="confirm-btn" style="border-color:var(--text-faint); color:var(--text-faint);" onclick="confirmConcept(this, '{{ s.concept }}', false)">undo</button>
+      </div>
+      {% endfor %}
+      {% endif %}
+
+      {% if role_readiness.verify %}
+      <div class="sub" style="margin:10px 0 6px; color:var(--text-faint); font-weight:600;">🔎 Verify manually — weak signal, not confirmed</div>
+      {% for v in role_readiness.verify %}
+      <div class="gap-row">
+        <div class="gap-label">{{ (v.raw or v.concept).replace('_',' ') }}</div>
+        <div style="font-size:12px; color:var(--text-dim);">{{ v.note }}</div>
+      </div>
+      {% endfor %}
+      {% endif %}
+
+      {% if role_readiness.framed_practice %}
+      <div class="sub" style="margin:12px 0 6px; color:var(--accent-2); font-weight:600;">🛠 Framed practice — questions that build the missing concepts</div>
+      <div style="display:flex; flex-wrap:wrap; gap:8px;">
+        {% for q in role_readiness.framed_practice %}
+        <a href="/?q={{ q.id }}" style="font-size:12px; color:var(--text); text-decoration:none; padding:6px 10px; background:var(--card-2); border:1px solid var(--border); border-radius:6px;">
+          {{ q.title }} <span style="color:var(--text-faint); font-size:10px;">· {{ q.lang }}</span>
+        </a>
+        {% endfor %}
+      </div>
+      {% endif %}
+    </div>
+    {% endif %}
+
+    {% if gap_alerts %}
+    <div class="card" style="border-color: rgba(245,197,66,0.3);">
+      <div class="section-title" style="color:var(--warn);">⚠️ Skill gaps — claimed on resume vs actual performance</div>
+      <div class="sub" style="margin-bottom:10px;">Your resume claims these skills, but your practice data shows room to improve.</div>
+      {% for gap in gap_alerts %}
+      <div class="gap-row">
+        <div class="gap-label">{{ gap.claimed }}</div>
+        <div class="gap-bar-track">
+          <div class="gap-bar-fill" style="width: {{ gap.accuracy }}%; background: {{ 'var(--error)' if gap.severity == 'high' else 'var(--warn)' }};"></div>
+        </div>
+        <div class="gap-count" style="color: {{ 'var(--error)' if gap.severity == 'high' else 'var(--warn)' }};">
+          {% if gap.attempts > 0 %}{{ gap.accuracy }}% ({{ gap.attempts }} tries){% else %}No practice yet{% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    <div class="danger-zone">
+      <div class="dz-title">Danger zone</div>
+      <div class="dz-desc">Permanently erase all progress — solved counts, streaks, due reviews, saved code, chat history, and replay notes. The dashboard will read 0/{{ total_questions }}. This cannot be undone.</div>
+      <button class="btn btn-ghost danger-btn" id="startover-btn" onclick="openStartOver()">Start over</button>
+    </div>
+
+    <div class="card">
+      <div class="section-title">Reset working state</div>
+      <div class="sub" style="margin-bottom:12px;">Clears saved code, traces, and notes for a whole category. Solved status and review schedule are kept. This cannot be undone.</div>
+      <div style="display:flex; flex-wrap:wrap; gap:8px;">
+        <button class="btn btn-ghost danger-btn" onclick="resetCategory('sql')">Reset SQL</button>
+        <button class="btn btn-ghost danger-btn" onclick="resetCategory('python')">Reset Python</button>
+        <button class="btn btn-ghost danger-btn" onclick="resetCategory('design')">Reset System Design</button>
+        <button class="btn btn-ghost danger-btn" onclick="resetCategory('tradeoff')">Reset Tradeoff</button>
+      </div>
+    </div>
+
+    {% if study_plan %}
+    <div class="card">
+      <div class="section-title">📋 Study plan — personalized for {{ resume.target_role or 'your target role' }}</div>
+      <div class="sub" style="margin-bottom:10px;">Based on your resume claims and practice performance.</div>
+      {% for item in study_plan %}
+      <div class="metric-row">
+        <div class="metric-row-top">
+          <span>
+            <span style="display:inline-block; width:6px; height:6px; border-radius:50%; margin-right:6px; background:{{ 'var(--error)' if item.priority == 'high' else ('var(--warn)' if item.priority == 'medium' else 'var(--text-faint)') }};"></span>
+            {{ item.title }}
+          </span>
+          <span class="sub" style="text-transform:uppercase; font-size:10px; letter-spacing:0.05em; color:{{ 'var(--error)' if item.category == 'sql' else ('var(--warn)' if item.category == 'python' else 'var(--accent)') }};">{{ item.category }}</span>
+        </div>
+        <div class="sub" style="margin-top:3px;">{{ item.action }}</div>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if claim_validation.total_skills > 0 %}
+    <div class="card">
+      <div class="section-title">✅ Claim validation — {{ claim_validation.validated_count }} of {{ claim_validation.total_skills }} skills validated</div>
+      <div class="sub" style="margin-bottom:10px;">Skills validated by practice performance (≥70% accuracy).</div>
+      {% if claim_validation.validated %}
+        {% for v in claim_validation.validated[:8] %}
+        <div class="weak-row">
+          <div class="weak-label">
+            {{ v.skill }}
+            <span style="font-size:10px; color:{{ 'var(--success)' if v.strong else 'var(--warn)' }};">{{ v.depth }}</span>
+          </div>
+          <div class="weak-bar-track">
+            <div class="weak-bar-fill" style="width: {{ v.accuracy }}%; background: {{ 'var(--success)' if v.strong else 'var(--warn)' }};"></div>
+          </div>
+          <div class="weak-count" style="width:60px;">{{ v.accuracy }}% <span style="color:var(--text-faint);">({{ v.attempts }})</span></div>
+        </div>
+        {% endfor %}
+      {% endif %}
+      {% if claim_validation.unvalidated %}
+        <div style="margin-top:8px; font-size:11px; color:var(--text-faint); text-transform:uppercase; letter-spacing:0.05em;">Not yet validated</div>
+        {% for u in claim_validation.unvalidated[:5] %}
+        <div class="weak-row" style="opacity:0.7;">
+          <div class="weak-label">{{ u.skill }} <span style="font-size:10px; color:var(--text-faint);">{{ u.depth }}</span></div>
+          <div class="weak-bar-track"><div class="weak-bar-fill" style="width: 0%;"></div></div>
+          <div class="weak-count" style="width:60px; color:var(--text-faint);">—</div>
+        </div>
+        {% endfor %}
+      {% endif %}
+    </div>
+    {% endif %}
 
     <div class="card">
       <div class="section-title">Interview-readiness signals</div>
@@ -229,6 +564,19 @@
       {% endif %}
     </div>
   </main>
+
+  <div class="modal-scrim" id="so-scrim" onclick="if(event.target===this) closeStartOver()">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="so-title">
+      <h3 id="so-title">Erase all progress?</h3>
+      <p>This permanently deletes every persistence file — solved counts, streaks, due reviews, saved code, chat history, and replay notes. The dashboard will reset to 0/{{ total_questions }}. This cannot be undone.</p>
+      <input id="so-input" type="text" placeholder="Type DELETE to confirm" oninput="onSoInput(this)" autocomplete="off" spellcheck="false">
+      <div class="modal-actions">
+        <button class="btn btn-ghost" onclick="closeStartOver()">Cancel</button>
+        <button class="btn-danger-solid" id="so-confirm" onclick="confirmStartOver()" disabled>Erase everything</button>
+      </div>
+    </div>
+  </div>
+
   <script>
     async function submitPostmortem() {
       const question = document.getElementById('pm-question').value.trim();
@@ -247,6 +595,138 @@
       btn.disabled = false;
       if (res.error) { status.textContent = res.error; status.className = 'sub bad'; return; }
       location.reload();
+    }
+
+    async function resetCategory(lang) {
+      const label = {sql: 'SQL', python: 'Python', design: 'System Design', tradeoff: 'Tradeoff'}[lang];
+      if (!confirm(`Reset ALL ${label} working state? Saved code, traces, and notes for every ${label} question will be cleared. Solved status is kept.`)) return;
+      const btn = event.target;
+      const old = btn.innerHTML;
+      btn.disabled = true;
+      btn.innerHTML = 'Resetting…';
+      try {
+        const r = await fetch(`/api/reset-category/${lang}`, {method: 'POST'});
+        if (!r.ok) throw new Error('reset failed');
+        location.reload();
+      } catch (e) {
+        btn.disabled = false;
+        btn.innerHTML = old;
+        alert('Could not reset category.');
+      }
+    }
+
+    function openStartOver() {
+      document.getElementById('so-input').value = '';
+      document.getElementById('so-confirm').disabled = true;
+      document.getElementById('so-scrim').classList.add('open');
+      document.getElementById('so-input').focus();
+    }
+
+    function closeStartOver() {
+      document.getElementById('so-scrim').classList.remove('open');
+    }
+
+    function onSoInput(el) {
+      document.getElementById('so-confirm').disabled = (el.value.trim() !== 'DELETE');
+    }
+
+    async function confirmStartOver() {
+      const btn = document.getElementById('so-confirm');
+      btn.disabled = true;
+      btn.textContent = 'Erasing…';
+      try {
+        const r = await fetch('/api/start-over', {method: 'POST'});
+        if (!r.ok) throw new Error('wipe failed');
+        location.reload();
+      } catch (e) {
+        btn.disabled = false;
+        btn.textContent = 'Erase everything';
+        alert('Could not wipe progress.');
+      }
+    }
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') closeStartOver();
+    });
+
+    async function uploadResume(input) {
+      const file = input.files[0];
+      if (!file) return;
+      const status = document.getElementById('resume-status');
+      status.textContent = 'Parsing…';
+      status.className = 'sub';
+      const form = new FormData();
+      form.append('resume', file);
+      try {
+        const r = await fetch('/api/upload-resume', {method: 'POST', body: form});
+        const res = await r.json();
+        if (!r.ok || res.error) {
+          status.textContent = res.error || 'Upload failed';
+          status.className = 'sub bad';
+          return;
+        }
+        status.textContent = `Extracted ${res.skills.length} skills — reloading…`;
+        status.className = 'sub ok';
+        setTimeout(() => location.reload(), 800);
+      } catch (e) {
+        status.textContent = 'Upload failed — try again';
+        status.className = 'sub bad';
+      }
+    }
+
+    async function talkAbout(name, oneLiner, tech) {
+      const techList = tech ? tech.split(', ') : [];
+      const res = await fetch('/api/talk-about', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({project_name: name, one_liner: oneLiner, tech: techList})
+      });
+      const data = await res.json();
+      if (data.error) { alert(data.error); return; }
+      const questions = data.questions.map((q, i) => `${i+1}. ${q}`).join('\n\n');
+      alert(`Interview follow-ups for "${data.project}":\n\n${questions}`);
+    }
+
+    async function confirmConcept(btn, concept, confirmed = true) {
+      // update in-place (no reload) so multiple clicks in a row all save
+      btn.disabled = true;
+      const orig = btn.innerHTML;
+      btn.innerHTML = 'saving…';
+      try {
+        const r = await fetch('/api/jd-confirm', {
+          method: 'POST', headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({concept, confirmed})
+        });
+        if (!r.ok) throw new Error('failed');
+        location.reload();
+      } catch (e) {
+        btn.disabled = false;
+        btn.innerHTML = orig;
+        alert('Could not save — try again');
+      }
+    }
+
+    async function uploadJD(input) {
+      if (!file) return;
+      const status = document.getElementById('jd-status');
+      status.textContent = 'Parsing concepts…';
+      status.className = 'sub';
+      const form = new FormData();
+      form.append('jd', file);
+      try {
+        const r = await fetch('/api/upload-jd', {method: 'POST', body: form});
+        const res = await r.json();
+        if (!r.ok || res.error) {
+          status.textContent = res.error || 'Upload failed';
+          status.className = 'sub bad';
+          return;
+        }
+        status.textContent = `Mapped ${res.concepts_required} concepts — reloading…`;
+        status.className = 'sub ok';
+        setTimeout(() => location.reload(), 800);
+      } catch (e) {
+        status.textContent = 'Upload failed — try again';
+        status.className = 'sub bad';
+      }
     }
   </script>
 </body>

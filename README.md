@@ -70,6 +70,11 @@ OPENROUTER_API_KEY=your-key-here
 OPENAI_API_KEY=your-openai-key
 # optional: point the tutor at a local OpenAI-compatible proxy (e.g. Headroom)
 HEADROOM_ENABLED=false
+# optional: enable the live-web "fresh angle" hybrid layer (see below). Without it, the app
+# uses only the precomputed question bank — no runtime difference.
+FIRECRAWL_API_KEY=your-firecrawl-key
+# optional: hard-disable the web layer even if a key is present
+FIRECRAWL_ENABLED=false
 ```
 
 Run the app:
@@ -105,6 +110,8 @@ it's never stored in the repo). `gunicorn app:app` is the start command.
 app.py                      Flask routes + logic: tutor prompts, grading, spaced repetition, mock loop
 precompute.py               One-off generator that fills traces.json / concept_maps.json /
                             solutions.json / question_contexts.json from questions.json (run once)
+firecrawl_layer.py          Optional Firecrawl-backed "fresh angle" hybrid (live web framing for
+                            hints/curveballs). Silently disabled without FIRECRAWL_API_KEY.
 test_scoring.py             unittest suite for backend scoring (hire_verdict, rubric parsing, etc.)
 templates/
   index.html                Practice UI: editor, tutor chat, design canvas, Command Center
@@ -136,6 +143,28 @@ replay_comments.json        Per-user replay annotations (runtime, gitignored)
 - **Editing JSON while running.** Flask's reloader watches `.py` files, not `.json`. After hand-editing
   a data file while `app.py` is running, `touch app.py` to force a restart, or the running process can
   overwrite your edit on its next write.
+
+## Live web hybrid (Firecrawl)
+
+The precomputed bank (`questions.json` + `traces/solutions/contexts`) is the always-available floor.
+On top of it, `firecrawl_layer.py` is an **optional** layer that grounds tutor hints, curveballs, and a
+standalone "Web angle" panel in real-world framing pulled from the web via
+[Firecrawl](https://github.com/firecrawl/firecrawl).
+
+Design rules (the hybrid, not option C-standalone):
+
+- **Never on the graded path.** It only flavors the *conversation* surface (hints, curveballs, the
+  standalone angle panel). Submit/Run/grading always use the precomputed bank.
+- **Fails silently.** No `FIRECRAWL_API_KEY`, a network failure, or garbage output → the layer returns
+  `None` and the caller uses the precomputed framing. The feature is invisible when unavailable.
+- **Cached.** Results are written to `research_cache.json` (gitignored, 30-day TTL) keyed by concept, so
+  repeat calls are free and the feature still works offline after the first successful scrape.
+- **Opt-in per action.** A "Web angle" toggle in the *More drills* menu switches `use_web` on for hints
+  and curveballs; the standalone "Web angle on this concept" item calls `POST /api/fresh-angle`.
+
+Env: `FIRECRAWL_API_KEY` (required to use it), `FIRECRAWL_ENABLED=false` (hard-disable). Routes:
+`POST /api/fresh-angle` (returns `{"angle": null}` when unavailable) and `POST /api/curveball` /
+`POST /api/hint` which accept a `use_web` boolean.
 
 ## Testing
 

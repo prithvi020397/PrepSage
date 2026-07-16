@@ -34,7 +34,7 @@
     --py: #f5c542;
     --design: #ff8fa3;
     --tradeoff: #9d8cff;
-    --napkin: #6cd67a;
+
     --warn: #f5c542;
     --radius: 10px;
     --shadow: 0 8px 24px rgba(0,0,0,0.35);
@@ -193,7 +193,6 @@
   .q-lang-badge.python { background: rgba(245,197,66,0.15); color: var(--py); }
   .q-lang-badge.design { background: rgba(255,143,163,0.15); color: var(--design); }
   .q-lang-badge.tradeoff { background: rgba(157,140,255,0.15); color: var(--tradeoff); }
-  .q-lang-badge.napkin { background: rgba(108,214,122,0.15); color: var(--napkin); }
   .q-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-dim); font-size: 13px; }
   .q-item.active .q-title, .q-item:hover .q-title { color: var(--text); }
   .q-check { display: none; color: var(--success); font-size: 13px; flex-shrink: 0; }
@@ -240,6 +239,9 @@
   .drills-menu .dm-item { display: flex; align-items: center; gap: 8px; width: 100%; text-align: left; padding: 8px 9px; border-radius: 7px; background: transparent; border: none; color: var(--text-dim); font-size: 12.5px; cursor: pointer; font-family: inherit; }
   .drills-menu .dm-item:hover { background: var(--card); color: var(--text); }
   .drills-menu .dm-item svg { width: 14px; height: 14px; color: var(--accent); flex-shrink: 0; }
+  .drills-menu .dm-item.dm-danger { color: var(--error); }
+  .drills-menu .dm-item.dm-danger svg { color: var(--error); }
+  .drills-menu .dm-item.dm-danger:hover { background: rgba(255,107,107,0.12); color: var(--error); }
   .drills-menu .dm-sep { height: 1px; background: var(--border-soft); margin: 5px 2px; }
   .drills-menu .dm-group { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-faint); padding: 4px 9px 2px; }
 
@@ -267,7 +269,6 @@
   .q-section-header.python .dot { background: var(--py); }
   .q-section-header.design .dot { background: var(--design); }
   .q-section-header.tradeoff .dot { background: var(--tradeoff); }
-  .q-section-header.napkin .dot { background: var(--napkin); }
   .q-section-header .count { margin-left: auto; color: var(--text-faint); font-weight: 500; }
   .q-section-header .chevron { flex-shrink: 0; transition: transform 0.12s ease; }
   .q-section-header.collapsed .chevron { transform: rotate(-90deg); }
@@ -336,7 +337,6 @@
   #lang-badge.python { display: inline-block; background: rgba(245,197,66,0.15); color: var(--py); }
   #lang-badge.design { display: inline-block; background: rgba(255,143,163,0.15); color: var(--design); }
   #lang-badge.tradeoff { display: inline-block; background: rgba(157,140,255,0.15); color: var(--tradeoff); }
-  #lang-badge.napkin { display: inline-block; background: rgba(108,214,122,0.15); color: var(--napkin); }
   #q-timer {
     margin-left: auto;
     font-family: 'JetBrains Mono', monospace;
@@ -615,7 +615,7 @@
     background: var(--card-2);
     border-bottom: 1px solid var(--border-soft);
   }
-  #plan-input, #tradeoff-input, #napkin-input {
+  #plan-input, #tradeoff-input {
     flex: 1;
     box-sizing: border-box;
     padding: 6px 10px;
@@ -626,17 +626,17 @@
     font-family: inherit;
     font-size: 12.5px;
   }
-  #plan-input:focus, #tradeoff-input:focus, #napkin-input:focus { outline: none; border-color: var(--accent); }
-  #plan-input::placeholder, #tradeoff-input::placeholder, #napkin-input::placeholder { color: var(--text-faint); }
-  #plan-feedback, #tradeoff-feedback, #napkin-feedback {
+  #plan-input:focus, #tradeoff-input:focus { outline: none; border-color: var(--accent); }
+  #plan-input::placeholder, #tradeoff-input::placeholder { color: var(--text-faint); }
+  #plan-feedback, #tradeoff-feedback {
     padding: 0;
     font-size: 12px;
     border-bottom: 1px solid transparent;
   }
-  #plan-feedback:not(:empty), #tradeoff-feedback:not(:empty), #napkin-feedback:not(:empty) { padding: 7px 12px; border-bottom-color: var(--border-soft); }
-  #plan-feedback.ok, #tradeoff-feedback.ok, #napkin-feedback.ok { color: var(--success); background: var(--success-soft); }
-  #plan-feedback.bad, #tradeoff-feedback.bad, #napkin-feedback.bad { color: var(--error); background: var(--error-soft); }
-  #plan-feedback.pending, #tradeoff-feedback.pending, #napkin-feedback.pending { color: var(--text-faint); }
+  #plan-feedback:not(:empty), #tradeoff-feedback:not(:empty) { padding: 7px 12px; border-bottom-color: var(--border-soft); }
+  #plan-feedback.ok, #tradeoff-feedback.ok { color: var(--success); background: var(--success-soft); }
+  #plan-feedback.bad, #tradeoff-feedback.bad { color: var(--error); background: var(--error-soft); }
+  #plan-feedback.pending, #tradeoff-feedback.pending { color: var(--text-faint); }
   .debrief-row {
     display: flex;
     gap: 8px;
@@ -759,7 +759,7 @@
   .datatable tr:nth-child(even) td { background: rgba(255,255,255,0.015); }
 
   #chatpanel {
-    width: 360px;
+    width: 400px;
     flex-shrink: 0;
     border-left: 1px solid var(--border);
     display: flex;
@@ -816,6 +816,60 @@
     white-space: pre-wrap;
   }
   .msg.tutor .msg-text { background: var(--card); border: 1px solid var(--border-soft); border-top-left-radius: 4px; }
+  .review-cards {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+    margin-top: 4px;
+    grid-auto-rows: auto;
+  }
+  .review-card {
+    background: var(--card-2);
+    border: 1px solid var(--border-soft);
+    border-radius: 6px;
+    padding: 8px 10px;
+    border-left: 3px solid var(--accent);
+    animation: cardFadeIn 0.3s ease-out both;
+    display: flex;
+    flex-direction: column;
+  }
+  .review-card:nth-child(1) { animation-delay: 0ms; border-left-color: var(--accent); }
+  .review-card:nth-child(2) { animation-delay: 60ms; border-left-color: var(--accent-2); }
+  .review-card:nth-child(3) { animation-delay: 120ms; border-left-color: var(--success); }
+  .review-card:nth-child(4) { animation-delay: 180ms; border-left-color: var(--warn); }
+  .review-card:nth-child(5) { animation-delay: 240ms; border-left-color: var(--design); }
+  .review-card-title {
+    font-size: 9.5px;
+    font-weight: 700;
+    letter-spacing: 0.4px;
+    color: var(--text-dim);
+    margin-bottom: 3px;
+    text-transform: uppercase;
+  }
+  .review-card-body {
+    font-size: 12.5px;
+    line-height: 1.4;
+    white-space: pre-wrap;
+    color: var(--text);
+    flex: 1;
+  }
+  .review-card.recall-card {
+    grid-column: 1 / -1;
+    border-left-color: var(--accent-2);
+    background: var(--card-2);
+    padding: 6px 10px;
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+  }
+  .review-card.recall-card .review-card-title { margin-bottom: 0; flex-shrink: 0; }
+  .review-card.recall-card .review-card-body {
+    color: var(--text-dim);
+    font-style: italic;
+    font-size: 12.5px;
+  }
+  @keyframes cardFadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+  @media (max-width: 560px) { .review-cards { grid-template-columns: 1fr; } .review-card.recall-card { grid-column: 1; } }
   .msg.me .msg-text { background: linear-gradient(135deg, var(--accent), #6a5ce0); color: #fff; border-top-right-radius: 4px; }
   .msg.err .msg-text { background: var(--error-soft); color: var(--error); border-color: transparent; }
   .msg.system { align-self: center; max-width: 100%; }
@@ -1105,6 +1159,13 @@
                 <div class="dm-sep"></div>
                 <div class="dm-group">Step-by-step</div>
                 <button class="dm-item" id="debug-menu" onclick="startDebug()"><svg class="icon" viewBox="0 0 24 24"><use href="#i-psy"/></svg>Debug (step through)</button>
+                <div class="dm-sep"></div>
+                <div class="dm-group">Live web (Firecrawl)</div>
+                <button class="dm-item" id="webangle-menu" onclick="requestFreshAngle()"><svg class="icon" viewBox="0 0 24 24"><use href="#i-grid"/></svg>Web angle on this concept</button>
+                <button class="dm-item" id="webtoggle-menu" onclick="toggleWebAngle()" style="font-size:11.5px; color:var(--text-faint);"><svg class="icon" viewBox="0 0 24 24"><use href="#i-check"/></svg><span id="webtoggle-label">Off</span> — ground hints & curveballs</button>
+                <div class="dm-sep"></div>
+                <div class="dm-group">This question</div>
+                <button class="dm-item dm-danger" onclick="resetCurrentQuestion()"><svg class="icon" viewBox="0 0 24 24"><use href="#i-rewind"/></svg>Reset this question</button>
               </div>
             </div>
           </div>
@@ -1180,20 +1241,6 @@
           </div>
         </div>
       </div>
-      <div id="napkin-card" style="display:none;">
-        <div class="plan-row" style="justify-content:space-between;">
-          <span id="napkin-timer" style="font-family:'JetBrains Mono',monospace; font-size:13px; color:var(--text-faint);"></span>
-          <button id="napkin-reroll-btn" class="btn btn-ghost" onclick="rerollNapkin()">🎲 New numbers</button>
-        </div>
-        <textarea id="napkin-assumptions" placeholder="Your assumptions (optional) — e.g. 'assume 10% of DAU are concurrent, avg payload 2KB'…" style="width:100%; min-height:50px; margin:0 0 8px; padding:8px 12px; background:var(--card-2); border:none; border-bottom:1px solid var(--border-soft); color:var(--text); font-family:inherit; font-size:13px; resize:vertical; box-sizing:border-box;"></textarea>
-        <div class="plan-row">
-          <input id="napkin-input" type="text" placeholder="Your estimate…">
-          <span id="napkin-unit" style="color:var(--text-faint); font-size:12.5px; align-self:center;"></span>
-          <button id="napkin-grade-btn" class="btn btn-ghost" onclick="gradeNapkin()">Check answer</button>
-        </div>
-        <div id="napkin-feedback"></div>
-        <div id="napkin-assumption-feedback" style="padding:0 12px 8px; font-size:12.5px; color:var(--text-dim);"></div>
-      </div>
       <div id="debug-panel" style="display:none; background:var(--card); border:1px solid var(--border); border-radius:var(--radius); overflow:hidden;">
         <div style="display:flex; align-items:center; gap:10px; padding:8px 12px; background:var(--card-2); border-bottom:1px solid var(--border);">
           <span style="font-weight:600; font-size:12.5px; color:var(--text);">🐞 Step-through debug</span>
@@ -1234,7 +1281,7 @@
       </div>
       <div id="debrief-row" class="debrief-row" style="display:none">
         <input id="complexity-input" type="text" placeholder="Actual time/space complexity of your code…">
-        <input id="edge-input" type="text" placeholder="Edge cases you'd test…">
+        <input id="edge-input" type="text" placeholder="Edge cases you'd test (ties, NULLs, empty table)…">
         <textarea id="narration-input" placeholder="Narrate your approach out loud — or type it. Mic-on types live here." style="flex:1; min-height:38px; resize:vertical; background:var(--card-2); border:1px solid var(--border); border-radius:6px; color:var(--text); padding:8px 10px; font-size:12.5px; font-family:inherit;"></textarea>
         <button id="debrief-btn" class="btn btn-ghost" onclick="submitDebrief()">Debrief</button>
       </div>
@@ -1314,6 +1361,7 @@
       </label>
       <input id="chatbox" placeholder="ask a follow-up… (or just speak)" onkeydown="if(event.key==='Enter') sendMessage()">
       <button class="btn btn-primary btn-icon" onclick="sendMessage()">➤</button>
+      <button id="skip-review-btn" class="btn btn-ghost" style="display:none;" onclick="skipToReview()" title="Get your review without answering the recall question">Skip to review →</button>
     </div>
     <div id="live-transcript" class="live-transcript"></div>
   </aside>
@@ -1346,6 +1394,7 @@ let idleTimer = null;
 let stuck = false;
 let nudgeSent = false;
 let reinforced = false;
+let pendingRecallReview = null;
 let stateCache = {}; // qid -> {code, chatHTML, resultsHTML, resultsClass, lastRunSummary, stuck, nudgeSent, reinforced, shapes}
 let timers = {}; // qid -> {elapsed, running}
 let timerInterval = null;
@@ -1795,6 +1844,27 @@ function toggleDrillsMenu() {
   btn.classList.toggle('active', open);
 }
 
+async function resetCurrentQuestion() {
+  if (!current) return;
+  if (!confirm(`Reset "${current.title}"? This clears your saved code, trace, and notes for this question. Your solved status is kept.`)) return;
+  const btn = document.querySelector('.dm-item.dm-danger');
+  const old = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = 'Resetting…';
+  try {
+    const r = await fetch(`/api/reset-question/${current.id}`, {method: 'POST'});
+    if (!r.ok) throw new Error('reset failed');
+    delete stateCache[current.id];
+    await loadQuestion(current.id, true);
+    showToast('Question reset — fresh starter code loaded.');
+  } catch (e) {
+    showToast('Could not reset question.');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = old;
+  }
+}
+
 document.addEventListener('click', (e) => {
   const wrap = document.querySelector('.more-drills-wrap');
   if (wrap && !wrap.contains(e.target)) {
@@ -2005,8 +2075,6 @@ function saveCurrentState() {
     scaling: scalingMode,
     tradeoffInput: document.getElementById('tradeoff-input').value,
     tradeoffFeedbackHTML: document.getElementById('tradeoff-feedback').outerHTML,
-    napkinInput: document.getElementById('napkin-input').value,
-    napkinFeedbackHTML: document.getElementById('napkin-feedback').outerHTML,
   };
 }
 
@@ -2150,6 +2218,7 @@ async function sendReverse() {
 }
 
 let curveballActive = false;
+let useWebAngle = false;  // HYBRID: when on, hints & curveballs request a Firecrawl-grounded real-world angle
 
 async function startCurveball() {
   const btn = document.getElementById('curveball-menu');
@@ -2157,7 +2226,7 @@ async function startCurveball() {
   btn.innerHTML = '<svg class="icon" viewBox="0 0 24 24"><use href="#i-zap"/></svg>Loading…';
   const res = await (await fetch('/api/curveball', {
     method: 'POST', headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({question_id: current.id})
+    body: JSON.stringify({question_id: current.id, use_web: useWebAngle})
   })).json();
   btn.disabled = false;
   btn.innerHTML = '<svg class="icon" viewBox="0 0 24 24"><use href="#i-zap"/></svg>Curveball';
@@ -2172,6 +2241,42 @@ async function startCurveball() {
 function closeCurveball() {
   document.getElementById('curveball-card').style.display = 'none';
   curveballActive = false;
+}
+
+function toggleWebAngle() {
+  useWebAngle = !useWebAngle;
+  const label = document.getElementById('webtoggle-label');
+  if (label) label.textContent = useWebAngle ? 'On' : 'Off';
+  showToast(useWebAngle
+    ? 'Web angle ON — hints & curveballs will pull a real-world framing (falls back silently if offline).'
+    : 'Web angle OFF — using the precomputed bank.');
+}
+
+async function requestFreshAngle() {
+  if (!current) { showToast('Open a question first.'); return; }
+  const btn = document.getElementById('webangle-menu');
+  const prev = btn.innerHTML;
+  btn.innerHTML = '<svg class="icon" viewBox="0 0 24 24"><use href="#i-grid"/></svg>Fetching…';
+  const placeholder = addMsg('tutor', 'pulling a real-world angle from the web…');
+  const textEl = placeholder.querySelector('.msg-text');
+  try {
+    const r = await fetch('/api/fresh-angle', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({question_id: current.id})
+    });
+    const res = await r.json();
+    if (!r.ok || !res.angle) {
+      placeholder.className += ' err';
+      textEl.textContent = 'No live angle available right now — using the precomputed framing instead.';
+    } else {
+      textEl.textContent = '🌐 Real-world angle: ' + res.angle;
+    }
+  } catch (e) {
+    placeholder.className += ' err';
+    textEl.textContent = 'Could not reach the web layer — using the precomputed framing instead.';
+  } finally {
+    btn.innerHTML = prev;
+  }
 }
 
 async function gradeCurveball() {
@@ -2304,90 +2409,19 @@ function appendSparTurn(who, text) {
   log.scrollTop = log.scrollHeight;
 }
 
-async function gradeNapkin() {
-  const btn = document.getElementById('napkin-grade-btn');
-  const answer = document.getElementById('napkin-input').value;
-  const assumptions = document.getElementById('napkin-assumptions').value;
-  const el = document.getElementById('napkin-feedback');
-  const aEl = document.getElementById('napkin-assumption-feedback');
-  btn.disabled = true;
-  el.className = 'pending';
-  el.textContent = 'Checking…';
-  aEl.textContent = '';
-  const res = await (await fetch('/api/napkin-grade', {
-    method: 'POST', headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({question_id: current.id, answer, assumptions})
-  })).json();
-  btn.disabled = false;
-  el.className = res.ok ? 'ok' : 'bad';
-  el.textContent = (res.ok ? '✓ ' : '✗ ') + res.feedback + (res.explanation ? ' ' + res.explanation : '');
-  aEl.textContent = res.assumption_feedback ? '💭 ' + res.assumption_feedback : '';
-  if (res.ok) markSolved(current.id);
-}
-
-let napkinTimerInterval = null;
-
-function startNapkinCountdown(seconds) {
-  clearInterval(napkinTimerInterval);
-  let left = seconds;
-  const el = document.getElementById('napkin-timer');
-  const render = () => {
-    const clamped = Math.max(0, left);
-    el.textContent = left <= 0 ? "⏱ time's up — finish your estimate"
-      : `⏱ ${Math.floor(clamped / 60)}:${String(clamped % 60).padStart(2, '0')}`;
-    el.style.color = left <= 15 ? 'var(--error)' : 'var(--text-faint)';
-  };
-  render();
-  napkinTimerInterval = setInterval(() => {
-    left--;
-    render();
-    if (left <= 0) clearInterval(napkinTimerInterval);
-  }, 1000);
-}
-
-async function rerollNapkin() {
-  const btn = document.getElementById('napkin-reroll-btn');
-  btn.disabled = true;
-  const oldLabel = btn.textContent;
-  btn.textContent = 'Rolling…';
-  try {
-    const r = await fetch('/api/napkin-regenerate', {
-      method: 'POST', headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({question_id: current.id})
-    });
-    const d = await r.json();
-    if (d.error) {
-      const el = document.getElementById('napkin-feedback');
-      el.className = 'bad';
-      el.textContent = 'Could not generate a new scenario — try again.';
-      return;
-    }
-    current.prompt = d.prompt;
-    current.unit = d.unit;
-    document.getElementById('prompt').textContent = d.prompt;
-    document.getElementById('napkin-unit').textContent = d.unit || '';
-    document.getElementById('napkin-input').value = '';
-    document.getElementById('napkin-assumptions').value = '';
-    document.getElementById('napkin-feedback').outerHTML = '<div id="napkin-feedback"></div>';
-    document.getElementById('napkin-assumption-feedback').textContent = '';
-    startNapkinCountdown(90);
-  } finally {
-    btn.disabled = false;
-    btn.textContent = oldLabel;
-  }
-}
 
 async function submitDebrief() {
   const complexity = document.getElementById('complexity-input').value.trim();
   const edge_cases = document.getElementById('edge-input').value.trim();
   const narrationVal = (document.getElementById('narration-input').value.trim() || narrationText).trim();
+  const isSql = current.lang === 'sql';
   const btn = document.getElementById('debrief-btn');
   const fb = document.getElementById('debrief-feedback');
-  if (!complexity || !edge_cases) {
+  if ((!isSql && !complexity) || !edge_cases) {
     fb.innerHTML = '';
     const line = document.createElement('div');
     line.className = 'line bad';
-    line.textContent = 'Fill in both fields.';
+    line.textContent = isSql ? 'Fill in the edge cases field.' : 'Fill in both fields.';
     fb.appendChild(line);
     return;
   }
@@ -2403,13 +2437,15 @@ async function submitDebrief() {
   })).json();
   btn.disabled = false;
   fb.innerHTML = '';
-  const complexityLine = document.createElement('div');
-  complexityLine.className = 'line ' + (res.complexity_ok ? 'ok' : 'bad');
-  complexityLine.textContent = (res.complexity_ok ? '✓' : '✗') + ' complexity: ' + res.complexity_feedback;
+  if (!isSql) {
+    const complexityLine = document.createElement('div');
+    complexityLine.className = 'line ' + (res.complexity_ok ? 'ok' : 'bad');
+    complexityLine.textContent = (res.complexity_ok ? '✓' : '✗') + ' complexity: ' + res.complexity_feedback;
+    fb.appendChild(complexityLine);
+  }
   const edgeLine = document.createElement('div');
   edgeLine.className = 'line ' + (res.edge_ok ? 'ok' : 'bad');
   edgeLine.textContent = (res.edge_ok ? '✓' : '✗') + ' edge cases: ' + res.edge_feedback;
-  fb.appendChild(complexityLine);
   fb.appendChild(edgeLine);
   if ('narration_ok' in res) {
     const narrationLine = document.createElement('div');
@@ -2465,7 +2501,6 @@ async function loadList() {
     {lang: 'python', label: 'Python'},
     {lang: 'design', label: 'System Design'},
     {lang: 'tradeoff', label: 'Tradeoff Drills'},
-    {lang: 'napkin', label: 'Napkin Math'},
   ];
 
   groups.forEach(({lang, label}) => {
@@ -2492,7 +2527,7 @@ async function loadList() {
 
       const badge = document.createElement('span');
       badge.className = 'q-lang-badge ' + q.lang;
-      badge.textContent = {sql: 'SQL', python: 'PY', design: 'SYS', tradeoff: 'T/O', napkin: 'NUM'}[q.lang];
+      badge.textContent = {sql: 'SQL', python: 'PY', design: 'SYS', tradeoff: 'T/O'}[q.lang];
 
       const title = document.createElement('span');
       title.className = 'q-title';
@@ -2600,6 +2635,7 @@ function markSolved(id) {
   const item = document.querySelector(`.q-item[data-id="${id}"]`);
   if (item) { item.classList.add('solved'); item.classList.remove('due'); }
   updateProgress();
+  if (current && current.id === id) loadConceptMapper(id);
 }
 
 function updateProgress() {
@@ -2637,7 +2673,6 @@ const FEATURE_FAMILIES = [
   {name: 'Mock', icon: 'i-loop', tools: [
     {label: 'Mock loop', icon: 'i-loop', tip: 'Chain a SQL/Python + design + tradeoff interview back-to-back.'},
     {label: 'Tradeoff', icon: 'i-scale', tip: 'Pick a side and defend it against the tutor.'},
-    {label: 'Napkin math', icon: 'i-timer', tip: 'Estimate a back-of-envelope system metric under time pressure.'},
     {label: 'Takeaways', icon: 'i-bulb', tip: 'After each solve, get 3 things worth remembering.'},
   ]},
 ];
@@ -2738,16 +2773,15 @@ async function loadQuestion(id) {
   renderQuestionContext(q.context);
   const langBadge = document.getElementById('lang-badge');
   langBadge.className = 'badge ' + q.lang;
-  langBadge.textContent = {sql: 'SQL', python: 'PYTHON', design: 'SYSTEM DESIGN', tradeoff: 'TRADEOFF', napkin: 'NAPKIN MATH'}[q.lang];
+  langBadge.textContent = {sql: 'SQL', python: 'PYTHON', design: 'SYSTEM DESIGN', tradeoff: 'TRADEOFF'}[q.lang];
 
   const isDesign = q.lang === 'design';
   const isTradeoff = q.lang === 'tradeoff';
-  const isNapkin = q.lang === 'napkin';
-  document.getElementById('editor-card').style.display = (isDesign || isTradeoff || isNapkin) ? 'none' : '';
-  document.getElementById('concept-box').style.display = (isDesign || isTradeoff || isNapkin) ? 'none' : '';
-  if (isDesign || isTradeoff || isNapkin) document.getElementById('concept-mapper').style.display = 'none';
-  if (isDesign || isTradeoff || isNapkin) document.getElementById('sample').style.display = 'none';
-  document.getElementById('results').style.display = (isDesign || isTradeoff || isNapkin) ? 'none' : '';
+  document.getElementById('editor-card').style.display = (isDesign || isTradeoff) ? 'none' : '';
+  document.getElementById('concept-box').style.display = (isDesign || isTradeoff) ? 'none' : '';
+  if (isDesign || isTradeoff) document.getElementById('concept-mapper').style.display = 'none';
+  if (isDesign || isTradeoff) document.getElementById('sample').style.display = 'none';
+  document.getElementById('results').style.display = (isDesign || isTradeoff) ? 'none' : '';
   document.getElementById('design-canvas-card').style.display = isDesign ? 'flex' : 'none';
   document.getElementById('wrapup-btn').style.display = isDesign ? '' : 'none';
   document.getElementById('clarify-btn').style.display = isDesign ? '' : 'none';
@@ -2761,8 +2795,7 @@ async function loadQuestion(id) {
   document.getElementById('refdesign-btn').style.display = 'none';
   resetTradeoffSpar();
   document.getElementById('tradeoff-card').style.display = isTradeoff ? '' : 'none';
-  document.getElementById('napkin-card').style.display = isNapkin ? '' : 'none';
-  document.getElementById('chatpanel').style.display = (isTradeoff || isNapkin) ? 'none' : '';
+  document.getElementById('chatpanel').style.display = isTradeoff ? 'none' : '';
   clarifyMode = false;
   adversarialMode = false;
   adversarialFlaws = [];
@@ -2777,21 +2810,6 @@ async function loadQuestion(id) {
     const cached = stateCache[id];
     document.getElementById('tradeoff-input').value = (cached && cached.tradeoffInput) || '';
     document.getElementById('tradeoff-feedback').outerHTML = (cached && cached.tradeoffFeedbackHTML) || '<div id="tradeoff-feedback"></div>';
-    resetIdleTimer();
-    return;
-  }
-
-  if (isNapkin) {
-    document.getElementById('trace-box').style.display = 'none';
-    document.getElementById('debrief-row').style.display = 'none';
-    startTimerFor(id);
-    document.getElementById('napkin-unit').textContent = q.unit || '';
-    const cached = stateCache[id];
-    document.getElementById('napkin-input').value = (cached && cached.napkinInput) || '';
-    document.getElementById('napkin-feedback').outerHTML = (cached && cached.napkinFeedbackHTML) || '<div id="napkin-feedback"></div>';
-    document.getElementById('napkin-assumptions').value = '';
-    document.getElementById('napkin-assumption-feedback').textContent = '';
-    startNapkinCountdown(90);
     resetIdleTimer();
     return;
   }
@@ -2861,6 +2879,9 @@ async function loadQuestion(id) {
     stuck = false;
     nudgeSent = false;
     reinforced = false;
+    pendingRecallReview = null;
+    const srb = document.getElementById('skip-review-btn');
+    if (srb) srb.style.display = 'none';
     planInput.value = '';
     planApproved = false;
     document.getElementById('plan-feedback').outerHTML = '<div id="plan-feedback"></div>';
@@ -2871,6 +2892,7 @@ async function loadQuestion(id) {
     document.getElementById('takeaways-box').style.display = 'none';
   }
   document.getElementById('debrief-row').style.display = isSolved(id) ? 'flex' : 'none';
+  document.getElementById('complexity-input').style.display = (q.lang === 'sql') ? 'none' : '';
   narrationText = '';
   canvasVoiceNote = false;
   const toolMic = document.getElementById('tool-mic');
@@ -3042,11 +3064,11 @@ async function loadConceptMapper(qid) {
   const nodesEl = document.getElementById('concept-mapper-nodes');
   const detailEl = document.getElementById('concept-mapper-detail');
   const solved = isSolved(qid);
-  const activeCount = res.active_count || (solved ? 5 : 3);
-  nodesEl.innerHTML = res.nodes.map((n, i) => {
-    const cls = i < activeCount ? 'active' : 'inactive';
-    const arrow = i < res.nodes.length - 1 ? '<span class="cm-arrow">→</span>' : '';
-    return `<span class="cm-node ${cls}" data-idx="${i}">${n}</span>${arrow}`;
+  const activeCount = solved ? 5 : 3;
+  const visible = res.nodes.slice(0, activeCount);
+  nodesEl.innerHTML = visible.map((n, i) => {
+    const arrow = i < visible.length - 1 ? '<span class="cm-arrow">→</span>' : '';
+    return `<span class="cm-node active" data-idx="${i}">${n}</span>${arrow}`;
   }).join('');
   nodesEl.querySelectorAll('.cm-node').forEach(el => {
     el.addEventListener('click', () => {
@@ -3432,7 +3454,10 @@ async function submitCode() {
   if (res.passed && !reinforced) {
     reinforced = true;
     requestHint({question_id: current.id, code: cm.getValue(), actual: lastRunSummary, reinforce: true});
-    loadReview(current.id, cm.getValue());
+    // Option C: hold the review until the candidate answers the recall question,
+    // then tailor it to what they said. Don't fire it unprompted.
+    pendingRecallReview = {qid: current.id, code: cm.getValue()};
+    document.getElementById('skip-review-btn').style.display = '';
   }
   resetIdleTimer();
 }
@@ -3459,7 +3484,7 @@ async function requestHint(body) {
 
 function askHint() {
   addMsg('system', 'Hint requested');
-  requestHint({question_id: current.id, code: cm.getValue(), actual: lastRunSummary});
+  requestHint({question_id: current.id, code: cm.getValue(), actual: lastRunSummary, use_web: useWebAngle});
   nudgeSent = true;
   resetIdleTimer();
 }
@@ -3476,25 +3501,54 @@ function askDryRun() {
   resetIdleTimer();
 }
 
-async function loadReview(qid, code) {
+async function loadReview(qid, code, recallAnswer) {
   const placeholder = addMsg('tutor', 'reviewing your solution…');
   const textEl = placeholder.querySelector('.msg-text');
   try {
     const r = await fetch('/api/review', {
       method: 'POST', headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({question_id: qid, code})
+      body: JSON.stringify({question_id: qid, code, recall_answer: recallAnswer || ''})
     });
     const res = await r.json();
     if (!r.ok || res.error) {
       placeholder.className += ' err';
       textEl.textContent = 'error: ' + (res.error || r.status);
     } else {
-      textEl.textContent = '🔍 ' + res.review;
+      textEl.innerHTML = renderReviewCards(res.review_sections || {});
     }
   } catch (e) {
     placeholder.className += ' err';
     textEl.textContent = 'error: ' + e.message;
   }
+}
+
+const REVIEW_CARD_META = {
+  recall: {icon: '🧠', title: 'Your recall', className: 'recall-card'},
+  readability: {icon: '✍️', title: 'Readability', className: ''},
+  edge_cases: {icon: '⚠️', title: 'Edge cases', className: ''},
+  followup: {icon: '🔁', title: 'Follow-up twist', className: ''},
+  alternate: {icon: '🔀', title: 'Alternate approach', className: ''},
+};
+
+function renderReviewCards(sections) {
+  const order = ['recall', 'readability', 'edge_cases', 'followup', 'alternate'];
+  const cards = order
+    .filter(k => sections[k] && String(sections[k]).trim())
+    .map(k => {
+      const m = REVIEW_CARD_META[k];
+      return `<div class="review-card ${m.className}">
+        <div class="review-card-title">${m.icon} ${m.title}</div>
+        <div class="review-card-body">${escapeHtml(sections[k])}</div>
+      </div>`;
+    });
+  if (!cards.length) return '🔍 (nothing notable to review)';
+  return `<div class="review-cards">${cards.join('')}</div>`;
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  }[c]));
 }
 
 function sendMessage() {
@@ -3513,8 +3567,24 @@ function sendMessage() {
       renderSqlClarifyGate();
     }
   }
+  // Option C: the candidate just answered the recall question — now give the
+  // tailored review that references what they said, then clear the pending flag.
+  if (pendingRecallReview) {
+    const pr = pendingRecallReview;
+    pendingRecallReview = null;
+    document.getElementById('skip-review-btn').style.display = 'none';
+    loadReview(pr.qid, pr.code, text);
+  }
   nudgeSent = true;
   resetIdleTimer();
+}
+
+function skipToReview() {
+  if (!pendingRecallReview) return;
+  const pr = pendingRecallReview;
+  pendingRecallReview = null;
+  document.getElementById('skip-review-btn').style.display = 'none';
+  loadReview(pr.qid, pr.code, '');
 }
 
 function renderDebriefChecklist(textEl, missed, taxonomy, selfRated) {

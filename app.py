@@ -7,10 +7,21 @@ import sqlite3
 import subprocess
 import tempfile
 from datetime import datetime, timedelta
+from io import BytesIO
 
 from dotenv import load_dotenv
 from flask import Flask, jsonify, request, render_template, redirect
 from openai import OpenAI
+
+# resume parsing — optional, graceful fallback if missing
+try:
+    import pdfplumber
+except Exception:
+    pdfplumber = None
+try:
+    import docx
+except Exception:
+    docx = None
 
 load_dotenv()
 
@@ -22,6 +33,13 @@ client = OpenAI(base_url=API_BASE, api_key=os.environ["OPENROUTER_API_KEY"])
 MODEL = "deepseek/deepseek-v4-flash"
 # ponytail: separate client — OpenRouter doesn't proxy Whisper transcription, needs a real OpenAI key
 whisper_client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY", "")) if os.environ.get("OPENAI_API_KEY") else None
+
+# ponytail: Firecrawl layer is OPTIONAL. If the module or its deps are missing, every hybrid call
+# degrades to the precomputed bank. Import failure must never break app startup.
+try:
+    import firecrawl_layer as fc
+except Exception:
+    fc = None
 
 
 def chat_content(resp):
@@ -467,6 +485,53 @@ def save_progress():
     _atomic_json(PROGRESS_FILE, PROGRESS)
 
 
+# ponytail: reset wipes the *working state* of a question (saved code, trace, pattern,
+# skeleton, concept map) but preserves the earned credit (solved_at / due_at / fails) so a
+# redo doesn't also erase spaced-repetition progress. This is the "clean slate to retry the
+# code" action, not an "I never solved this" action.
+RESET_FIELDS = ("code", "trace", "pattern", "skeleton", "concept_map")
+
+
+def _reset_entry(qid):
+    p = PROGRESS.get(qid)
+    if not isinstance(p, dict):
+        return
+    for f in RESET_FIELDS:
+        p.pop(f, None)
+
+
+@app.route("/api/reset-question/<qid>", methods=["POST"])
+def reset_question(qid):
+    if qid not in QUESTIONS:
+        return jsonify({"error": "not found"}), 404
+    _reset_entry(qid)
+    save_progress()
+    return jsonify({"ok": True})
+
+
+@app.route("/api/reset-category/<lang>", methods=["POST"])
+def reset_category(lang):
+    if lang not in ("sql", "python", "design", "tradeoff"):
+        return jsonify({"error": "unknown lang"}), 404
+    for qid, q in QUESTIONS.items():
+        if q["lang"] == lang:
+            _reset_entry(qid)
+    save_progress()
+    return jsonify({"ok": True, "lang": lang})
+
+
+@app.route("/api/start-over", methods=["POST"])
+def start_over():
+    # ponytail: full clean slate — wipes every persistence file so the dashboard reads 0/N
+    # with no streaks, due reviews, saved code, chat history, or replay comments. Distinct
+    # from /api/reset-category which only clears working state and keeps solved credit.
+    import glob
+    for f in (PROGRESS_FILE, HISTORY_FILE, CHATS_FILE, REPLAY_COMMENTS_FILE):
+        if os.path.exists(f):
+            os.remove(f)
+    return jsonify({"ok": True})
+
+
 def log_history(entry):
     entry["ts"] = datetime.now().isoformat()
     HISTORY.append(entry)
@@ -611,6 +676,274 @@ def is_due(qid):
     return datetime.now() >= datetime.fromisoformat(p["due_at"])
 
 
+def _compute_gap_alerts():
+    """Compare resume-claimed skills against actual performance data for the dashboard.
+    Only shows skills that match our question bank — filters out irrelevant skills."""
+    resume = PROGRESS.get("_resume")
+    if not resume:
+        return []
+
+    # extract skill names (now objects with name/depth/context)
+    raw_skills = resume.get("skills", [])
+    skill_entries = []
+    for s in raw_skills:
+        if isinstance(s, dict):
+            skill_entries.append(s)
+        else:
+            skill_entries.append({"name": s, "depth": "moderate", "context": ""})
+
+    claimed_domains = [d.lower() for d in resume.get("domains", [])]
+
+    # build a set of all topic keywords we actually have questions for
+    question_topics = set()
+    for q in QUESTIONS.values():
+        question_topics.add(q.get("lang", "").lower())
+        t = topic_for(q)
+        question_topics.add(t.lower())
+    # add design concept tags
+    for q in QUESTIONS.values():
+        if q["lang"] == "design" and q.get("concept_tag"):
+            question_topics.add(q["concept_tag"].lower().replace("_", " "))
+
+    # filter: only show skills that plausibly match our question bank
+    def _is_relevant(skill_name):
+        sn = skill_name.lower()
+        # direct match
+        if sn in question_topics:
+            return True
+        # keyword overlap
+        for topic in question_topics:
+            if any(w in topic for w in sn.split() if len(w) > 3):
+                return True
+            if any(w in sn for w in topic.split() if len(w) > 3):
+                return True
+        # language match
+        if sn in ("sql", "python", "java", "scala", "javascript", "typescript"):
+            return True
+        # design domain match
+        design_domains = {"distributed systems", "data engineering", "machine learning",
+                          "cloud infrastructure", "microservices", "streaming", "databases",
+                          "payments", "ad tech", "healthcare", "retail", "real-time systems"}
+        if sn in design_domains:
+            return True
+        return False
+
+    # build accuracy per topic from HISTORY
+    topic_stats = {}
+    for h in HISTORY:
+        if h.get("event") == "submit":
+            t = h.get("topic")
+            if t:
+                if t not in topic_stats:
+                    topic_stats[t] = {"total": 0, "passed": 0}
+                topic_stats[t]["total"] += 1
+                if h.get("passed"):
+                    topic_stats[t]["passed"] += 1
+
+    gaps = []
+    for entry in skill_entries:
+        name = entry.get("name", "")
+        if not _is_relevant(name):
+            continue
+
+        # find matching topic
+        best_match = None
+        best_score = 0
+        for topic in topic_stats:
+            if name.lower() in topic or topic in name.lower():
+                best_match = topic
+                best_score = 1.0
+            elif any(w in topic for w in name.lower().split() if len(w) > 3):
+                score = sum(1 for w in name.lower().split() if w in topic and len(w) > 3) / max(1, len(name.split()))
+                if score > best_score:
+                    best_match = topic
+                    best_score = score
+
+        if best_match and best_score > 0.3:
+            stats = topic_stats[best_match]
+            pct = round(100 * stats["passed"] / stats["total"]) if stats["total"] > 0 else 0
+            if pct < 70:
+                gaps.append({"claimed": name, "topic": best_match, "accuracy": pct,
+                             "attempts": stats["total"],
+                             "severity": "high" if pct < 40 else "medium",
+                             "depth": entry.get("depth", "moderate")})
+        elif not best_match:
+            # claimed skill with zero practice — only show if relevant
+            gaps.append({"claimed": name, "topic": None, "accuracy": 0,
+                         "attempts": 0, "severity": "high",
+                         "depth": entry.get("depth", "moderate")})
+
+    # also check domains
+    for domain in claimed_domains:
+        if not _is_relevant(domain):
+            continue
+        best_match = None
+        for topic in topic_stats:
+            if domain in topic or topic in domain:
+                best_match = topic
+                break
+        if best_match:
+            stats = topic_stats[best_match]
+            pct = round(100 * stats["passed"] / stats["total"]) if stats["total"] > 0 else 0
+            if pct < 70:
+                gaps.append({"claimed": domain, "topic": best_match, "accuracy": pct,
+                             "attempts": stats["total"],
+                             "severity": "high" if pct < 40 else "medium",
+                             "depth": "domain"})
+
+    gaps.sort(key=lambda g: (0 if g["severity"] == "high" else 1, g["accuracy"]))
+    return gaps[:8]
+
+
+def _compute_study_plan():
+    """Compute a basic study plan from resume + performance data (no LLM call).
+    The full LLM-generated plan is available via /api/study-plan."""
+    resume = PROGRESS.get("_resume")
+    if not resume:
+        return []
+
+    target_role = resume.get("target_role", "software engineer")
+    strongest = resume.get("strongest_skills", [])[:3]
+
+    # find weak topics
+    topic_stats = {}
+    for h in HISTORY:
+        if h.get("event") == "submit":
+            t = h.get("topic")
+            if t:
+                if t not in topic_stats:
+                    topic_stats[t] = {"total": 0, "passed": 0}
+                topic_stats[t]["total"] += 1
+                if h.get("passed"):
+                    topic_stats[t]["passed"] += 1
+
+    weak_topics = []
+    for topic, stats in topic_stats.items():
+        pct = round(100 * stats["passed"] / stats["total"]) if stats["total"] > 0 else 0
+        if pct < 70 and stats["total"] >= 1:
+            weak_topics.append({"topic": topic, "accuracy": pct, "attempts": stats["total"]})
+    weak_topics.sort(key=lambda w: w["accuracy"])
+
+    plan = []
+    # priority 1: weak topics that match claimed skills
+    raw_skills = resume.get("skills", [])
+    skill_names = [s.get("name", s).lower() if isinstance(s, dict) else s.lower() for s in raw_skills]
+    for wt in weak_topics[:3]:
+        if any(s in wt["topic"].lower() for s in skill_names if len(s) > 3):
+            plan.append({
+                "title": f"Practice {wt['topic']}",
+                "action": f"You claim this skill but have {wt['accuracy']}% accuracy. Drill the weak spots.",
+                "priority": "high",
+                "category": "sql" if "sql" in wt["topic"].lower() or "join" in wt["topic"].lower() or "window" in wt["topic"].lower() else "python",
+            })
+
+    # priority 2: due reviews
+    due_count = sum(1 for qid in PROGRESS if is_due(qid))
+    if due_count > 0:
+        plan.append({
+            "title": f"Review {due_count} due question{'s' if due_count != 1 else ''}",
+            "action": "Spaced repetition keeps knowledge fresh. Review before starting new questions.",
+            "priority": "high",
+            "category": "sql",
+        })
+
+    # priority 3: design practice if claimed but not practiced
+    design_count = sum(1 for q in QUESTIONS.values() if q["lang"] == "design" and not is_solved(q["id"]))
+    design_practiced = any(h.get("event") == "design_debrief" for h in HISTORY)
+    domains = [d.lower() for d in resume.get("domains", [])]
+    if domains and not design_practiced and design_count > 0:
+        plan.append({
+            "title": "Try a system design question",
+            "action": f"Your resume mentions {', '.join(domains[:2])} — practice applying your experience to design problems.",
+            "priority": "medium",
+            "category": "design",
+        })
+
+    # fill to 5 items
+    if len(plan) < 5:
+        unsolved_sql = sum(1 for q in QUESTIONS.values() if q["lang"] == "sql" and not is_solved(q["id"]))
+        unsolved_py = sum(1 for q in QUESTIONS.values() if q["lang"] == "python" and not is_solved(q["id"]))
+        if unsolved_sql > 0:
+            plan.append({
+                "title": f"Solve {unsolved_sql} SQL question{'s' if unsolved_sql != 1 else ''}",
+                "action": "Keep momentum on your core skill.",
+                "priority": "low",
+                "category": "sql",
+            })
+        if unsolved_py > 0 and len(plan) < 5:
+            plan.append({
+                "title": f"Solve {unsolved_py} Python question{'s' if unsolved_py != 1 else ''}",
+                "action": "Build coding fluency.",
+                "priority": "low",
+                "category": "python",
+            })
+
+    return plan[:5]
+
+
+def _compute_claim_validation():
+    """Track which resume claims have been validated by practice (no LLM call)."""
+    resume = PROGRESS.get("_resume")
+    if not resume:
+        return {"validated": [], "unvalidated": [], "total_skills": 0, "validated_count": 0}
+
+    raw_skills = resume.get("skills", [])
+    skill_entries = []
+    for s in raw_skills:
+        if isinstance(s, dict):
+            skill_entries.append(s)
+        else:
+            skill_entries.append({"name": s, "depth": "moderate", "context": ""})
+
+    topic_stats = {}
+    for h in HISTORY:
+        if h.get("event") == "submit":
+            t = h.get("topic")
+            if t:
+                if t not in topic_stats:
+                    topic_stats[t] = {"total": 0, "passed": 0}
+                topic_stats[t]["total"] += 1
+                if h.get("passed"):
+                    topic_stats[t]["passed"] += 1
+
+    validated = []
+    unvalidated = []
+    for entry in skill_entries:
+        name = entry.get("name", "")
+        best_match = None
+        for topic in topic_stats:
+            if name.lower() in topic or topic in name.lower():
+                best_match = topic
+                break
+            elif any(w in topic for w in name.lower().split() if len(w) > 3):
+                best_match = topic
+                break
+
+        if best_match:
+            stats = topic_stats[best_match]
+            pct = round(100 * stats["passed"] / stats["total"]) if stats["total"] > 0 else 0
+            validated.append({
+                "skill": name, "accuracy": pct, "attempts": stats["total"],
+                "depth": entry.get("depth", "moderate"),
+                "strong": pct >= 70,
+            })
+        else:
+            unvalidated.append({
+                "skill": name, "depth": entry.get("depth", "moderate"),
+                "context": entry.get("context", ""),
+            })
+
+    validated.sort(key=lambda v: (-v["strong"], -v["accuracy"]))
+    unvalidated.sort(key=lambda u: 0 if u["depth"] == "deep" else 1)
+
+    return {
+        "validated": validated,
+        "unvalidated": unvalidated[:15],
+        "total_skills": len(skill_entries),
+        "validated_count": len([v for v in validated if v["strong"]]),
+    }
+
+
 def run_sql_case(schema_sql, code):
     conn = sqlite3.connect(":memory:")
     conn.executescript(schema_sql)
@@ -685,6 +1018,1005 @@ def save_onboarding():
     PROGRESS["_onboarding"] = {"strongest": strongest, "weakest": weakest}
     save_progress()
     return jsonify({"ok": True})
+
+
+def _extract_text_from_resume(file_bytes, filename):
+    """Extract plain text from a PDF or DOCX file."""
+    lower = filename.lower()
+    if lower.endswith(".pdf") and pdfplumber:
+        with pdfplumber.open(BytesIO(file_bytes)) as pdf:
+            return "\n".join(page.extract_text() or "" for page in pdf.pages)
+    elif lower.endswith((".docx", ".doc")) and docx:
+        doc = docx.Document(BytesIO(file_bytes))
+        return "\n".join(p.text for p in doc.paragraphs)
+    elif lower.endswith(".txt"):
+        return file_bytes.decode("utf-8", errors="replace")
+    return None
+
+
+def _call_json_extract(prompt, max_tokens=1800):
+    """Call the LLM for a JSON-only extraction, with a truncation-safe retry.
+    If the first response is cut off (finish_reason 'length'), retries once with a
+    larger cap. Returns the cleaned response text, or None if both attempts fail."""
+    def _clean(raw):
+        if not raw:
+            return None
+        raw = re.sub(r"^```[a-zA-Z]*\n?", "", raw.strip())
+        raw = re.sub(r"\n?```$", "", raw).strip()
+        if "{" not in raw or "}" not in raw:
+            return None
+        return raw
+
+    try:
+        resp = client.chat.completions.create(
+            model=MODEL,
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=max_tokens,
+            temperature=0.1,
+            extra_body={"reasoning": {"enabled": False}},
+        )
+        raw = _clean(chat_content(resp))
+        if raw:
+            return raw
+        # truncated or empty — retry once with a larger cap if it was length-limited
+        if getattr(resp.choices[0], "finish_reason", None) == "length":
+            resp2 = client.chat.completions.create(
+                model=MODEL,
+                messages=[{"role": "user", "content": prompt}],
+                max_tokens=max_tokens * 2,
+                temperature=0.1,
+                extra_body={"reasoning": {"enabled": False}},
+            )
+            raw2 = _clean(chat_content(resp2))
+            if raw2:
+                return raw2
+        return None
+    except Exception:
+        return None
+
+
+def _extract_skills_from_resume(text):
+    """Use LLM to extract structured skills, projects, and domain from resume text.
+    Returns rich data including depth signals, project specificity, and skill context."""
+    prompt = f"""Analyze this resume like a technical interviewer would. Extract structured information. Respond ONLY with a JSON object — no markdown, no commentary.
+
+Resume text (truncated):
+{text[:4000]}
+
+Return exactly this JSON shape:
+{{
+  "target_role": "inferred target role e.g. 'data engineer', 'backend engineer', 'ML engineer' — be specific",
+  "years_experience": "estimated years or null",
+  "skills": [
+    {{
+      "name": "skill name (e.g. 'Python', 'PostgreSQL', 'Kafka')",
+      "depth": "deep | moderate | shallow — based on how it was used (built production system = deep, listed in skills section only = shallow)",
+      "context": "where/how it was used (e.g. 'used in AdTech pipeline for 3B daily events') — be specific"
+    }}
+  ],
+  "projects": [
+    {{
+      "name": "project name",
+      "description": "what it does — be specific about scale, impact, technical choices",
+      "tech": ["technologies used"],
+      "specificity": "high | low — are the numbers/concrete details provided or is it vague?"
+    }}
+  ],
+  "domains": ["application domains e.g. 'ad tech', 'healthcare', 'payments', 'distributed systems'"],
+  "strongest_skills": ["top 3-5 skills based on depth and context"],
+  "weakest_signals": ["skills that appear only in the skills list with no project context — likely shallow"]
+}}
+
+Note: do NOT include interview questions/probes — those are generated on demand later.
+Be strict about depth: "familiar with X" or just listing X = shallow. "Built Y using X processing Z events/day" = deep."""
+
+    raw = _call_json_extract(prompt, max_tokens=1800)
+    if not raw:
+        return None
+    try:
+        obj = json.loads(raw[raw.index("{"):raw.rindex("}") + 1])
+        return {
+            "skills": obj.get("skills", []),
+            "projects": obj.get("projects", []),
+            "domains": obj.get("domains", []),
+            "years_experience": obj.get("years_experience"),
+            "target_role": obj.get("target_role"),
+            "strongest_skills": obj.get("strongest_skills", []),
+            "weakest_signals": obj.get("weakest_signals", []),
+        }
+    except Exception:
+        return None
+
+
+# ponytail: CONCEPT_TAXONOMY (defined near the top of this file) is the shared vocabulary
+# the JD extractor maps into. JD tool-keywords ("Kafka", "Flink") are intentionally
+# translated to the UNDERLYING CONCEPT ("streaming paradigm") so matching against the
+# resume happens at the concept level, not the tool level. Azure↔AWS↔GCP are treated
+# as the same concept (cloud platform) — a translation, not a gap.
+JD_CONCEPT_TRANSLATIONS = {
+    "azure": "cloud_platform", "aws": "cloud_platform", "gcp": "cloud_platform",
+    "google cloud": "cloud_platform", "cloud platform": "cloud_platform",
+    "kafka": "streaming_paradigm", "flink": "streaming_paradigm",
+    "spark streaming": "streaming_paradigm", "kinesis": "streaming_paradigm",
+    "pyspark": "batch_paradigm", "spark": "batch_paradigm", "databricks": "batch_paradigm",
+    "airflow": "orchestration", "luigi": "orchestration", "dagster": "orchestration",
+    "terraform": "iac", "pulumi": "iac", "cloudformation": "iac",
+    "dbt": "data_modeling", "snowflake": "warehouse", "bigquery": "warehouse",
+    "redshift": "warehouse", "postgres": "sql_database", "mysql": "sql_database",
+    "sql server": "sql_database", "t-sql": "sql_database",
+    "iceberg": "storage_format", "delta lake": "storage_format", "parquet": "storage_format",
+    "hive": "storage_format", "kubernetes": "container_orchestration", "docker": "containers",
+}
+
+
+def _extract_concepts_from_jd(text):
+    """Use LLM to extract the JD at the CONCEPT level, not the tool-keyword level.
+    Returns concepts (mapped to our taxonomy where possible), required capabilities,
+    and the raw tool keywords (for the translation sidebar)."""
+    concept_list = ", ".join(CONCEPT_TAXONOMY)
+    prompt = f"""You are analyzing a job description for a technical interview coach. Extract what the role ACTUALLY requires at the CONCEPT level — not the literal tool names.
+
+Job description (truncated):
+{text[:4000]}
+
+Our coaching taxonomy of data-engineering concepts (use these exact keys where they fit):
+{concept_list}
+
+Return ONLY this JSON — no markdown, no commentary:
+{{
+  "role_title": "the job title, be specific",
+  "seniority": "junior | mid | senior | staff | principal",
+  "domain": "the application domain (e.g. 'real-time recommendation', 'payments', 'adtech', 'healthcare')",
+  "concepts_required": [
+    {{
+      "concept": "a concept key from the taxonomy above if it fits, else a short concept phrase (e.g. 'streaming_paradigm', 'batch_vs_stream_choice', 'partitioning_hot_key_skew', 'cloud_platform', 'ic_across_teams')",
+      "evidence": "the JD phrase that implies this concept",
+      "importance": "must_have | nice_to_have"
+    }}
+  ],
+  "capabilities_required": [
+    "broader capabilities the role needs that aren't single taxonomy concepts, e.g. 'design a real-time system from scratch', 'own a data platform end to end', 'translate batch experience to streaming' — 3 to 6 items"
+  ],
+  "tool_keywords": ["literal tools/services named in the JD, e.g. 'Kafka', 'AWS', 'Flink', 'Terraform' — preserved for the translation sidebar"],
+  "signal_framing": "1-2 sentences on what kind of candidate this JD is really looking for (beyond the bullet list)"
+}}
+
+Critical: if the JD says 'Kafka' or 'Flink', the concept is 'streaming_paradigm' (not 'Kafka'). If it says 'AWS' or 'GCP', the concept is 'cloud_platform'. Batch tools (Spark, PySpark) map to 'batch_paradigm'. Think in paradigms and concepts, not brand names."""
+
+    raw = _call_json_extract(prompt, max_tokens=1500)
+    if not raw:
+        return None
+    try:
+        obj = json.loads(raw[raw.index("{"):raw.rindex("}") + 1])
+        return {
+            "role_title": obj.get("role_title", ""),
+            "seniority": obj.get("seniority", ""),
+            "domain": obj.get("domain", ""),
+            "concepts_required": obj.get("concepts_required", []),
+            "capabilities_required": obj.get("capabilities_required", []),
+            "tool_keywords": obj.get("tool_keywords", []),
+            "signal_framing": obj.get("signal_framing", ""),
+        }
+    except Exception:
+        return None
+
+
+@app.route("/api/upload-jd", methods=["POST"])
+def upload_jd():
+    """Accept a PDF/DOCX/TXT job description, extract concepts via LLM, store in progress."""
+    file = request.files.get("jd")
+    if not file:
+        return jsonify({"error": "no file uploaded"}), 400
+
+    raw_bytes = file.read()
+    if len(raw_bytes) > 5 * 1024 * 1024:
+        return jsonify({"error": "file too large (max 5 MB)"}), 400
+
+    text = _extract_text_from_resume(raw_bytes, file.filename or "jd.pdf")
+    if not text or len(text.strip()) < 30:
+        return jsonify({"error": "could not extract text — try a different file format"}), 400
+
+    jd_data = _extract_concepts_from_jd(text)
+    if not jd_data:
+        return jsonify({"error": "could not parse JD — try again"}), 500
+
+    jd_data["raw_text_preview"] = text[:300]
+    jd_data["uploaded_at"] = datetime.now().isoformat()
+    jd_data["filename"] = file.filename
+    PROGRESS["_jd"] = jd_data
+    save_progress()
+    return jsonify({"ok": True, "role_title": jd_data.get("role_title"),
+                    "seniority": jd_data.get("seniority"),
+                    "domain": jd_data.get("domain"),
+                    "concepts_required": len(jd_data.get("concepts_required", [])),
+                    "tool_keywords": jd_data.get("tool_keywords", [])})
+
+
+@app.route("/api/jd", methods=["GET"])
+def get_jd():
+    """Return stored JD concept data or empty."""
+    return jsonify(PROGRESS.get("_jd", {}))
+
+
+@app.route("/api/upload-resume", methods=["POST"])
+def upload_resume():
+    """Accept a PDF/DOCX/TXT resume, extract text, pull skills via LLM, store in progress."""
+    file = request.files.get("resume")
+    if not file:
+        return jsonify({"error": "no file uploaded"}), 400
+
+    raw_bytes = file.read()
+    if len(raw_bytes) > 5 * 1024 * 1024:
+        return jsonify({"error": "file too large (max 5 MB)"}), 400
+
+    text = _extract_text_from_resume(raw_bytes, file.filename or "resume.pdf")
+    if not text or len(text.strip()) < 50:
+        return jsonify({"error": "could not extract text — try a different file format"}), 400
+
+    skills_data = _extract_skills_from_resume(text)
+    if not skills_data:
+        return jsonify({"error": "could not parse resume — try again"}), 500
+
+    skills_data["raw_text_preview"] = text[:500]
+    skills_data["uploaded_at"] = datetime.now().isoformat()
+    skills_data["filename"] = file.filename
+    PROGRESS["_resume"] = skills_data
+    save_progress()
+    # build summary for response
+    skill_names = [s.get("name", s) if isinstance(s, dict) else s for s in skills_data.get("skills", [])]
+    return jsonify({"ok": True, "skills": skill_names, "domains": skills_data.get("domains", []),
+                     "projects_count": len(skills_data.get("projects", [])),
+                     "target_role": skills_data.get("target_role"),
+                     "strongest_skills": skills_data.get("strongest_skills", [])})
+
+
+@app.route("/api/resume", methods=["GET"])
+def get_resume():
+    """Return stored resume data (skills, projects, domains) or empty."""
+    return jsonify(PROGRESS.get("_resume", {}))
+
+
+@app.route("/api/gap-alert", methods=["GET"])
+def gap_alert():
+    """Compare resume-claimed skills against actual performance data.
+    Returns a list of gaps: claimed skill with low or no accuracy."""
+    resume = PROGRESS.get("_resume")
+    if not resume:
+        return jsonify({"gaps": [], "resume_loaded": False})
+
+    claimed_skills = [s.lower() for s in resume.get("skills", [])]
+    claimed_domains = [d.lower() for d in resume.get("domains", [])]
+    all_claims = claimed_skills + claimed_domains
+
+    # build accuracy per topic from HISTORY
+    topic_stats = {}  # topic -> {"total": N, "passed": N}
+    for h in HISTORY:
+        if h.get("event") == "submit":
+            t = h.get("topic")
+            if t:
+                if t not in topic_stats:
+                    topic_stats[t] = {"total": 0, "passed": 0}
+                topic_stats[t]["total"] += 1
+                if h.get("passed"):
+                    topic_stats[t]["passed"] += 1
+
+    # match claimed skills to topics
+    gaps = []
+    for claim in all_claims:
+        best_match = None
+        best_score = 0
+        for topic in topic_stats:
+            # fuzzy match: claim appears in topic or topic appears in claim
+            if claim in topic or topic in claim:
+                best_match = topic
+                best_score = 1.0
+            elif any(w in topic for w in claim.split() if len(w) > 3):
+                score = sum(1 for w in claim.split() if w in topic and len(w) > 3) / max(1, len(claim.split()))
+                if score > best_score:
+                    best_match = topic
+                    best_score = score
+
+        if best_match and best_score > 0.3:
+            stats = topic_stats[best_match]
+            pct = round(100 * stats["passed"] / stats["total"]) if stats["total"] > 0 else 0
+            if pct < 70:
+                gaps.append({"claimed": claim, "topic": best_match, "accuracy": pct,
+                             "attempts": stats["total"], "severity": "high" if pct < 40 else "medium"})
+        elif not best_match:
+            # claimed skill with zero practice attempts
+            gaps.append({"claimed": claim, "topic": None, "accuracy": 0,
+                         "attempts": 0, "severity": "high"})
+
+    # sort: high severity first, then by accuracy ascending
+    gaps.sort(key=lambda g: (0 if g["severity"] == "high" else 1, g["accuracy"]))
+    return jsonify({"gaps": gaps[:10], "resume_loaded": True,
+                     "claimed_skills": resume.get("skills", []),
+                     "claimed_domains": resume.get("domains", [])})
+
+
+@app.route("/api/talk-about", methods=["POST"])
+def talk_about():
+    """Generate interview follow-up questions for a resume project.
+    Uses rich project data from resume extraction (specificity, interview probes)."""
+    data = request.json
+    project_name = data.get("project_name", "")
+    project_tech = data.get("tech", [])
+    project_desc = data.get("one_liner", "")
+
+    resume = PROGRESS.get("_resume", {})
+    projects = resume.get("projects", [])
+    project = next((p for p in projects if p.get("name") == project_name), None)
+
+    project_name_used = project_name
+    project_desc_used = project_desc
+    project_tech_used = project_tech
+    specificity = "unknown"
+
+    if project:
+        project_name_used = project.get("name", project_name)
+        project_tech_used = project.get("tech", project_tech)
+        project_desc_used = project.get("description", project.get("one_liner", project_desc))
+        specificity = project.get("specificity", "unknown")
+
+    tech_str = ", ".join(project_tech_used) if project_tech_used else "their stack"
+    specificity_note = ""
+    if specificity == "low":
+        specificity_note = "\n\nNote: This project description is vague. Include a question that probes for specifics (scale, numbers, challenges) — interviewers will."
+
+    target_role = resume.get("target_role", "")
+    role_note = ""
+    if target_role:
+        role_note = f"\n\nThe candidate is targeting a {target_role} role. Frame at least one question around architectural decisions relevant to that role."
+
+    prompt = f"""You are a senior interviewer drilling a candidate on a project from their resume.
+
+Project: {project_name_used}
+Description: {project_desc_used}
+Technologies: {tech_str}
+Description specificity: {specificity}
+{specificity_note}{role_note}
+
+Generate 5 interview follow-up questions that a real interviewer would ask.
+Mix depths:
+1. Warm-up — "tell me about this project"
+2. Technical deep-dive — probe a specific technology choice
+3. Challenge — "what was the hardest part?"
+4. Scale/impact — probe numbers or scale
+5. Reflection — "what would you change?"
+
+Make questions SPECIFIC to this project — not generic "tell me about a time when..."
+
+Respond ONLY with JSON — no markdown, no commentary:
+{{"questions": ["q1", "q2", "q3", "q4", "q5"], "vague_description": true/false}}"""
+
+    try:
+        resp = client.chat.completions.create(
+            model=MODEL,
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=500,
+            temperature=0.4,
+            extra_body={"reasoning": {"enabled": False}},
+        )
+        raw = chat_content(resp)
+        if not raw:
+            return jsonify({"error": "model returned empty response"}), 502
+        raw = re.sub(r"^```[a-zA-Z]*\n?", "", raw.strip())
+        raw = re.sub(r"\n?```$", "", raw).strip()
+        obj = json.loads(raw[raw.index("{"):raw.rindex("}") + 1])
+        questions = obj.get("questions", [])
+        if not questions:
+            return jsonify({"error": "no questions generated"}), 502
+        return jsonify({
+            "questions": questions,
+            "project": project_name_used,
+            "vague_description": obj.get("vague_description", False),
+            "specificity": specificity,
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 502
+
+
+@app.route("/api/study-plan", methods=["GET"])
+def study_plan():
+    """Generate a personalized study plan based on resume + performance data."""
+    resume = PROGRESS.get("_resume")
+    if not resume:
+        return jsonify({"plan": [], "resume_loaded": False})
+
+    target_role = resume.get("target_role", "software engineer")
+    strongest = resume.get("strongest_skills", [])[:5]
+    weakest = resume.get("weakest_signals", [])[:5]
+
+    # get accuracy per topic
+    topic_stats = {}
+    for h in HISTORY:
+        if h.get("event") == "submit":
+            t = h.get("topic")
+            if t:
+                if t not in topic_stats:
+                    topic_stats[t] = {"total": 0, "passed": 0}
+                topic_stats[t]["total"] += 1
+                if h.get("passed"):
+                    topic_stats[t]["passed"] += 1
+
+    # build practice summary
+    practice_lines = []
+    for topic, stats in sorted(topic_stats.items(), key=lambda x: x[1]["total"], reverse=True):
+        pct = round(100 * stats["passed"] / stats["total"]) if stats["total"] > 0 else 0
+        practice_lines.append(f"  - {topic}: {pct}% accuracy ({stats['total']} attempts)")
+
+    # find unsolved questions by category
+    unsolved_sql = sum(1 for q in QUESTIONS.values() if q["lang"] == "sql" and not is_solved(q["id"]))
+    unsolved_py = sum(1 for q in QUESTIONS.values() if q["lang"] == "python" and not is_solved(q["id"]))
+    unsolved_design = sum(1 for q in QUESTIONS.values() if q["lang"] == "design" and not is_solved(q["id"]))
+    due = sum(1 for qid in PROGRESS if is_due(qid))
+
+    # deadline info
+    deadline_info = ""
+    deadline = PROGRESS.get("_deadline")
+    if isinstance(deadline, dict) and deadline.get("date"):
+        days_left = (datetime.fromisoformat(deadline["date"]) - datetime.now()).days
+        deadline_info = f"\nInterview in {days_left} days."
+
+    practice_summary = "\n".join(practice_lines) if practice_lines else "  No practice data yet."
+
+    prompt = f"""You are a technical interview coach creating a personalized weekly study plan.
+
+Candidate profile:
+- Target role: {target_role}
+- Strongest skills (from resume): {', '.join(strongest) if strongest else 'unknown'}
+- Skills needing validation (shallow/no context): {', '.join(weakest) if weakest else 'unknown'}
+- Resume domains: {', '.join(resume.get('domains', [])[:5])}
+
+Current practice performance:
+{practice_summary}
+
+Remaining questions: {unsolved_sql} SQL, {unsolved_py} Python, {unsolved_design} design
+Due for review: {due}{deadline_info}
+
+Create a focused 5-item study plan. Each item should be:
+- Specific (not "practice SQL" but "practice SQL window functions — you claim SQL expertise")
+- Actionable (point to what to do, not what to read)
+- Prioritized (most impactful first)
+
+Respond ONLY with JSON — no markdown, no commentary:
+{{"plan_items": [{{"title": "short title", "action": "what to do — 1-2 sentences", "priority": "high|medium|low", "category": "sql|python|design|behavioral"}}]}}"""
+
+    try:
+        resp = client.chat.completions.create(
+            model=MODEL,
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=500,
+            temperature=0.3,
+            extra_body={"reasoning": {"enabled": False}},
+        )
+        raw = chat_content(resp)
+        if not raw:
+            return jsonify({"plan": [], "resume_loaded": True})
+        raw = re.sub(r"^```[a-zA-Z]*\n?", "", raw.strip())
+        raw = re.sub(r"\n?```$", "", raw).strip()
+        obj = json.loads(raw[raw.index("{"):raw.rindex("}") + 1])
+        items = obj.get("plan_items", [])
+        return jsonify({"plan": items[:5], "resume_loaded": True,
+                         "target_role": target_role})
+    except Exception:
+        return jsonify({"plan": [], "resume_loaded": True, "target_role": target_role})
+
+
+@app.route("/api/claim-validation", methods=["GET"])
+def claim_validation():
+    """Track which resume claims have been validated by practice performance."""
+    resume = PROGRESS.get("_resume")
+    if not resume:
+        return jsonify({"validated": [], "unvalidated": [], "resume_loaded": False})
+
+    raw_skills = resume.get("skills", [])
+    skill_entries = []
+    for s in raw_skills:
+        if isinstance(s, dict):
+            skill_entries.append(s)
+        else:
+            skill_entries.append({"name": s, "depth": "moderate", "context": ""})
+
+    # build accuracy per topic
+    topic_stats = {}
+    for h in HISTORY:
+        if h.get("event") == "submit":
+            t = h.get("topic")
+            if t:
+                if t not in topic_stats:
+                    topic_stats[t] = {"total": 0, "passed": 0}
+                topic_stats[t]["total"] += 1
+                if h.get("passed"):
+                    topic_stats[t]["passed"] += 1
+
+    validated = []
+    unvalidated = []
+    for entry in skill_entries:
+        name = entry.get("name", "")
+        best_match = None
+        for topic in topic_stats:
+            if name.lower() in topic or topic in name.lower():
+                best_match = topic
+                break
+            elif any(w in topic for w in name.lower().split() if len(w) > 3):
+                best_match = topic
+                break
+
+        if best_match:
+            stats = topic_stats[best_match]
+            pct = round(100 * stats["passed"] / stats["total"]) if stats["total"] > 0 else 0
+            validated.append({
+                "skill": name, "accuracy": pct, "attempts": stats["total"],
+                "depth": entry.get("depth", "moderate"),
+                "strong": pct >= 70,
+            })
+        else:
+            unvalidated.append({
+                "skill": name, "depth": entry.get("depth", "moderate"),
+                "context": entry.get("context", ""),
+            })
+
+    validated.sort(key=lambda v: (-v["strong"], -v["accuracy"]))
+    unvalidated.sort(key=lambda u: 0 if u["depth"] == "deep" else 1)
+
+    return jsonify({
+        "validated": validated,
+        "unvalidated": unvalidated[:15],
+        "resume_loaded": True,
+        "total_skills": len(skill_entries),
+        "validated_count": len([v for v in validated if v["strong"]]),
+    })
+
+
+def _resume_concept_evidence():
+    """Flatten the resume into a concept-evidence string the JD matcher can scan.
+    Pulls skill names, depths, contexts, project descriptions, tech, and domains so a
+    concept like 'streaming_paradigm' can be detected from a project narrative even if
+    the word 'streaming' never appears literally."""
+    resume = PROGRESS.get("_resume")
+    if not resume:
+        return "", []
+    parts = []
+    evidence_skills = []
+    for s in resume.get("skills", []):
+        if isinstance(s, dict):
+            parts.append(f"skill: {s.get('name','')} ({s.get('depth','moderate')}) — {s.get('context','')}")
+            evidence_skills.append(s.get("name", "").lower())
+        else:
+            parts.append(f"skill: {s}")
+            evidence_skills.append(str(s).lower())
+    for p in resume.get("projects", []):
+        desc = p.get("description", p.get("one_liner", ""))
+        tech = ", ".join(p.get("tech", []))
+        parts.append(f"project: {p.get('name','')} — {desc} (tech: {tech})")
+    for d in resume.get("domains", []):
+        parts.append(f"domain: {d}")
+    return "\n".join(parts), evidence_skills
+
+
+# ponytail: the JD extractor may emit either a taxonomy key OR a plain-English phrase.
+# Normalize both to the canonical taxonomy key so the matcher's heuristics line up.
+# This is deterministic string mapping — no LLM involvement, so no hallucination risk here.
+CONCEPT_NORMALIZATION = {
+    "streaming": "streaming_paradigm", "streaming paradigm": "streaming_paradigm",
+    "stream processing": "streaming_paradigm", "real-time": "streaming_paradigm",
+    "real time": "streaming_paradigm", "realtime": "streaming_paradigm",
+    "streaming paradigm": "streaming_paradigm", "kafka": "streaming_paradigm",
+    "flink": "streaming_paradigm", "event streaming": "streaming_paradigm",
+    "batch": "batch_paradigm", "batch processing": "batch_paradigm",
+    "batch paradigm": "batch_paradigm", "etl": "batch_paradigm",
+    "cloud": "cloud_platform", "cloud platform": "cloud_platform",
+    "cloud provider": "cloud_platform", "azure": "cloud_platform",
+    "aws": "cloud_platform", "gcp": "cloud_platform", "databricks": "cloud_platform",
+    "partitioning": "partitioning_hot_key_skew", "hot key": "partitioning_hot_key_skew",
+    "skew": "partitioning_hot_key_skew", "data skew": "partitioning_hot_key_skew",
+    "idempotency": "idempotency_dedup", "dedup": "idempotency_dedup",
+    "idempotent": "idempotency_dedup", "exactly once": "idempotency_dedup",
+    "backfill": "backfill_reprocessing", "reprocessing": "backfill_reprocessing",
+    "replay": "backfill_reprocessing", "reprocess": "backfill_reprocessing",
+    "schema evolution": "schema_evolution_compat", "schema": "schema_evolution_compat",
+    "watermark": "late_data_watermarks", "late data": "late_data_watermarks",
+    "late arrival": "late_data_watermarks", "event time": "late_data_watermarks",
+    "data quality": "data_quality_observability", "observability": "data_quality_observability",
+    "monitoring": "data_quality_observability", "data validation": "data_quality_observability",
+    "storage format": "storage_format_choice", "file format": "storage_format_choice",
+    "replication": "replication_consistency", "consistency": "replication_consistency",
+    "failover": "replication_consistency", "stakeholder": "domain_alignment",
+    "requirements gathering": "clarifying_requirements", "clarifying": "clarifying_requirements",
+    "scoping": "clarifying_requirements", "orchestration": "orchestration",
+    "scheduler": "orchestration", "iac": "iac", "infrastructure as code": "iac",
+    "data modeling": "data_modeling", "modeling": "data_modeling",
+    "warehouse": "warehouse", "sql": "sql_database", "relational": "sql_database",
+    "kubernetes": "container_orchestration", "containers": "containers",
+    "grain": "grain_awareness", "star schema": "grain_awareness",
+    "scd": "scd_strategy", "slowly changing": "scd_strategy",
+    "entity": "entity_enumeration", "dimension": "missing_dimension_audit",
+    "feature store": "feature_store", "feature serving": "feature_store",
+    "low-latency serving": "feature_store", "ml platform": "feature_store",
+}
+
+
+def _normalize_concept(concept):
+    """Map a JD concept (taxonomy key OR plain-English phrase) to a canonical key.
+    Falls back to the lowercased, underscored form so unknown concepts still flow through."""
+    if not concept:
+        return ""
+    c = concept.strip().lower()
+    if c in CONCEPT_NORMALIZATION:
+        return CONCEPT_NORMALIZATION[c]
+    # try the underscored version (e.g. 'streaming_paradigm' passes through untouched)
+    underscored = c.replace(" ", "_")
+    if underscored in CONCEPT_NORMALIZATION:
+        return CONCEPT_NORMALIZATION[underscored]
+    # try substring match against known phrases (handles 'real-time processing' etc.)
+    for phrase, key in CONCEPT_NORMALIZATION.items():
+        if phrase in c:
+            return key
+    return underscored
+
+
+def _concept_is_present(concept, evidence_text, evidence_skills):
+    """Heuristic: is this JD concept evidenced in the resume?
+    Returns (present: bool, confidence: 'high'|'medium'|'low').
+    Conservative by design: requires STRONG signals for easy-to-false-positive concepts
+    (streaming must show streaming tooling, not just the word 'event' in a batch context)."""
+    concept_l = concept.lower().replace("_", " ")
+    hay = evidence_text.lower()
+
+    # STRONG (tool-level) signals — high confidence when present
+    strong = {
+        "streaming_paradigm": ["kafka", "flink", "kinesis", "spark streaming", "pub/sub",
+                               "streaming pipeline", "real-time pipeline", "stream processor"],
+        "batch_paradigm": ["batch", "pyspark", "spark", "etl", "dataproc", "scheduled job",
+                           "daily job", "hourly job", "airflow"],
+        "cloud_platform": ["azure", "aws", "gcp", "databricks", "s3", "blob", "cloud"],
+        "idempotency_dedup": ["idempot", "dedup", "exactly-once", "exactly once", "deduplicate"],
+        "backfill_reprocessing": ["backfill", "reprocess", "replay", "recompute"],
+        "late_data_watermarks": ["watermark", "late arrival", "late data", "event time", "windowed"],
+        "schema_evolution_compat": ["schema evolution", "schema contract", "avro", "versioned schema"],
+        "partitioning_hot_key_skew": ["partition skew", "hot key", "data skew", "repartition"],
+        "replication_consistency": ["replication", "failover", "leader", "replica"],
+        "storage_format_choice": ["parquet", "iceberg", "delta lake", "orc", "columnar"],
+        "data_quality_observability": ["data quality", "data validation", "monitoring", "observability"],
+        "orchestration": ["airflow", "dagster", "luigi", "orchestrat"],
+        "iac": ["terraform", "pulumi", "cloudformation"],
+        "warehouse": ["snowflake", "bigquery", "redshift"],
+        "sql_database": ["postgres", "mysql", "t-sql", "sql server", "relational"],
+        "container_orchestration": ["kubernetes", "k8s", "eks", "aks", "gke"],
+        "containers": ["docker", "container", "podman"],
+        "grain_awareness": ["grain", "star schema", "fact table"],
+        "scd_strategy": ["scd", "slowly changing", "type 2"],
+        "entity_enumeration": ["dimension", "fact table", "entity model"],
+        "missing_dimension_audit": ["dimension", "data mart", "modeling audit"],
+        "feature_store": ["feature store", "feature serving", "low-latency serving", "ml platform",
+                          "feature development", "feature reuse"],
+    }
+    # WEAK (fuzzy) signals — medium/low confidence, prone to false positives, so gated
+    weak = {
+        "streaming_paradigm": [("real-time", "low"), ("realtime", "low"), ("event stream", "medium")],
+        "batch_vs_stream_choice": [("batch", "medium"), ("stream", "low"), ("latency", "low"), ("sla", "low")],
+        "late_data_watermarks": [("window", "low"), ("event time", "low")],
+        "domain_alignment": [("stakeholder", "medium"), ("requirements", "medium"), ("business", "low"), ("alignment", "low")],
+        "clarifying_requirements": [("requirement", "medium"), ("scope", "low"), ("clarif", "low")],
+        "data_modeling": [("modeling", "low"), ("warehouse", "low")],
+    }
+
+    for s in strong.get(concept, []):
+        if s and s in hay:
+            return True, "high"
+    # weak signals only count if no strong signal matched, and they're explicitly lower confidence
+    for w, conf in weak.get(concept, []):
+        if w and w in hay:
+            return True, conf
+    return False, "none"
+
+
+def _compute_concept_match():
+    """Concept-level gap analysis: map JD required concepts against resume evidence.
+    Returns real gaps (concept not evidenced) vs translations (tool differs but concept
+    is present, e.g. Azure→AWS) vs covered. This is the core of the JD feature."""
+    jd = PROGRESS.get("_jd")
+    resume = PROGRESS.get("_resume")
+    if not jd:
+        return {"jd_loaded": False, "resume_loaded": bool(resume), "real_gaps": [],
+                "translations": [], "covered": []}
+    if not resume:
+        # JD loaded but no resume — report every required concept as unverifiable
+        return {"jd_loaded": True, "resume_loaded": False,
+                "real_gaps": [{"concept": c.get("concept"), "evidence": c.get("evidence", ""),
+                                "importance": c.get("importance", "must_have")}
+                               for c in jd.get("concepts_required", [])],
+                "translations": [], "covered": []}
+
+    evidence_text, evidence_skills = _resume_concept_evidence()
+
+    # build a set of tool keywords the resume has, for translation detection
+    resume_tool_set = set()
+    for s in resume.get("skills", []):
+        if isinstance(s, dict):
+            resume_tool_set.add(s.get("name", "").lower())
+    for p in resume.get("projects", []):
+        for t in p.get("tech", []):
+            resume_tool_set.add(t.lower())
+
+    jd_tool_set = set(t.lower() for t in jd.get("tool_keywords", []))
+
+    # user self-attestations: concepts the candidate confirmed they've handled even
+    # though the resume didn't evidence them. Treated as self-reported coverage (not
+    # proven), so they leave the "real gaps" list but stay distinct from validated skills.
+    user_confirmed = set(jd.get("user_confirmed", []))
+
+    # ponytail: the JD extractor sometimes parks the single most important theme
+    # (e.g. "feature store") in free-text capabilities_required instead of concepts_required.
+    # Scan capability text for known concept keywords so LLM under-extraction doesn't
+    # silently drop a must-have concept from the analysis.
+    CAPABILITY_CONCEPT_KEYWORDS = {
+        "feature_store": ["feature store", "feature serving", "feature development",
+                          "feature reuse", "feature freshness", "feature infrastructure",
+                          "low-latency feature", "real-time feature"],
+        "streaming_paradigm": ["real-time", "streaming", "event stream", "kafka", "flink"],
+        "cloud_platform": ["cloud platform", "multi-cloud", "aws", "gcp", "azure"],
+        "data_quality_observability": ["data quality", "monitoring", "data contracts",
+                                       "quality checks", "pipeline reliability"],
+        "iac": ["infrastructure as code", "terraform", "ci/cd", "deployment framework"],
+        "orchestration": ["orchestrat", "scheduler", "pipelines"],
+    }
+    concepts_required = list(jd.get("concepts_required", []))
+    cap_text = " ".join(jd.get("capabilities_required", [])).lower()
+    seen_concepts = {_normalize_concept(c.get("concept", "")) for c in concepts_required}
+    for concept_key, kws in CAPABILITY_CONCEPT_KEYWORDS.items():
+        if concept_key in seen_concepts:
+            continue
+        if any(kw in cap_text for kw in kws):
+            # pull the matching capability phrase as evidence
+            evidence = next((cap for cap in jd.get("capabilities_required", [])
+                             if any(kw in cap.lower() for kw in kws)), cap_text[:80])
+            concepts_required.append({"concept": concept_key, "evidence": evidence,
+                                      "importance": "must_have", "from_capability": True})
+
+    real_gaps = []
+    translations = []
+    covered = []
+    verify = []  # low-confidence "present" matches the candidate should double-check
+    self_reported = []  # user confirmed they've done it, but resume didn't evidence it
+
+    for c in concepts_required:
+        raw_concept = c.get("concept", "")
+        concept = _normalize_concept(raw_concept)
+        # user self-attestation overrides the gap — moves to self-reported, not proven
+        if concept in user_confirmed:
+            self_reported.append({"concept": concept, "raw": raw_concept,
+                                  "evidence": c.get("evidence", ""),
+                                  "importance": c.get("importance", "must_have")})
+            continue
+        present, confidence = _concept_is_present(concept, evidence_text, evidence_skills)
+        if present:
+            if confidence == "low":
+                # don't assert coverage — surface for manual verification
+                verify.append({"concept": concept, "raw": raw_concept,
+                               "evidence": c.get("evidence", ""),
+                               "importance": c.get("importance", "must_have"),
+                               "note": "Weak signal in resume — verify you've actually done this."})
+            else:
+                covered.append({"concept": concept, "raw": raw_concept,
+                                "evidence": c.get("evidence", ""),
+                                "importance": c.get("importance", "must_have"),
+                                "confidence": confidence})
+            continue
+        # not directly evidenced — check if it's a tool translation
+        jd_tool = _translation_source(concept, jd_tool_set)
+        if jd_tool and resume_tool_set:
+            # does the resume have a sibling tool in the same concept family?
+            sibling = _find_translation_sibling(concept, resume_tool_set)
+            if sibling:
+                translations.append({
+                    "concept": concept, "raw": raw_concept,
+                    "jd_tool": jd_tool,
+                    "your_tool": sibling,
+                    "message": f"You have {sibling}; {jd_tool} is the same concept ({concept.replace('_',' ')}) — a translation, not a gap.",
+                    "importance": c.get("importance", "must_have"),
+                })
+                continue
+        real_gaps.append({"concept": concept, "raw": raw_concept, "evidence": c.get("evidence", ""),
+                           "importance": c.get("importance", "must_have")})
+
+    # sort so must_have gaps lead, and surface capability-derived gaps (e.g. feature_store)
+    # before the longer concepts_required list so they aren't sliced off the end
+    real_gaps.sort(key=lambda g: (0 if g["importance"] == "must_have" else 1,
+                                   0 if g.get("from_capability") else 1))
+    return {
+        "jd_loaded": True,
+        "resume_loaded": True,
+        "role_title": jd.get("role_title"),
+        "seniority": jd.get("seniority"),
+        "domain": jd.get("domain"),
+        "capabilities_required": jd.get("capabilities_required", []),
+        "signal_framing": jd.get("signal_framing", ""),
+        "real_gaps": real_gaps[:12],
+        "translations": translations[:8],
+        "covered": covered[:8],
+        "verify": verify[:8],
+        "self_reported": self_reported[:12],
+        "real_gap_count": len(real_gaps),
+        "translation_count": len(translations),
+        "covered_count": len(covered),
+        "verify_count": len(verify),
+        "self_reported_count": len(self_reported),
+    }
+
+
+def _translation_source(concept, jd_tool_set):
+    """Given a concept, return the JD tool keyword that implies it (for the sidebar)."""
+    concept_to_tool = {
+        "streaming_paradigm": ["kafka", "flink", "kinesis", "spark streaming"],
+        "cloud_platform": ["aws", "azure", "gcp", "google cloud"],
+        "batch_paradigm": ["spark", "pyspark", "databricks"],
+        "orchestration": ["airflow", "dagster", "luigi"],
+        "iac": ["terraform", "pulumi", "cloudformation"],
+        "warehouse": ["snowflake", "bigquery", "redshift"],
+        "sql_database": ["postgres", "mysql", "sql server", "t-sql"],
+        "container_orchestration": ["kubernetes", "k8s", "eks", "aks"],
+        "containers": ["docker"],
+        "storage_format": ["iceberg", "delta lake", "parquet", "hive"],
+    }
+    for t in concept_to_tool.get(concept, []):
+        if t in jd_tool_set:
+            return t
+    return None
+
+
+def _find_translation_sibling(concept, resume_tool_set):
+    """Given a concept and the resume's tool set, find a sibling tool in the same family."""
+    families = {
+        "streaming_paradigm": ["kafka", "flink", "kinesis", "spark streaming", "pubsub"],
+        "cloud_platform": ["aws", "azure", "gcp", "google cloud", "databricks"],
+        "batch_paradigm": ["spark", "pyspark", "databricks", "hadoop"],
+        "orchestration": ["airflow", "dagster", "luigi", "prefect"],
+        "iac": ["terraform", "pulumi", "cloudformation"],
+        "warehouse": ["snowflake", "bigquery", "redshift", "databricks"],
+        "sql_database": ["postgres", "mysql", "sql server", "t-sql", "oracle"],
+        "container_orchestration": ["kubernetes", "k8s", "eks", "aks", "gke"],
+        "containers": ["docker", "podman", "containerd"],
+        "storage_format": ["iceberg", "delta lake", "parquet", "hive", "orc"],
+    }
+    fam = families.get(concept, [])
+    for t in fam:
+        if t in resume_tool_set:
+            return t
+    return None
+
+
+@app.route("/api/jd-gap", methods=["GET"])
+def jd_gap():
+    """Concept-level gap analysis between the loaded JD and resume."""
+    return jsonify(_compute_concept_match())
+
+
+@app.route("/api/jd-confirm", methods=["POST"])
+def jd_confirm():
+    """Self-attest that a JD concept has been handled (even if the resume didn't
+    evidence it). Stored on the JD record so it persists across re-renders and
+    re-uploads. Toggling the same concept off removes the confirmation."""
+    jd = PROGRESS.get("_jd")
+    if not jd:
+        return jsonify({"error": "no JD loaded"}), 400
+    data = request.json or {}
+    concept = _normalize_concept(data.get("concept", ""))
+    if not concept:
+        return jsonify({"error": "missing concept"}), 400
+
+    confirmed = set(jd.get("user_confirmed", []))
+    if data.get("confirmed"):
+        confirmed.add(concept)
+    else:
+        confirmed.discard(concept)
+    jd["user_confirmed"] = sorted(confirmed)
+    PROGRESS["_jd"] = jd
+    save_progress()
+    return jsonify({"ok": True, "user_confirmed": sorted(confirmed)})
+
+
+def _compute_role_readiness():
+    """Composite role-readiness: concept coverage × resume claim validation × practice
+    mastery. NOT a single reductive match score — three lenses the candidate can act on.
+    Returns framed practice: which of our question bank topics exercise the JD's real gaps."""
+    match = _compute_concept_match()
+    if not match.get("jd_loaded"):
+        return {"jd_loaded": False}
+
+    # lens 1: concept coverage from the matcher. Verify items are uncertain — excluded
+    # from both numerator and denominator so coverage reflects only confident matches.
+    # Self-reported (user-confirmed) concepts count toward coverage but are kept separate
+    # from proven coverage so the number stays honest.
+    total_concepts = (match["real_gap_count"] + match["translation_count"]
+                      + match["covered_count"] + match["verify_count"] + match["self_reported_count"])
+    proven = match["covered_count"] + match["translation_count"]
+    self_reported = match["self_reported_count"]
+    coverage = round(100 * (proven + self_reported) / total_concepts) if total_concepts else 0
+    proven_coverage = round(100 * proven / total_concepts) if total_concepts else 0
+
+    # lens 2: resume claim validation (skills practiced at >=70%)
+    cv = _compute_claim_validation()
+    claim_readiness = round(100 * cv.get("validated_count", 0) / cv.get("total_skills", 1)) \
+        if cv.get("total_skills") else None
+
+    # lens 3: SQL/Python mastery (pass rate across submissions)
+    topic_attempts, topic_fails = {}, {}
+    for h in HISTORY:
+        if h.get("event") == "submit" and h.get("topic"):
+            t = h["topic"]
+            topic_attempts[t] = topic_attempts.get(t, 0) + 1
+            if not h["passed"]:
+                topic_fails[t] = topic_fails.get(t, 0) + 1
+    if topic_attempts:
+        overall = round(100 * (sum(topic_attempts.values()) - sum(topic_fails.values())) / sum(topic_attempts.values()))
+    else:
+        overall = None
+
+    # framed practice: map each real gap (or low-confidence verify item) to SPECIFIC
+    # questions from the bank that exercise the transferable skill. The bank is classic
+    # algo/SQL, not DE-streaming, so we pick the questions that genuinely build the
+    # underlying pattern (windowing, dedup, self-join-by-date, rank, pivot, group-by grain)
+    # rather than fuzzy keyword matching (which pulled trivial JOINs before).
+    GAP_TO_QUESTIONS = {
+        "late_data_watermarks": ["sql-3", "sql-49", "py-2"],
+        "streaming_paradigm": ["sql-49", "py-2", "sql-45"],
+        "batch_vs_stream_choice": ["sql-3", "sql-49", "py-2"],
+        "idempotency_dedup": ["sql-2", "sql-24", "py-6"],
+        "backfill_reprocessing": ["sql-13", "sql-8", "sql-35"],
+        "partitioning_hot_key_skew": ["sql-7", "sql-12", "sql-20"],
+        "schema_evolution_compat": ["sql-43", "sql-41"],
+        "grain_awareness": ["sql-22", "sql-33", "sql-32"],
+        "scd_strategy": ["sql-8", "sql-13", "sql-35"],
+        "missing_dimension_audit": ["sql-4", "sql-11", "sql-57"],
+        "data_quality_observability": ["sql-41", "sql-43", "sql-35"],
+        "feature_store": ["sql-49", "py-2", "sql-45"],
+        "entity_enumeration": ["sql-9", "sql-26", "sql-48"],
+        "replication_consistency": ["sql-41", "sql-35"],
+        "storage_format_choice": ["sql-55", "sql-43"],
+        "domain_alignment": ["sql-34", "sql-52", "sql-40"],
+        "clarifying_requirements": ["sql-37", "sql-42"],
+    }
+    gap_concepts = [g["concept"] for g in match["real_gaps"]]
+    gap_concepts += [v["concept"] for v in match.get("verify", [])]
+    framed = []
+    seen = set()
+    for concept in gap_concepts:
+        for qid in GAP_TO_QUESTIONS.get(concept, []):
+            q = QUESTIONS.get(qid)
+            if not q or qid in seen or is_solved(qid):
+                continue
+            framed.append({"id": qid, "title": q["title"], "lang": q["lang"], "gap": concept})
+            seen.add(qid)
+            if len(framed) >= 5:
+                break
+        if len(framed) >= 5:
+            break
+
+    return {
+        "jd_loaded": True,
+        "role_title": match.get("role_title"),
+        "seniority": match.get("seniority"),
+        "domain": match.get("domain"),
+        "signal_framing": match.get("signal_framing"),
+        "coverage": coverage,
+        "proven_coverage": proven_coverage,
+        "self_reported_count": self_reported,
+        "claim_readiness": claim_readiness,
+        "practice_mastery": overall,
+        "real_gaps": match["real_gaps"][:10],
+        "translations": match["translations"][:5],
+        "self_reported": match["self_reported"][:10],
+        "framed_practice": framed,
+        "framing_note": "Your path to this role, not your deficit. Translations are wins; real gaps are where to focus practice.",
+    }
+
+
+@app.route("/api/role-readiness", methods=["GET"])
+def role_readiness():
+    """Composite readiness + framed practice for the loaded JD."""
+    return jsonify(_compute_role_readiness())
 
 
 @app.route("/dashboard")
@@ -776,6 +2108,15 @@ def dashboard():
         design_debrief_count=len(design_debriefs), rushed_pct=rushed_pct,
         mastery_map=mastery_map,
         postmortems=list(reversed(postmortems))[:15],
+        resume_loaded=bool(PROGRESS.get("_resume")),
+        resume=PROGRESS.get("_resume", {}),
+        gap_alerts=_compute_gap_alerts(),
+        study_plan=_compute_study_plan(),
+        claim_validation=_compute_claim_validation(),
+        jd_loaded=bool(PROGRESS.get("_jd")),
+        jd=PROGRESS.get("_jd", {}),
+        concept_match=_compute_concept_match(),
+        role_readiness=_compute_role_readiness(),
     )
 
 
@@ -806,16 +2147,78 @@ def list_questions():
 def mock_loop_start():
     """Picks one SQL-or-Python + one design + one tradeoff question for a chained mock
     interview — biased toward unsolved ones, falling back to the full pool if everything
-    in that category is already solved."""
+    in that category is already solved. Resume-aware: favors questions matching the
+    candidate's claimed domains and skills."""
+    resume = PROGRESS.get("_resume")
+    resume_domains = []
+    resume_skills = []
+    if resume:
+        resume_domains = [d.lower() for d in resume.get("domains", [])]
+        resume_skills = [s.get("name", s).lower() if isinstance(s, dict) else s.lower()
+                         for s in resume.get("skills", [])]
+
+    jd = PROGRESS.get("_jd")
+    jd_hints = []
+    if jd:
+        # translate JD concepts -> search hints so frameable questions surface
+        concept_to_hint = {
+            "streaming_paradigm": ["window", "real-time", "event", "running total"],
+            "batch_vs_stream_choice": ["window", "running total", "aggregation"],
+            "partitioning_hot_key_skew": ["rank", "partition", "top", "window"],
+            "idempotency_dedup": ["distinct", "dedup", "duplicate"],
+            "backfill_reprocessing": ["self join", "lag", "date"],
+            "schema_evolution_compat": ["pivot", "json", "column"],
+            "late_data_watermarks": ["window", "date", "running total"],
+            "data_quality_observability": ["null", "coalesce", "case"],
+            "grain_awareness": ["group by", "join", "distinct"],
+            "scd_strategy": ["lag", "self join", "date"],
+            "missing_dimension_audit": ["join", "subquery"],
+            "entity_enumeration": ["self join", "hierarchy", "recursion"],
+        }
+        for c in jd.get("concepts_required", []):
+            jd_hints.extend(concept_to_hint.get(c.get("concept", ""), []))
+
+    def _matches_resume(q):
+        """Check if a question matches the candidate's resume domains/skills."""
+        if not resume_domains and not resume_skills:
+            return False
+        text = (q.get("title", "") + " " + q.get("prompt", "") + " " + q.get("concept", "")).lower()
+        return any(d in text for d in resume_domains if len(d) > 3) or \
+               any(s in text for s in resume_skills if len(s) > 3)
+
+    def _matches_jd(q):
+        """Check if a question exercises a JD-required concept (frameable practice)."""
+        if not jd_hints:
+            return False
+        text = (q.get("title", "") + " " + q.get("prompt", "") + " " + q.get("concept", "")).lower()
+        return any(h in text for h in jd_hints if len(h) > 3)
+
     def pick(lang):
         candidates = [q for q in QUESTIONS.values() if q["lang"] == lang]
         if not candidates:
             return None
         unsolved = [q for q in candidates if not is_solved(q["id"])]
-        return random.choice(unsolved or candidates)["id"]
+        # prefer JD-frameable questions among unsolved, then resume-matched, then any unsolved
+        if unsolved:
+            jd_hits = [q for q in unsolved if _matches_jd(q)]
+            if jd_hits:
+                return random.choice(jd_hits)["id"]
+            resume_hits = [q for q in unsolved if _matches_resume(q)]
+            if resume_hits:
+                return random.choice(resume_hits)["id"]
+            return random.choice(unsolved)["id"]
+        # fallback to solved (for review)
+        jd_hits = [q for q in candidates if _matches_jd(q)]
+        if jd_hits:
+            return random.choice(jd_hits)["id"]
+        resume_hits = [q for q in candidates if _matches_resume(q)]
+        if resume_hits:
+            return random.choice(resume_hits)["id"]
+        return random.choice(candidates)["id"]
 
     ids = [pick(random.choice(["sql", "python"])), pick("design"), pick("tradeoff")]
-    return jsonify({"ids": [i for i in ids if i]})
+    return jsonify({"ids": [i for i in ids if i],
+                    "resume_aware": bool(resume), "jd_aware": bool(jd)})
 
 
 @app.route("/api/mock-loop/report")
@@ -842,16 +2245,12 @@ def get_question(qid):
     q = QUESTIONS.get(qid)
     if not q:
         return jsonify({"error": "not found"}), 404
-    if q["lang"] in ("design", "tradeoff", "napkin"):
-        # ponytail: no test_cases/starter_code for design/tradeoff/napkin questions, and the
+    if q["lang"] in ("design", "tradeoff"):
+        # ponytail: no test_cases/starter_code for design/tradeoff questions, and the
         # rubric/key_points/answer range are graded server-side only — never sent to the client
         resp = {"id": q["id"], "lang": q["lang"], "title": q["title"], "prompt": q["prompt"]}
         if q["lang"] == "design":
             resp["track"] = q.get("track", "data")
-        if q["lang"] == "napkin":
-            roll = NAPKIN_ROLLS.get(q["id"])
-            resp["prompt"] = roll["prompt"] if roll else q["prompt"]
-            resp["unit"] = roll["unit"] if roll else q.get("unit", "")
         if q["lang"] == "tradeoff":
             roll = TRADEOFF_ROLLS.get(q["id"])
             resp["title"] = roll["title"] if roll else q["title"]
@@ -1341,10 +2740,22 @@ def curveball():
     if not q or q["lang"] not in ("sql", "python"):
         return jsonify({"error": "not found"}), 404
 
+    # HYBRID: if the candidate opts into a web-sourced angle, ground the twist in a real system.
+    # Any Firecrawl failure returns None and we silently use the normal precomputed prompt.
+    web_note = ""
+    if data.get("use_web") and fc:
+        angle = fc.fresh_angle(q.get("concept", ""), q["lang"])
+        if angle:
+            web_note = (
+                f"\n\nREAL-WORLD ANCHOR (use to make the twist feel grounded in a system the "
+                f"candidate would recognize — weave it in naturally, don't name the source):\n{angle}"
+            )
+
     prompt = f"""You are a senior interviewer. The candidate is mid-solve on this problem and hasn't submitted yet.
 
 Problem: {q['title']}
 {q['prompt']}
+{web_note}
 
 Pose ONE realistic mid-interview requirement change — reuse the same schema/function signature, but change a
 constraint (e.g. a uniqueness assumption no longer holds, an extra filter is added, ties must now be handled a
@@ -1367,6 +2778,23 @@ Respond ONLY strict JSON, no markdown fences, no commentary:
         return jsonify({"twist": twist})
     except Exception as e:
         return jsonify({"error": str(e)}), 502
+
+
+@app.route("/api/fresh-angle", methods=["POST"])
+def fresh_angle():
+    """Standalone hybrid endpoint: a web-sourced real-world framing for a question's concept.
+
+    Returns {"angle": <text>} on success or {"angle": null} when Firecrawl is unavailable / failed,
+    so the UI can simply hide the panel rather than error. Never blocks on the graded path.
+    """
+    if not fc:
+        return jsonify({"angle": None})
+    data = request.json or {}
+    q = QUESTIONS.get(data.get("question_id"))
+    if not q:
+        return jsonify({"angle": None})
+    angle = fc.fresh_angle(q.get("concept", ""), q["lang"])
+    return jsonify({"angle": angle})
 
 
 @app.route("/api/curveball-grade", methods=["POST"])
@@ -1498,7 +2926,9 @@ def concept_map():
 
     p = PROGRESS.get(q["id"], {})
     if isinstance(p, dict) and p.get("concept_map"):
-        return jsonify(p["concept_map"])
+        cached = dict(p["concept_map"])
+        cached["active_count"] = len(cached.get("nodes", CONCEPT_MAP_NODES)) if is_solved(q["id"]) else 3
+        return jsonify(cached)
 
     pre = PRECOMPUTED_CONCEPTS.get(q["id"])
     if pre:
@@ -1808,6 +3238,15 @@ def hint():
         if war_story else ""
     )
 
+    # HYBRID: optionally ground the hint in a web-sourced real-world framing. Fails silently to
+    # nothing if Firecrawl is off/unavailable, so the hint degrades to the precomputed bank.
+    if data.get("use_web") and fc:
+        angle = fc.fresh_angle(q.get("concept", ""), q["lang"])
+        if angle:
+            war_story_note += (
+                f"\n\nA real-world anchor for this concept (use only if it sharpens the hint): {angle}"
+            )
+
     system_prompt = f"""You are a terse, encouraging interview-prep coding tutor, not a solution-giver.
 
 Problem: {q['title']}
@@ -2062,6 +3501,17 @@ The current incident (this is the real failure the candidate must respond to):
         if persona_key in PERSONAS:
             persona_note = f"\n\nInterviewer persona for this session: {PERSONAS[persona_key]}"
 
+        resume_note = ""
+        resume = PROGRESS.get("_resume")
+        if resume and data.get("start"):
+            domains = resume.get("domains", [])[:3]
+            skills = resume.get("skills", [])[:4]
+            if domains or skills:
+                resume_note = (
+                    f"\n\nCandidate's background: domains = {', '.join(domains)}; skills = {', '.join(skills)}. "
+                    f"When probing, draw connections to their experience where relevant — e.g. 'Given your work with {domains[0] if domains else skills[0]}, how would you handle...'"
+                )
+
         system_prompt = f"""You are a {persona_for(q)} conducting a system design interview. Stay in character as the interviewer throughout.
 
 Scenario: {q['title']}
@@ -2081,7 +3531,7 @@ Rules:
 5. Push back, don't just note it and move on: if they propose streaming-only or batch-only with no reprocessing/replay story, or never mention idempotency, backfills, schema evolution, or data quality once the design is otherwise taking shape, ask one pointed question grounded in the matching failure scenario above before letting them move to the next layer.
 6. Never design it for them and never state the "correct" answer, even if asked directly.
 7. Keep replies to 2-4 sentences, interviewer voice, no bullet lists.
-8. The candidate has a whiteboard. Before their message you'll see its current contents as boxes/arrows/notes — treat it like glancing at a real whiteboard. React to mismatches: things they said but never drew, or drew but never explained.{resurfacing_note}{persona_note}"""
+8. The candidate has a whiteboard. Before their message you'll see its current contents as boxes/arrows/notes — treat it like glancing at a real whiteboard. React to mismatches: things they said but never drew, or drew but never explained.{resurfacing_note}{persona_note}{resume_note}"""
 
     if data.get("wrap_up"):
         if incident:
@@ -2515,13 +3965,21 @@ def tradeoff_regenerate():
     if not q or q["lang"] != "tradeoff":
         return jsonify({"error": "not found"}), 404
 
+    resume = PROGRESS.get("_resume")
+    resume_hint = ""
+    if resume:
+        skills = resume.get("skills", [])[:5]
+        domains = resume.get("domains", [])[:3]
+        if skills or domains:
+            resume_hint = f"\nThe candidate's background: skills = {', '.join(skills)}; domains = {', '.join(domains)}. Ground the scenario in their domain when possible."
+
     prompt = f"""You are writing a forced-choice system-design tradeoff drill for interview practice, targeting the
 same underlying concept as the example below, but with a different concrete scenario (different domain,
 numbers, and framing) so it can't be memorized.
 
 Concept: {q['concept_tag'].replace('_', ' ')}
 Existing example (for concept reference only — don't reuse its scenario): {q['title']} — {q['prompt']}
-
+{resume_hint}
 Respond ONLY strict JSON, no markdown fences, no commentary:
 {{"title": "short scenario title, under 8 words", "prompt": "2-4 sentences posing a forced choice between two concrete options for a new scenario", "key_points": ["3-4 bullets, private grading key, what a strong justification must touch on"]}}"""
 
@@ -2641,104 +4099,13 @@ Rules:
     return jsonify({"reply": reply})
 
 
-# qid -> {prompt, answer_low, answer_high, unit, explanation} — session-only re-rolled napkin
-# scenarios, so the same underlying skill can't just be memorized after one pass. Falls back to
-# the static bank entry whenever a question hasn't been re-rolled (or after a server restart).
-NAPKIN_ROLLS = {}
 
-
-@app.route("/api/napkin-regenerate", methods=["POST"])
-def napkin_regenerate():
-    data = request.json
-    q = QUESTIONS.get(data["question_id"])
-    if not q or q["lang"] != "napkin":
-        return jsonify({"error": "not found"}), 404
-
-    prompt = f"""Write a fresh back-of-envelope estimation scenario testing the exact same underlying
-skill/formula as this one, but with different concrete inputs (different user counts, rates, sizes, etc.)
-so the numeric answer differs and the scenario can't just be memorized.
-
-Title: {q['title']}
-Original scenario: {q['prompt']}
-
-Respond ONLY strict JSON, no markdown fences:
-{{"prompt": "the new scenario text", "answer_low": <number>, "answer_high": <number>, "unit": "{q.get('unit', '')}", "explanation": "one sentence walking through the estimate"}}"""
-    try:
-        resp = client.chat.completions.create(
-            model=MODEL, messages=[{"role": "user", "content": prompt}],
-            max_tokens=400, temperature=0.6, extra_body={"reasoning": {"enabled": False}},
-        )
-        raw = chat_content(resp)
-        raw = raw[raw.index("{"):raw.rindex("}") + 1]
-        result = json.loads(raw)
-        NAPKIN_ROLLS[q["id"]] = {
-            "prompt": result.get("prompt") or q["prompt"],
-            "answer_low": float(result.get("answer_low", q["answer_low"])),
-            "answer_high": float(result.get("answer_high", q["answer_high"])),
-            "unit": result.get("unit") or q.get("unit", ""),
-            "explanation": result.get("explanation") or q.get("explanation", ""),
-        }
-        return jsonify(NAPKIN_ROLLS[q["id"]])
-    except Exception as e:
-        return jsonify({"error": str(e)}), 502
-
-
-@app.route("/api/napkin-grade", methods=["POST"])
-def napkin_grade():
-    """Numeric tolerance-band check stays deterministic, no LLM call. An optional free-text
-    'assumptions' field gets a best-effort LLM aside — never blocks the objective pass/fail."""
-    data = request.json
-    q = QUESTIONS.get(data["question_id"])
-    if not q or q["lang"] != "napkin":
-        return jsonify({"error": "not found"}), 404
-    raw_answer = (data.get("answer") or "").strip().replace(",", "")
-    # ponytail: questions prompt approximations with "~" (e.g. "~211") but float() chokes on it —
-    # strip a leading approximation marker so users can paste what the prompt shows.
-    raw_answer = raw_answer.lstrip("~≈ ").strip()
-    try:
-        value = float(raw_answer)
-    except ValueError:
-        return jsonify({"ok": False, "feedback": "Enter a number."})
-
-    roll = NAPKIN_ROLLS.get(q["id"])
-    low, high, unit = (roll["answer_low"], roll["answer_high"], roll["unit"]) if roll else (
-        q["answer_low"], q["answer_high"], q.get("unit", ""))
-    explanation = roll["explanation"] if roll else q.get("explanation", "")
-    scenario = roll["prompt"] if roll else q["prompt"]
-    ok = low <= value <= high
-    feedback = (f"Within the expected range ({low:g}-{high:g} {unit})."
-                if ok else f"Outside the expected range — aim for roughly {low:g}-{high:g} {unit}.")
-
-    if ok:
-        schedule_review(q["id"], ATTEMPTS.get(q["id"], 0))
-    else:
-        ATTEMPTS[q["id"]] = ATTEMPTS.get(q["id"], 0) + 1
-    log_history({"event": "napkin", "qid": q["id"], "ok": ok})
-
-    assumption_feedback = ""
-    assumptions = (data.get("assumptions") or "").strip()
-    if assumptions:
-        try:
-            aprompt = (f"A candidate is doing a back-of-envelope estimation problem.\n"
-                       f"Scenario: {scenario}\nTheir stated assumptions: \"{assumptions}\"\n"
-                       f"In one short, terse sentence (like a quick interviewer aside), note whether "
-                       f"their assumptions are reasonable, or flag the shakiest one.")
-            aresp = client.chat.completions.create(
-                model=MODEL, messages=[{"role": "user", "content": aprompt}],
-                max_tokens=80, temperature=0, extra_body={"reasoning": {"enabled": False}},
-            )
-            assumption_feedback = chat_content(aresp)
-        except Exception:
-            pass
-
-    return jsonify({"ok": ok, "feedback": feedback, "explanation": explanation,
-                     "assumption_feedback": assumption_feedback})
 
 
 @app.route("/api/start")
 def smart_start():
     """Phase 1: one-tap entry. Picks the single most useful question to do right now:
-    a due review > a weak-area unsolved > otherwise the next unsolved one.
+    a due review > a weak-area unsolved > resume-matched unsolved > otherwise the next unsolved one.
     Accepts ?lane=focused|weak|mock to bias the pick (the practice command-center lanes)."""
     lane = (request.args.get("lane") or "").strip().lower()
 
@@ -2760,6 +4127,18 @@ def smart_start():
 
     if (not lane or lane == "focused") and weak_hits:
         return jsonify({"id": weak_hits[0][0], "reason": "weak_area"})
+
+    # resume-skill bias: if resume uploaded, prefer questions matching claimed skills/domains
+    resume = PROGRESS.get("_resume")
+    if resume:
+        claimed = [s.lower() for s in resume.get("skills", []) + resume.get("domains", [])]
+        if claimed:
+            def _matches_resume(q):
+                text = (q.get("title", "") + " " + q.get("prompt", "") + " " + q.get("concept", "")).lower()
+                return any(c in text for c in claimed if len(c) > 2)
+            resume_hits = [(qid, q) for qid, q in unsolved if _matches_resume(q) and q["lang"] in ("sql", "python")]
+            if resume_hits:
+                return jsonify({"id": random.choice(resume_hits)[0], "reason": "resume_match"})
 
     pool = [qid for qid, q in unsolved if q["lang"] in ("sql", "python")]
     if pool:
@@ -2865,6 +4244,18 @@ def review():
     if not q:
         return jsonify({"error": "not found"}), 404
 
+    recall = (data.get("recall_answer") or "").strip()
+    if recall:
+        recall_note = (
+            f"\n\nThe candidate was just asked to explain the key idea in their own words and answered:\n"
+            f"\"{recall}\"\n\n"
+            "In your review, first briefly validate or correct their explanation (if it's wrong or incomplete, "
+            "say so plainly and fill the gap). Then give the rest of the review below, tailored to what they "
+            "did and didn't grasp. "
+        )
+    else:
+        recall_note = ""
+
     prompt = f"""You are a terse senior interviewer reviewing a candidate's PASSING solution — they already got it correct, this is a quality review, not a hint.
 
 Problem: {q['title']}
@@ -2875,28 +4266,62 @@ Candidate's passing solution:
 ```{q['lang']}
 {data.get('code', '')}
 ```
+{recall_note}
+Give a short, blunt code review. Respond with a single JSON object — no prose outside it, no markdown fences — with these keys (omit or use a short "" for any category with nothing worth saying):
+- "readability": style/readability issues, if any
+- "edge_cases": edge cases their solution might miss that the test cases didn't cover
+- "followup": whether this survives a follow-up twist in a real interview
+- "alternate": one alternate approach and its complexity tradeoff, if genuinely different
 
-Give a short, blunt code review covering only what's actually notable (skip categories with nothing worth saying):
-- Readability/style issues, if any
-- Edge cases their solution might not handle that weren't covered by the test cases
-- Whether this would survive a follow-up twist on the same problem in a real interview
-- One alternate approach and its complexity tradeoff, if there's a genuinely different one worth knowing
-
-4-6 sentences max, plain prose, no markdown, no headers, no "great job" preamble."""
+Keep each value to 1-2 sentences, plain text, no headers, no "great job" preamble."""
 
     try:
         resp = client.chat.completions.create(
             model=MODEL,
             messages=[{"role": "user", "content": prompt}],
-            max_tokens=350,
+            max_tokens=500,
             extra_body={"reasoning": {"enabled": False}},
         )
-        review = chat_content(resp)
-        if not review:
+        raw = chat_content(resp)
+        if not raw:
             return jsonify({"error": "model returned an empty response — try again"}), 502
-        return jsonify({"review": review})
+        sections = _parse_review_sections(raw)
+        if recall:
+            sections["recall"] = recall
+        return jsonify({"review_sections": sections})
     except Exception as e:
         return jsonify({"error": str(e)}), 502
+
+
+def _parse_review_sections(raw):
+    import re, json as _json
+    text = raw.strip()
+    # strip accidental code fences
+    if text.startswith("```"):
+        text = re.sub(r"^```[a-zA-Z]*\n?", "", text)
+        text = re.sub(r"\n?```$", "", text).strip()
+    try:
+        obj = _json.loads(text)
+        if isinstance(obj, dict):
+            return {k: (obj.get(k) or "").strip() for k in ("readability", "edge_cases", "followup", "alternate")}
+    except Exception:
+        pass
+    # fallback: split on labelled headers if model ignored the JSON instruction
+    sections = {"readability": "", "edge_cases": "", "followup": "", "alternate": ""}
+    cur = None
+    for line in text.splitlines():
+        low = line.lower()
+        if "readab" in low or "style" in low:
+            cur = "readability"
+        elif "edge" in low or "corner" in low:
+            cur = "edge_cases"
+        elif "follow" in low or "twist" in low:
+            cur = "followup"
+        elif "alternat" in low or "tradeoff" in low or "approach" in low:
+            cur = "alternate"
+        elif cur:
+            sections[cur] += line.strip() + " "
+    return {k: v.strip() for k, v in sections.items()}
 
 
 if __name__ == "__main__":
