@@ -212,7 +212,7 @@
   /* ---- Feature Compass: legible feature map (icon + label, grouped families) ---- */
   .cc-compass { margin: 22px 0 4px; text-align: left; }
   .cc-compass-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em; color: var(--text-faint); text-align: center; margin-bottom: 12px; }
-  .cc-families { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; }
+  .cc-families { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
   .cc-family { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 12px 11px; display: flex; flex-direction: column; gap: 8px; transition: border-color 0.12s ease; }
   .cc-family:hover { border-color: var(--accent); }
   .cc-family-head { display: flex; align-items: center; gap: 7px; }
@@ -236,7 +236,7 @@
 
   /* ---- overflow "More drills" menu ---- */
   .more-drills-wrap { position: relative; display: inline-block; }
-  .drills-menu { display: none; position: absolute; top: calc(100% + 6px); left: 0; z-index: 40; background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 6px; box-shadow: var(--shadow); min-width: 220px; }
+  .drills-menu { display: none; position: absolute; top: calc(100% + 6px); right: 0; z-index: 40; background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 6px; box-shadow: var(--shadow); min-width: 210px; }
   .drills-menu.open { display: block; }
   .drills-menu .dm-item { display: flex; align-items: center; gap: 8px; width: 100%; text-align: left; padding: 8px 9px; border-radius: 7px; background: transparent; border: none; color: var(--text-dim); font-size: 12.5px; cursor: pointer; font-family: inherit; }
   .drills-menu .dm-item:hover { background: var(--card); color: var(--text); }
@@ -370,7 +370,7 @@
   .empty-stat .l { font-size: 11px; color: var(--text-faint); text-transform: uppercase; letter-spacing: 0.06em; }
   .empty-hint { color: var(--text-faint); font-size: 13px; }
   #empty-panel { height: 100%; display: flex; align-items: center; justify-content: center; overflow-y: auto; }
-  #command-center { max-width: 540px; width: 100%; padding: 28px 24px; text-align: center; }
+  #command-center { max-width: 640px; width: 100%; padding: 32px 24px; text-align: center; }
   .cc-hero { margin-bottom: 20px; }
   .cc-greeting { font-size: 24px; font-weight: 700; letter-spacing: -0.01em; color: var(--text); }
   .cc-momentum { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-top: 12px; }
@@ -1058,20 +1058,20 @@
             <div class="cc-greeting" id="cc-greeting">Let's get into a loop.</div>
             <div class="cc-momentum" id="cc-momentum"></div>
           </div>
-          <button class="btn btn-primary btn-lg cc-start" onclick="startPractice()"><svg class="icon" style="margin-right:7px;"><use href="#i-play"/></svg>Start Practice</button>
+          <button class="btn btn-primary btn-lg cc-start" onclick="startPractice()"><svg class="icon" viewBox="0 0 24 24" style="margin-right:7px;"><use href="#i-play"/></svg>Start Practice</button>
           <div class="cc-lanes">
             <button class="cc-lane" onclick="startPractice('focused')">
-              <span class="cc-lane-ico"><svg class="icon" style="width:18px;height:18px;"><use href="#i-target"/></svg></span>
+              <span class="cc-lane-ico"><svg class="icon" viewBox="0 0 24 24" style="width:18px;height:18px;"><use href="#i-target"/></svg></span>
               <span class="cc-lane-title">Focused rep</span>
               <span class="cc-lane-sub">One smart-picked question</span>
             </button>
             <button class="cc-lane" onclick="startMockLoop()">
-              <span class="cc-lane-ico"><svg class="icon" style="width:18px;height:18px;"><use href="#i-loop"/></svg></span>
+              <span class="cc-lane-ico"><svg class="icon" viewBox="0 0 24 24" style="width:18px;height:18px;"><use href="#i-loop"/></svg></span>
               <span class="cc-lane-title">Mock loop</span>
               <span class="cc-lane-sub">SQL → design → tradeoff</span>
             </button>
             <button class="cc-lane" onclick="startPractice('weak')">
-              <span class="cc-lane-ico"><svg class="icon" style="width:18px;height:18px;"><use href="#i-bandage"/></svg></span>
+              <span class="cc-lane-ico"><svg class="icon" viewBox="0 0 24 24" style="width:18px;height:18px;"><use href="#i-bandage"/></svg></span>
               <span class="cc-lane-title">Weak-area drill</span>
               <span class="cc-lane-sub">Your recurring misses</span>
             </button>
@@ -1088,22 +1088,22 @@
         <div class="editor-toolbar">
           <span id="editor-lang-label"></span>
           <div class="editor-actions">
-            <button id="run-btn" class="btn btn-ghost" onclick="runSample()"><svg class="icon"><use href="#i-play"/></svg>Run</button>
-            <button id="hint-btn" class="btn btn-ghost" onclick="askHint()"><svg class="icon"><use href="#i-bulb"/></svg>Hint</button>
-            <button id="submit-btn" class="btn btn-primary" onclick="submitCode()"><svg class="icon"><use href="#i-check"/></svg>Submit</button>
+            <button id="run-btn" class="btn btn-ghost" onclick="runSample()"><svg class="icon" viewBox="0 0 24 24"><use href="#i-play"/></svg>Run</button>
+            <button id="hint-btn" class="btn btn-ghost" onclick="askHint()"><svg class="icon" viewBox="0 0 24 24"><use href="#i-bulb"/></svg>Hint</button>
+            <button id="submit-btn" class="btn btn-primary" onclick="submitCode()"><svg class="icon" viewBox="0 0 24 24"><use href="#i-check"/></svg>Submit</button>
             <div class="more-drills-wrap">
-              <button class="btn btn-ghost" id="more-drills-btn" onclick="toggleDrillsMenu()" title="Pressure & interview drills"><svg class="icon"><use href="#i-more"/></svg>More drills</button>
+              <button class="btn btn-ghost" id="more-drills-btn" onclick="toggleDrillsMenu()" title="Pressure & interview drills"><svg class="icon" viewBox="0 0 24 24"><use href="#i-more"/></svg>More drills</button>
               <div class="drills-menu" id="drills-menu">
                 <div class="dm-group">Pressure drills</div>
-                <button class="dm-item" onclick="startSpotBug()"><svg class="icon"><use href="#i-bug"/></svg>Spot the bug</button>
-                <button class="dm-item" id="clarify-menu" onclick="toggleSqlClarify()"><svg class="icon"><use href="#i-target"/></svg>Clarify first</button>
-                <button class="dm-item" onclick="startCurveball()"><svg class="icon"><use href="#i-zap"/></svg>Curveball</button>
-                <button class="dm-item" id="twist-menu" onclick="askTwist()" disabled><svg class="icon"><use href="#i-repeat"/></svg>Twist</button>
-                <button class="dm-item" id="dryrun-menu" onclick="askDryRun()" disabled><svg class="icon"><use href="#i-shoe"/></svg>Dry run</button>
-                <button class="dm-item" id="reverse-menu" onclick="startReverse()" disabled><svg class="icon"><use href="#i-mask"/></svg>Be the interviewer</button>
+                <button class="dm-item" onclick="startSpotBug()"><svg class="icon" viewBox="0 0 24 24"><use href="#i-bug"/></svg>Spot the bug</button>
+                <button class="dm-item" id="clarify-menu" onclick="toggleSqlClarify()"><svg class="icon" viewBox="0 0 24 24"><use href="#i-target"/></svg>Clarify first</button>
+                <button class="dm-item" onclick="startCurveball()"><svg class="icon" viewBox="0 0 24 24"><use href="#i-zap"/></svg>Curveball</button>
+                <button class="dm-item" id="twist-menu" onclick="askTwist()" disabled><svg class="icon" viewBox="0 0 24 24"><use href="#i-repeat"/></svg>Twist</button>
+                <button class="dm-item" id="dryrun-menu" onclick="askDryRun()" disabled><svg class="icon" viewBox="0 0 24 24"><use href="#i-shoe"/></svg>Dry run</button>
+                <button class="dm-item" id="reverse-menu" onclick="startReverse()" disabled><svg class="icon" viewBox="0 0 24 24"><use href="#i-mask"/></svg>Be the interviewer</button>
                 <div class="dm-sep"></div>
                 <div class="dm-group">Step-by-step</div>
-                <button class="dm-item" id="debug-menu" onclick="startDebug()"><svg class="icon"><use href="#i-psy"/></svg>Debug (step through)</button>
+                <button class="dm-item" id="debug-menu" onclick="startDebug()"><svg class="icon" viewBox="0 0 24 24"><use href="#i-psy"/></svg>Debug (step through)</button>
               </div>
             </div>
           </div>
@@ -2048,13 +2048,13 @@ let spotBugNote = null;
 async function startSpotBug() {
   const btn = document.getElementById('spotbug-menu');
   btn.disabled = true;
-  btn.innerHTML = '<svg class="icon"><use href="#i-bug"/></svg>Loading…';
+  btn.innerHTML = '<svg class="icon" viewBox="0 0 24 24"><use href="#i-bug"/></svg>Loading…';
   const res = await (await fetch('/api/spot-bug', {
     method: 'POST', headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({question_id: current.id})
   })).json();
   btn.disabled = false;
-  btn.innerHTML = '<svg class="icon"><use href="#i-bug"/></svg>Spot the bug';
+  btn.innerHTML = '<svg class="icon" viewBox="0 0 24 24"><use href="#i-bug"/></svg>Spot the bug';
   if (res.error) { showToast('Could not generate a code-review drill: ' + res.error); return; }
   spotBugNote = res.bug_note;
   document.getElementById('spotbug-code').textContent = res.code;
@@ -2090,13 +2090,13 @@ let reverseState = null;
 async function startReverse() {
   const btn = document.getElementById('reverse-menu');
   btn.disabled = true;
-  btn.innerHTML = '<svg class="icon"><use href="#i-mask"/></svg>Loading…';
+  btn.innerHTML = '<svg class="icon" viewBox="0 0 24 24"><use href="#i-mask"/></svg>Loading…';
   const res = await (await fetch('/api/reverse', {
     method:'POST', headers:{'Content-Type':'application/json'},
     body:JSON.stringify({question_id: current.id})
   })).json();
   btn.disabled = false;
-  btn.innerHTML = '<svg class="icon"><use href="#i-mask"/></svg>Be the interviewer';
+  btn.innerHTML = '<svg class="icon" viewBox="0 0 24 24"><use href="#i-mask"/></svg>Be the interviewer';
   if (res.error) { showToast('Could not start reverse interview: ' + res.error); return; }
   reverseState = {qid: current.id};
   const panel = document.getElementById('reversal-panel');
@@ -2153,13 +2153,13 @@ let curveballActive = false;
 async function startCurveball() {
   const btn = document.getElementById('curveball-menu');
   btn.disabled = true;
-  btn.innerHTML = '<svg class="icon"><use href="#i-zap"/></svg>Loading…';
+  btn.innerHTML = '<svg class="icon" viewBox="0 0 24 24"><use href="#i-zap"/></svg>Loading…';
   const res = await (await fetch('/api/curveball', {
     method: 'POST', headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({question_id: current.id})
   })).json();
   btn.disabled = false;
-  btn.innerHTML = '<svg class="icon"><use href="#i-zap"/></svg>Curveball';
+  btn.innerHTML = '<svg class="icon" viewBox="0 0 24 24"><use href="#i-zap"/></svg>Curveball';
   if (res.error) { showToast('Could not generate a curveball: ' + res.error); return; }
   curveballActive = true;
   document.getElementById('curveball-twist').textContent = '🌀 Interviewer: ' + res.twist;
@@ -2647,14 +2647,14 @@ function renderFeatureCompass() {
   wrap.innerHTML = FEATURE_FAMILIES.map(f => `
     <div class="cc-family">
       <div class="cc-family-head">
-        <span class="cc-family-ico"><svg class="icon"><use href="#${f.icon}"/></svg></span>
+        <span class="cc-family-ico"><svg class="icon" viewBox="0 0 24 24"><use href="#${f.icon}"/></svg></span>
         <span class="cc-family-name">${f.name}</span>
       </div>
       <div class="cc-family-tools">
         ${f.tools.map(t => `
           <div class="cc-tool">
             <span class="cc-tool-info">
-              <svg class="icon"><use href="#${t.icon}"/></svg>
+              <svg class="icon" viewBox="0 0 24 24"><use href="#${t.icon}"/></svg>
               <span class="cc-tip"><b>${t.label}.</b> ${t.tip}</span>
             </span>
             <span>${t.label}</span>
@@ -2694,6 +2694,10 @@ function renderEmptyState(qs) {
   const panel = document.getElementById('empty-panel');
   panel.style.display = '';
   document.getElementById('command-center').style.display = '';
+  // full-width command center: hide the left panel + resizer
+  document.getElementById('main-left').style.display = 'none';
+  document.getElementById('sidebar-resizer').style.display = 'none';
+  document.getElementById('main-right').style.borderLeft = 'none';
   renderFeatureCompass();
 }
 
@@ -2706,6 +2710,10 @@ async function loadQuestion(id) {
   const q = await (await fetch(`/api/questions/${id}`)).json();
   current = q;
   document.getElementById('empty-panel').style.display = 'none';
+  // restore layout after command center was full-width
+  document.getElementById('main-left').style.display = '';
+  document.getElementById('sidebar-resizer').style.display = '';
+  document.getElementById('main-right').style.borderLeft = '';
   clearTimeout(idleTimer);
   const card = document.getElementById('question-card');
   card.classList.remove('fade-in');
@@ -3194,14 +3202,14 @@ let debugSource = [];
 async function startDebug() {
   const btn = document.getElementById('debug-menu');
   btn.disabled = true;
-  btn.innerHTML = '<svg class="icon"><use href="#i-psy"/></svg>Debugging…';
+  btn.innerHTML = '<svg class="icon" viewBox="0 0 24 24"><use href="#i-psy"/></svg>Debugging…';
   const res = await (await fetch('/api/debug', {
     method: 'POST', headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({question_id: current.id, code: cm.getValue()})
   })).json();
   btn.disabled = false;
   btn.disabled = false;
-  btn.innerHTML = '<svg class="icon"><use href="#i-psy"/></svg>Debug (step through)';
+  btn.innerHTML = '<svg class="icon" viewBox="0 0 24 24"><use href="#i-psy"/></svg>Debug (step through)';
   if (res.error) { showToast('Debug error: ' + res.error); return; }
   debugSteps = res.steps || [];
   debugSource = res.source || [];
