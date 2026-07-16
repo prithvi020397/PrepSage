@@ -23,6 +23,22 @@ MODEL = "deepseek/deepseek-v4-flash"
 # ponytail: separate client — OpenRouter doesn't proxy Whisper transcription, needs a real OpenAI key
 whisper_client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY", "")) if os.environ.get("OPENAI_API_KEY") else None
 
+
+def chat_content(resp):
+    """Safely pull text out of an OpenAI chat-completions response.
+
+    The model intermittently returns an empty `content` (None), which used to crash every
+    route that did `resp.choices[0].message.content.strip()` with a 502 + leaked exception
+    ('NoneType' object has no attribute 'strip'). Centralizing this means each route can just
+    check `if not text:` and return a clean retry error instead of 500ing. Returns the stripped
+    string, or None if the response was empty/malformed.
+    """
+    try:
+        text = resp.choices[0].message.content
+    except (AttributeError, IndexError, TypeError):
+        return None
+    return text.strip() if text else None
+
 QUESTIONS = {q["id"]: q for q in json.load(open("questions.json"))}
 
 # ponytail: in-memory, single-user, resets on restart — fine for a local tutor
@@ -481,7 +497,7 @@ Respond ONLY strict JSON:
             model=MODEL, messages=[{"role": "user", "content": prompt}],
             max_tokens=400, temperature=0.3, extra_body={"reasoning": {"enabled": False}},
         )
-        raw = resp.choices[0].message.content.strip()
+        raw = chat_content(resp)
         raw = raw[raw.index("{"):raw.rindex("}") + 1]
         result = json.loads(raw)
         return {"scenario": result.get("scenario", "").strip(),
@@ -999,7 +1015,7 @@ Respond ONLY with the code, no markdown fences, no commentary."""
                     model=MODEL, messages=[{"role": "user", "content": prompt}],
                     max_tokens=500, temperature=0, extra_body={"reasoning": {"enabled": False}},
                 )
-                solution = resp.choices[0].message.content.strip()
+                solution = chat_content(resp)
                 if "```" in solution:
                     for part in solution.split("```"):
                         if q["lang"] in part or (not part.startswith("{") and not part.startswith("<") and not part.startswith("[")):
@@ -1041,7 +1057,7 @@ Explain in one short sentence why this difference matters conceptually — not j
                         model=MODEL, messages=[{"role": "user", "content": ap}],
                         max_tokens=80, temperature=0, extra_body={"reasoning": {"enabled": False}},
                     )
-                    context = r.choices[0].message.content.strip()
+                    context = chat_content(r)
                 except Exception:
                     context = ""
 
@@ -1120,7 +1136,7 @@ Respond with ONLY strict JSON, no markdown fences, no commentary:
             temperature=0,
             extra_body={"reasoning": {"enabled": False}},
         )
-        raw = resp.choices[0].message.content.strip()
+        raw = chat_content(resp)
         raw = raw[raw.index("{"):raw.rindex("}") + 1]
         result = json.loads(raw)
         return jsonify({"ok": bool(result.get("ok")), "feedback": result.get("feedback", "")})
@@ -1158,7 +1174,7 @@ Respond ONLY strict JSON, no markdown fences, no commentary:
             model=MODEL, messages=[{"role": "user", "content": prompt}],
             max_tokens=500, temperature=0.4, extra_body={"reasoning": {"enabled": False}},
         )
-        raw = resp.choices[0].message.content.strip()
+        raw = chat_content(resp)
         raw = raw[raw.index("{"):raw.rindex("}") + 1]
         result = json.loads(raw)
         return jsonify({"code": result.get("code", ""), "bug_note": result.get("bug_note", "")})
@@ -1195,7 +1211,7 @@ Respond with ONLY strict JSON, no markdown fences, no commentary:
             model=MODEL, messages=[{"role": "user", "content": prompt}],
             max_tokens=200, temperature=0, extra_body={"reasoning": {"enabled": False}},
         )
-        raw = resp.choices[0].message.content.strip()
+        raw = chat_content(resp)
         raw = raw[raw.index("{"):raw.rindex("}") + 1]
         result = json.loads(raw)
         log_history({"event": "spot_bug", "qid": q["id"], "ok": bool(result.get("ok")), "topic": topic_for(q)})
@@ -1253,7 +1269,7 @@ Respond ONLY strict JSON, no markdown fences:
                 model=MODEL, messages=[{"role": "user", "content": prompt}],
                 max_tokens=500, temperature=0.4, extra_body={"reasoning": {"enabled": False}},
             )
-            raw = resp.choices[0].message.content.strip()
+            raw = chat_content(resp)
             raw = raw[raw.index("{"):raw.rindex("}") + 1]
             result = json.loads(raw)
             buggy_code = result.get("code", "")
@@ -1275,7 +1291,7 @@ Code: ```{q['lang']}
                           {"role": "user", "content": opening_prompt}],
                 max_tokens=100, temperature=0.5, extra_body={"reasoning": {"enabled": False}},
             )
-            reply = r.choices[0].message.content.strip()
+            reply = chat_content(r)
         except Exception:
             reply = "Oh, um, sure — I wrote this solution. I think it handles the main case correctly?"
 
@@ -1307,7 +1323,7 @@ Code: ```{q['lang']}
             messages=[{"role": "system", "content": system_prompt}] + state["history"],
             max_tokens=200, extra_body={"reasoning": {"enabled": False}},
         )
-        reply = resp.choices[0].message.content.strip()
+        reply = chat_content(resp)
     except Exception as e:
         state["history"].pop()
         return jsonify({"error": str(e)}), 502
@@ -1342,7 +1358,7 @@ Respond ONLY strict JSON, no markdown fences, no commentary:
             model=MODEL, messages=[{"role": "user", "content": prompt}],
             max_tokens=150, temperature=0.5, extra_body={"reasoning": {"enabled": False}},
         )
-        raw = resp.choices[0].message.content.strip()
+        raw = chat_content(resp)
         raw = raw[raw.index("{"):raw.rindex("}") + 1]
         twist = json.loads(raw).get("twist", "").strip()
         if not twist:
@@ -1389,7 +1405,7 @@ Respond with ONLY strict JSON, no markdown fences, no commentary:
             model=MODEL, messages=[{"role": "user", "content": prompt}],
             max_tokens=200, temperature=0, extra_body={"reasoning": {"enabled": False}},
         )
-        raw = resp.choices[0].message.content.strip()
+        raw = chat_content(resp)
         raw = raw[raw.index("{"):raw.rindex("}") + 1]
         result = json.loads(raw)
         log_history({"event": "curveball", "qid": q["id"], "ok": bool(result.get("ok")), "topic": topic_for(q)})
@@ -1447,7 +1463,7 @@ Respond with ONLY strict JSON, no markdown fences, no commentary:
             temperature=0,
             extra_body={"reasoning": {"enabled": False}},
         )
-        raw = resp.choices[0].message.content.strip()
+        raw = chat_content(resp)
         raw = raw[raw.index("{"):raw.rindex("}") + 1]
         result = json.loads(raw)
         complexity_ok = bool(result.get("complexity_ok"))
@@ -1519,7 +1535,7 @@ Respond ONLY strict JSON, no markdown fences:
             model=MODEL, messages=[{"role": "user", "content": prompt}],
             max_tokens=700, temperature=0, extra_body={"reasoning": {"enabled": False}},
         )
-        raw = resp.choices[0].message.content.strip()
+        raw = chat_content(resp)
         if "```" in raw:
             raw = raw.split("```")[1]
             if raw.startswith("json"):
@@ -1661,7 +1677,7 @@ Respond with ONLY JSON:
             max_tokens=2000, temperature=0,
             extra_body={"reasoning": {"enabled": False}},
         )
-        raw = resp.choices[0].message.content.strip()
+        raw = chat_content(resp)
         if "```" in raw:
             raw = raw.split("```")[1]
             if raw.startswith("json"):
@@ -1731,7 +1747,7 @@ Respond with ONLY strict JSON, no markdown fences, no commentary:
             temperature=0,
             extra_body={"reasoning": {"enabled": False}},
         )
-        raw = resp.choices[0].message.content.strip()
+        raw = chat_content(resp)
         raw = raw[raw.index("{"):raw.rindex("}") + 1]
         result = json.loads(raw)
         return jsonify({"results": result.get("results", [])})
@@ -2302,7 +2318,7 @@ Respond ONLY strict JSON, no markdown fences, no commentary:
             model=MODEL, messages=[{"role": "user", "content": prompt}],
             max_tokens=50, temperature=0, extra_body={"reasoning": {"enabled": False}},
         )
-        raw = resp.choices[0].message.content.strip()
+        raw = chat_content(resp)
         raw = raw[raw.index("{"):raw.rindex("}") + 1]
         candidate = json.loads(raw).get("label", "")
         if candidate in vocab:
@@ -2347,7 +2363,7 @@ Respond ONLY strict JSON, no markdown fences, no commentary:
             model=MODEL, messages=[{"role": "user", "content": prompt}],
             max_tokens=600, temperature=0, extra_body={"reasoning": {"enabled": False}},
         )
-        raw = resp.choices[0].message.content.strip()
+        raw = chat_content(resp)
         raw = raw[raw.index("{"):raw.rindex("}") + 1]
         result = json.loads(raw)
         return jsonify({"bullets": result.get("bullets", []), "diagram": result.get("diagram", [])})
@@ -2386,7 +2402,7 @@ Respond ONLY strict JSON, no markdown fences, no commentary:
             model=MODEL, messages=[{"role": "user", "content": prompt}],
             max_tokens=600, temperature=0, extra_body={"reasoning": {"enabled": False}},
         )
-        raw = resp.choices[0].message.content.strip()
+        raw = chat_content(resp)
         raw = raw[raw.index("{"):raw.rindex("}") + 1]
         result = json.loads(raw)
         flaws = [f for f in result.get("flaws", []) if f.get("concept") in taxonomy_for(q)]
@@ -2426,7 +2442,7 @@ Respond ONLY strict JSON, no markdown fences:
             model=MODEL, messages=[{"role": "user", "content": prompt}],
             max_tokens=500, temperature=0.3, extra_body={"reasoning": {"enabled": False}},
         )
-        raw = resp.choices[0].message.content.strip()
+        raw = chat_content(resp)
         raw = raw[raw.index("{"):raw.rindex("}") + 1]
         result = json.loads(raw)
         return jsonify({"scenario": result.get("scenario", ""),
@@ -2478,7 +2494,7 @@ Respond ONLY strict JSON, no markdown fences:
             model=MODEL, messages=[{"role": "user", "content": prompt}],
             max_tokens=800, temperature=0, extra_body={"reasoning": {"enabled": False}},
         )
-        raw = resp.choices[0].message.content.strip()
+        raw = chat_content(resp)
         raw = raw[raw.index("{"):raw.rindex("}") + 1]
         result = json.loads(raw)
         return jsonify({"comparisons": result.get("comparisons", [])})
@@ -2514,7 +2530,7 @@ Respond ONLY strict JSON, no markdown fences, no commentary:
             model=MODEL, messages=[{"role": "user", "content": prompt}],
             max_tokens=400, temperature=0.6, extra_body={"reasoning": {"enabled": False}},
         )
-        raw = resp.choices[0].message.content.strip()
+        raw = chat_content(resp)
         raw = raw[raw.index("{"):raw.rindex("}") + 1]
         result = json.loads(raw)
         title, new_prompt, key_points = result.get("title", ""), result.get("prompt", ""), result.get("key_points", [])
@@ -2561,7 +2577,7 @@ Respond with ONLY strict JSON, no markdown fences, no commentary:
             model=MODEL, messages=[{"role": "user", "content": prompt}],
             max_tokens=250, temperature=0, extra_body={"reasoning": {"enabled": False}},
         )
-        raw = resp.choices[0].message.content.strip()
+        raw = chat_content(resp)
         raw = raw[raw.index("{"):raw.rindex("}") + 1]
         result = json.loads(raw)
         ok = bool(result.get("ok"))
@@ -2652,7 +2668,7 @@ Respond ONLY strict JSON, no markdown fences:
             model=MODEL, messages=[{"role": "user", "content": prompt}],
             max_tokens=400, temperature=0.6, extra_body={"reasoning": {"enabled": False}},
         )
-        raw = resp.choices[0].message.content.strip()
+        raw = chat_content(resp)
         raw = raw[raw.index("{"):raw.rindex("}") + 1]
         result = json.loads(raw)
         NAPKIN_ROLLS[q["id"]] = {
@@ -2676,6 +2692,9 @@ def napkin_grade():
     if not q or q["lang"] != "napkin":
         return jsonify({"error": "not found"}), 404
     raw_answer = (data.get("answer") or "").strip().replace(",", "")
+    # ponytail: questions prompt approximations with "~" (e.g. "~211") but float() chokes on it —
+    # strip a leading approximation marker so users can paste what the prompt shows.
+    raw_answer = raw_answer.lstrip("~≈ ").strip()
     try:
         value = float(raw_answer)
     except ValueError:
@@ -2708,7 +2727,7 @@ def napkin_grade():
                 model=MODEL, messages=[{"role": "user", "content": aprompt}],
                 max_tokens=80, temperature=0, extra_body={"reasoning": {"enabled": False}},
             )
-            assumption_feedback = aresp.choices[0].message.content.strip()
+            assumption_feedback = chat_content(aresp)
         except Exception:
             pass
 
@@ -2872,7 +2891,10 @@ Give a short, blunt code review covering only what's actually notable (skip cate
             max_tokens=350,
             extra_body={"reasoning": {"enabled": False}},
         )
-        return jsonify({"review": resp.choices[0].message.content.strip()})
+        review = chat_content(resp)
+        if not review:
+            return jsonify({"error": "model returned an empty response — try again"}), 502
+        return jsonify({"review": review})
     except Exception as e:
         return jsonify({"error": str(e)}), 502
 

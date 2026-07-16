@@ -1,4 +1,4 @@
-# Contributing to PrepSage
+# Contributing to The Loop (a.k.a. PrepSage)
 
 Thanks for taking a look. This is a small, single-file-backend Flask app — the goal here is to
 keep it easy to run and easy to change, not to add process for its own sake.
@@ -10,11 +10,18 @@ requirements.txt`, add `OPENROUTER_API_KEY` to a `.env` file, run `python3 app.p
 
 ## Project layout
 
-- `app.py` — all backend routes, tutor prompts, and grading/spaced-repetition logic
+- `app.py` — all backend routes, tutor prompts, grading/spaced-repetition logic, and the
+  `chat_content(resp)` LLM-safety helper
+- `precompute.py` — one-off generator that fills the precomputed data files from `questions.json`
 - `questions.json` — the question bank (SQL / Python / System Design / Tradeoff / Napkin Math)
-- `templates/index.html` — the practice UI (editor, tutor chat, canvas) — vanilla JS, no build step
+- `traces.json`, `concept_maps.json`, `solutions.json`, `question_contexts.json` — precomputed
+  LLM framing, shipped with the repo
+- `templates/index.html` — the practice UI (editor, tutor chat, canvas, **Command Center**) — vanilla
+  JS, no build step
 - `templates/dashboard.html` — the progress dashboard
-- `history.json` / `chats.json` / `progress.json` — per-user runtime state, gitignored, created automatically
+- `templates/onboarding.html` — first-run setup
+- `history.json` / `chats.json` / `progress.json` / `replay_comments.json` — per-user runtime state,
+  gitignored, created automatically
 
 There's no frontend build tooling on purpose — `templates/*.html` are plain HTML/CSS/JS served
 directly by Flask. Keep it that way unless there's a real reason to add a build step.
@@ -44,9 +51,13 @@ There's no automated test suite for the UI — [`TESTING_GUIDE.md`](TESTING_GUID
 click-through checklist covering every feature. If you change a feature it covers, walk through
 its section before opening a PR. If you add a new feature, add a section for it.
 
+Backend scoring logic (`hire_verdict`, `split_wrap_up_reply`, rubric parsing) *does* have automated
+coverage — run `python3 -m unittest test_scoring` before you touch anything in that area.
+
 ## Pull requests
 
 - Keep diffs focused — one feature or fix per PR.
 - Describe what you tested manually (screenshots/GIFs welcome for UI changes).
-- Don't commit `.env`, or anything under `history.json` / `chats.json` / `progress.json` — these
-  are gitignored for a reason (they're your personal practice data, not app state).
+- Don't commit `.env`, or anything under `history.json` / `chats.json` / `progress.json` /
+  `replay_comments.json` — these are gitignored for a reason (they're your personal practice data,
+  not app state).

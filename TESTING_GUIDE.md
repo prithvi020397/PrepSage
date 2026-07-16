@@ -1,6 +1,6 @@
 # Testing Guide
 
-PrepSage has no automated UI test suite (see [CONTRIBUTING.md](CONTRIBUTING.md)) — this is a manual
+The Loop has no automated UI test suite (see [CONTRIBUTING.md](CONTRIBUTING.md)) — this is a manual
 click-through checklist covering every feature, plus a running log of the latest full test pass.
 If you change a feature a section covers, walk through that section before opening a PR. If you
 add a new feature, add a section for it.
@@ -37,6 +37,13 @@ writes to them for real (there's no test/mock mode), and there's no undo.
 - [ ] **← back to practice** goes to `/practice` (not `/`, which would bounce you right back here).
 
 ### Practice shell (`/practice`)
+- [ ] With no question selected, the **Command Center** renders full-width (left panel hidden):
+      greeting + momentum pills, **Start Practice** button, three **lanes** (Focused rep / Mock loop
+      / Weak-area drill) as the primary entry points, a **See all tools** toggle that expands the
+      **Feature Compass** (5 families, hover tooltips), and a compact standings strip.
+- [ ] Clicking a lane starts the matching mode; clicking a sidebar question restores the two-pane
+      layout (left panel + resizer reappear).
+- [ ] Expanding the Feature Compass and hovering a tool shows its tooltip; collapsing hides it again.
 - [ ] Sidebar category headers (SQL / Python / System Design / Tradeoff Drills / Napkin Math)
       collapse/expand independently; solved items show a checkmark, due-for-review items are
       visually marked.
@@ -82,9 +89,8 @@ writes to them for real (there's no test/mock mode), and there's no undo.
 - [ ] Assumptions box is optional — leaving it blank still lets you submit a numeric estimate.
 - [ ] **Check answer** grades deterministically (no LLM latency) against a tolerance band and
       explains the expected order of magnitude either way.
-- [ ] ⚠️ Known papercut: the input rejects a leading `~` (e.g. `~211` → "Enter a number.") even
-      though the question prompts themselves use `~` for approximation — type the bare number.
-      See `napkin_grade()` in `app.py`. Low severity, not yet fixed.
+- [ ] A leading approximation marker is accepted — e.g. `~211` or `≈211` grades the same as `211`
+      (fixed in `napkin_grade()` via `raw_answer.lstrip("~≈ ")`).
 - [ ] **New numbers** regenerates the scenario with fresh figures (also in-memory only).
 
 ### Mock interview loop
@@ -98,16 +104,13 @@ all 41 routes and a hands-on browser walkthrough of onboarding, dashboard, and o
 each type (SQL, System Design, Tradeoff, Napkin Math). Runtime state files were backed up first
 and restored after; no real practice data was affected.
 
-**Backend (all 41 routes reachable, correct response shapes):**
-- One real bug found: **intermittent 502 with a leaked Python exception**
-  (`'NoneType' object has no attribute 'strip'`) on `/api/adversarial-design` and, by the same
-  root cause, potentially any of the ~20 other LLM-calling routes that don't guard against the
-  model returning empty content. Only `/api/interview` and `/api/hint` currently check for this
-  (`if not reply: return jsonify({"error": "model returned an empty response — try again"}), 502`);
-  every other route calls `resp.choices[0].message.content.strip()` unguarded. Confirmed
-  reproducible: identical request succeeded on retry, so it's a real intermittent model-response
-  case, not a payload issue. Fix shape: one shared helper used at each call site rather than
-  duplicating the guard by hand — see call sites via `grep -n "message.content.strip()" app.py`.
+**Backend (all 44 routes reachable, correct response shapes):**
+- **Fixed: intermittent empty-response crash.** Previously ~24 LLM-calling routes did
+  `resp.choices[0].message.content.strip()` unguarded and 502'd with a leaked
+  `'NoneType' object has no attribute 'strip'` when the model returned empty content. All call
+  sites now route through `chat_content(resp)`, which returns `None` on an empty/`None` response;
+  routes check for `None` and return a clean "try again" 502 instead of crashing. Verified no
+  remaining unguarded `content.strip()` outside the two already-guarded interview/hint routes.
 - `/api/transcribe` correctly short-circuits with a clean error when `OPENAI_API_KEY` isn't set
   (by design — OpenRouter doesn't proxy Whisper).
 
