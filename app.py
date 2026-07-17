@@ -41,6 +41,14 @@ try:
 except Exception:
     fc = None
 
+# ponytail: security scanner for candidate-submitted code. Optional so a missing
+# bandit install never blocks app startup — run_python_case degrades to a soft warn.
+try:
+    from security_scan import scan_code, has_blocker
+except Exception:
+    scan_code = None
+    has_blocker = None
+
 
 def chat_content(resp):
     """Safely pull text out of an OpenAI chat-completions response.
@@ -988,6 +996,16 @@ def get_sample_tables(schema_sql):
 
 
 def run_python_case(harness, code):
+    # ponytail: security gate — never execute code that could damage the host.
+    # Candidate code is scanned for process-spawn / eval / fs-destruction before
+    # it ever reaches the interpreter. A BLOCK finding short-circuits execution.
+    blocker = has_blocker(code)
+    if blocker:
+        return None, (
+            f"Security scan blocked execution: {blocker.message} "
+            f"(line {blocker.line}). This looks like it could harm the host machine, "
+            f"not solve the interview problem. Rewrite using plain algorithm code."
+        )
     full_code = code + "\n\n" + harness
     with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
         f.write(full_code)
@@ -2436,6 +2454,11 @@ def debug():
     code = data.get("code", "")
     if not code.strip():
         return jsonify({"error": "write some code first"}), 400
+    # ponytail: same security gate as run_python_case — debug runs user code too
+    if has_blocker:
+        blocker = has_blocker(code)
+        if blocker:
+            return jsonify({"error": f"Security scan blocked execution: {blocker.message} (line {blocker.line})."}), 400
     case = q["test_cases"][0]
     harness = case.get("harness", "")
 
