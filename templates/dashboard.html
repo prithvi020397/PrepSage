@@ -193,6 +193,27 @@
   .hero-secondary { font-size: 12.5px; color: var(--text-dim); }
   .hero-secondary a { color: var(--accent); text-decoration: none; }
   .hero-secondary a:hover { text-decoration: underline; }
+  /* provenance tooltips */
+  .why {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 15px; height: 15px; border-radius: 50%;
+    background: var(--card-2); border: 1px solid var(--border);
+    color: var(--text-faint); font-size: 9px; font-weight: 700;
+    cursor: help; position: relative; margin-left: 4px; flex-shrink: 0;
+    font-style: normal; font-family: inherit;
+  }
+  .why:hover { border-color: var(--accent); color: var(--accent); }
+  .why .tp {
+    display: none;
+    position: absolute; left: 22px; top: -6px;
+    background: #1e212c; border: 1px solid var(--border);
+    border-radius: 7px; padding: 8px 10px;
+    font-size: 11.5px; font-weight: 400; color: var(--text-dim);
+    white-space: normal; width: 260px; z-index: 100;
+    line-height: 1.45; box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+  }
+  .why:hover .tp { display: block; }
+  .tp-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-faint); margin-bottom: 2px; }
 </style>
 </head>
 <body>
@@ -379,7 +400,7 @@
       <div class="sub" style="margin-bottom:6px; color:var(--success); font-weight:600;">✅ Translations — same concept, different tool (you're further along than it looks)</div>
       {% for t in role_readiness.translations %}
       <div class="gap-row">
-        <div class="gap-label">{{ t.concept.replace('_',' ') }}</div>
+        <div class="gap-label">{{ t.concept.replace('_',' ') }}<span class="why">?<span class="tp"><div class="tp-label">Translation — same concept, different tool</div>JD mentions <strong>{{ t.jd_tool }}</strong>; your resume shows <strong>{{ t.your_tool }}</strong>. Same concept, not a gap.</span></span></div>
         <div style="font-size:12px; color:var(--text-dim);">{{ t.your_tool }} → {{ t.jd_tool }}</div>
       </div>
       {% endfor %}
@@ -389,7 +410,7 @@
       <div class="sub" style="margin:12px 0 6px; color:var(--success); font-weight:600;">✔ Covered — evidenced in your resume</div>
       {% for cov in role_readiness.covered %}
       <div class="gap-row">
-        <div class="gap-label">{{ (cov.raw or cov.concept).replace('_',' ') }}</div>
+        <div class="gap-label">{{ (cov.raw or cov.concept).replace('_',' ') }}<span class="why">?<span class="tp">{% if cov.translation_note %}<div class="tp-label">Translation</div>{{ cov.translation_note }}{% else %}<div class="tp-label">Found in resume</div>JD requires this concept{% if cov.evidence %}: <em>{{ cov.evidence[:120] }}</em>{% endif %}. Your resume matches with <strong>{{ cov.confidence }}</strong> confidence.{% endif %}</span></span></div>
         <div style="font-size:12px; color:var(--text-dim); flex:1;">
           {{ cov.translation_note if cov.translation_note else (cov.evidence or '') }}
         </div>
@@ -402,7 +423,7 @@
       <div class="sub" style="margin:10px 0 6px; color:var(--warn); font-weight:600;">🎯 Real gaps — where to focus</div>
       {% for g in role_readiness.real_gaps %}
       <div class="gap-row">
-        <div class="gap-label">{{ (g.raw or g.concept).replace('_',' ') }}</div>
+        <div class="gap-label">{{ (g.raw or g.concept).replace('_',' ') }}<span class="why">?<span class="tp"><div class="tp-label">Why is this a gap?</div>JD requires this concept{% if g.evidence %}: <em>{{ g.evidence[:120] }}</em>{% endif %}. Not found in your resume.</span></span></div>
         <div style="font-size:12px; color:var(--text-dim); flex:1;">{{ g.evidence }}</div>
         <span class="gap-count" style="color: var(--error); width:auto; margin-right:8px;">{{ 'must-have' if g.importance == 'must_have' else 'nice' }}</span>
         <button class="confirm-btn" onclick="confirmConcept(this, '{{ g.concept }}')">✓ I've done this</button>
@@ -414,7 +435,7 @@
       <div class="sub" style="margin:12px 0 6px; color:var(--warn); font-weight:600;">🔶 Self-reported — you say you've handled these (verify in practice)</div>
       {% for s in role_readiness.self_reported %}
       <div class="gap-row">
-        <div class="gap-label">{{ (s.raw or s.concept).replace('_',' ') }}</div>
+        <div class="gap-label">{{ (s.raw or s.concept).replace('_',' ') }}<span class="why">?<span class="tp"><div class="tp-label">Self-reported</div>You confirmed you've done this. Not counted toward proven coverage. Verify by practicing.</span></span></div>
         <div style="font-size:12px; color:var(--text-dim); flex:1;">Self-attested — not yet proven by practice</div>
         <button class="confirm-btn" style="border-color:var(--text-faint); color:var(--text-faint);" onclick="confirmConcept(this, '{{ s.concept }}', false)">undo</button>
       </div>
@@ -425,7 +446,7 @@
       <div class="sub" style="margin:10px 0 6px; color:var(--text-faint); font-weight:600;">🔎 Verify manually — weak signal, not confirmed</div>
       {% for v in role_readiness.verify %}
       <div class="gap-row">
-        <div class="gap-label">{{ (v.raw or v.concept).replace('_',' ') }}</div>
+        <div class="gap-label">{{ (v.raw or v.concept).replace('_',' ') }}<span class="why">?<span class="tp"><div class="tp-label">Weak signal — needs manual check</div>A keyword match was found in your resume{% if v.evidence %} (<em>{{ v.evidence[:100] }}</em>){% endif %}, but confidence is low — verify you've actually done this work.</span></span></div>
         <div style="font-size:12px; color:var(--text-dim);">{{ v.note }}</div>
       </div>
       {% endfor %}
