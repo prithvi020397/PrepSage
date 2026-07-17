@@ -1347,23 +1347,18 @@ def _clean_pdf_artifacts(text):
     return text
 
 
-# Common English words that LLMs hallucinate as "skills" from resume text
 _NON_TECH_SKILL_BLACKLIST = {
     "sam", "designed", "power", "questease", "programming", "compliance",
-    "automated", "computer", "data", "engineer", "engineering", "bachelor",
-    "master", "university", "college", "school", "institute", "team",
-    "leader", "leadership", "communication", "collaboration", "problem",
-    "solving", "analytical", "detail", "oriented", "self", "motivated",
-    "experience", "years", "year", "role", "position", "company", "corp",
-    "inc", "llc", "ltd", "technologies", "tools", "systems", "solutions",
-    "services", "platform", "platforms", "infrastructure", "environment",
-    "environments", "development", "development", "management", "operations",
-    "production", "process", "processes", "projects", "project", "product",
-    "products", "business", "stakeholders", "clients", "customers",
-    "requirements", "specifications", "documentation", "standards",
-    "best practices", "methodologies", "frameworks", "approach",
-    "strategic", "strategic planning", "cross-functional", "cross-functional",
-    "amazon web services", "google cloud", "microsoft azure",
+    "automated", "computer", "bachelor", "master", "university", "college",
+    "school", "institute", "team", "leader", "leadership", "communication",
+    "collaboration", "problem", "solving", "analytical", "detail", "oriented",
+    "self", "motivated", "experience", "years", "year", "role", "position",
+    "technologies", "tools", "systems", "solutions", "services", "platform",
+    "platforms", "infrastructure", "environment", "environments",
+    "development", "management", "operations", "production", "process",
+    "processes", "projects", "project", "product", "products", "business",
+    "stakeholders", "clients", "customers", "requirements", "specifications",
+    "documentation", "standards", "methodologies", "approach", "data",
 }
 
 
@@ -1373,8 +1368,6 @@ def _is_technical_skill(name):
     if len(n) <= 2:
         return False
     if n in _NON_TECH_SKILL_BLACKLIST:
-        return False
-    if re.match(r"^[a-z]+$", n) and len(n) <= 5:
         return False
     return True
 
@@ -1413,7 +1406,9 @@ Return exactly this JSON shape:
 
 Note: do NOT include interview questions/probes — those are generated on demand later.
 Be strict about depth: "familiar with X" or just listing X = shallow. "Built Y using X processing Z events/day" = deep.
-CRITICAL: ONLY extract genuine technical skills. Do not include company names, person names, university names, cities, or generic English words."""
+CRITICAL: ONLY extract genuine technical skills. Do not include company names, person names, university names, cities, or generic English words.
+DO NOT extract these as skills: Sam, Designed, Power, Programming, Compliance, Automated, Computer, Data, Engineer, Team, Business, Systems, Solutions, Platforms, Infrastructure, Environment, Development, Management, Operations, Production, Process, Projects, Products, Services, Solutions.
+DO extract these as skills: Apache Spark, Python, SQL, Docker, Kubernetes, Snowflake, dbt, Airflow, Terraform, AWS, GCP, Azure, Git, React, Node.js, Java, Scala, Go, Rust, MongoDB, PostgreSQL, Kafka, Spark Streaming."""
 
     raw = _call_json_extract(prompt, max_tokens=1800)
     if not raw:
