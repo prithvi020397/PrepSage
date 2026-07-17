@@ -251,6 +251,19 @@
     </div>
     {% endif %}
 
+    {% if jd_loaded and role_readiness.taxonomy_stale %}
+    <div class="card" style="border-color: rgba(245,197,66,0.3); background: rgba(245,197,66,0.04);">
+      <div class="section-title" style="color:var(--warn);">🔄 Taxonomy updated</div>
+      <div class="sub" style="margin-bottom:10px;">The concept taxonomy has changed since your last upload. Re-parsing with the latest taxonomy may reveal new gaps or change your coverage reading.</div>
+      {% if reparse_available %}
+      <button class="btn" onclick="reparseStale()" style="background:var(--warn); color:#0e1015; border:none; border-radius:6px; padding:8px 16px; font-size:12.5px; font-weight:600; cursor:pointer;">Re-parse with latest taxonomy</button>
+      <span id="reparse-status" class="sub" style="margin-left:10px;"></span>
+      {% else %}
+      <div class="sub" style="color:var(--text-dim);">Re-upload your resume and JD to use the latest taxonomy.</div>
+      {% endif %}
+    </div>
+    {% endif %}
+
     {% if first_use and jd_concept_list %}
     <div class="card" style="border-color: rgba(124,108,246,0.4);">
       <div class="section-title" style="color:var(--accent);">🎯 Self-diagnose — tap what you've done</div>
@@ -698,6 +711,23 @@
       if (data.error) { alert(data.error); return; }
       const questions = data.questions.map((q, i) => `${i+1}. ${q}`).join('\n\n');
       alert(`Interview follow-ups for "${data.project}":\n\n${questions}`);
+    }
+
+    async function reparseStale() {
+      const btn = document.querySelector('[onclick="reparseStale()"]');
+      const status = document.getElementById('reparse-status');
+      btn.disabled = true;
+      status.textContent = 'Re-parsing…';
+      try {
+        const r = await fetch('/api/reparse-stale', {method: 'POST'});
+        const res = await r.json();
+        if (!r.ok || res.error) { status.textContent = 'Failed — try again'; return; }
+        status.textContent = 'Done! Reloading…';
+        setTimeout(() => location.reload(), 800);
+      } catch (e) {
+        status.textContent = 'Failed — try again';
+        btn.disabled = false;
+      }
     }
 
     async function selfDiagnose(btn, concept, confirm) {

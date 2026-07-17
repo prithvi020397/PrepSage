@@ -1508,6 +1508,7 @@ def upload_jd():
         return jsonify({"error": "could not parse JD — try again"}), 500
 
     jd_data["raw_text_preview"] = text[:300]
+    jd_data["raw_text"] = text[:5000]
     jd_data["uploaded_at"] = datetime.now().isoformat()
     jd_data["filename"] = file.filename
     jd_data["_extraction_method"] = method
@@ -1541,6 +1542,7 @@ def upload_jd_text():
         return jsonify({"error": "could not parse JD — try again"}), 500
 
     jd_data["raw_text_preview"] = text[:300]
+    jd_data["raw_text"] = text[:5000]
     jd_data["uploaded_at"] = datetime.now().isoformat()
     jd_data["filename"] = "pasted"
     jd_data["_extraction_method"] = method
@@ -1575,6 +1577,7 @@ def upload_resume():
         return jsonify({"error": "could not parse resume — try again"}), 500
 
     skills_data["raw_text_preview"] = text[:500]
+    skills_data["raw_text"] = text[:5000]
     skills_data["uploaded_at"] = datetime.now().isoformat()
     skills_data["filename"] = file.filename
     skills_data["_extraction_method"] = method
@@ -2461,7 +2464,46 @@ def dashboard():
         first_use=(total_solved == 0 and bool(PROGRESS.get("_jd")) and bool(PROGRESS.get("_resume"))),
         jd_concept_list=jd_concept_list,
         coverage_signal=coverage_signal,
+        reparse_available=bool(
+            (PROGRESS.get("_jd") or {}).get("raw_text")
+            or (PROGRESS.get("_resume") or {}).get("raw_text")
+        ),
     )
+
+
+@app.route("/api/reparse-stale", methods=["POST"])
+def reparse_stale():
+    """Re-extract concepts from stored raw text when taxonomy changes.
+    Returns the number of concepts extracted for both resume and JD."""
+    jd = PROGRESS.get("_jd")
+    resume = PROGRESS.get("_resume")
+    result = {}
+    if jd and jd.get("raw_text"):
+        jd_data, method = _extraction_fallback_chain(
+            _extract_concepts_from_jd, _fallback_extract_jd, jd["raw_text"], "JD-reparse")
+        if jd_data:
+            jd_data["raw_text_preview"] = jd["raw_text"][:300]
+            jd_data["raw_text"] = jd["raw_text"]
+            jd_data["uploaded_at"] = datetime.now().isoformat()
+            jd_data["filename"] = jd.get("filename", "reparsed")
+            jd_data["_extraction_method"] = method
+            _stamp_taxonomy(jd_data)
+            PROGRESS["_jd"] = jd_data
+            result["jd"] = len(jd_data.get("concepts_required", []))
+    if resume and resume.get("raw_text"):
+        skills_data, method = _extraction_fallback_chain(
+            _extract_skills_from_resume, _fallback_extract_resume, resume["raw_text"], "resume-reparse")
+        if skills_data:
+            skills_data["raw_text_preview"] = resume["raw_text"][:500]
+            skills_data["raw_text"] = resume["raw_text"]
+            skills_data["uploaded_at"] = datetime.now().isoformat()
+            skills_data["filename"] = resume.get("filename", "reparsed")
+            skills_data["_extraction_method"] = method
+            _stamp_taxonomy(skills_data)
+            PROGRESS["_resume"] = skills_data
+            result["resume"] = len(skills_data.get("skills", []))
+    save_progress()
+    return jsonify({"ok": True, **result})
 
 
 @app.route("/api/deadline", methods=["GET", "POST"])
