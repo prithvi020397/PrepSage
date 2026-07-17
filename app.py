@@ -1229,7 +1229,8 @@ def _call_json_extract(prompt, max_tokens=1800):
             if raw2:
                 return raw2
         return None
-    except Exception:
+    except Exception as e:
+        print(f"[_call_json_extract] LLM error: {type(e).__name__}: {e}", flush=True)
         return None
 
 
@@ -1438,7 +1439,7 @@ def upload_resume():
 
     skills_data = _extract_skills_from_resume(text)
     if not skills_data:
-        return jsonify({"error": "could not parse resume — try again"}), 500
+        return jsonify({"error": "could not parse resume — LLM extraction failed. Check Render logs for details."}), 500
 
     skills_data["raw_text_preview"] = text[:500]
     skills_data["uploaded_at"] = datetime.now().isoformat()
