@@ -1,0 +1,51 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>The Loop — Taxonomy</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0e1015; --panel: #14161d; --card: #1b1e27; --card-2: #20232e;
+    --border: rgba(255,255,255,0.08); --text: #e7e9ee; --text-dim: #9299ab;
+    --text-faint: #656c7e; --accent: #7c6cf6; --accent-2: #5ee6d8;
+  }
+  * { box-sizing: border-box; }
+  body { font-family: 'Inter', sans-serif; margin: 0; background: var(--bg); color: var(--text); font-size: 14px; padding: 24px; }
+  h1 { font-size: 18px; margin: 0 0 4px; }
+  .sub { color: var(--text-dim); font-size: 13px; margin-bottom: 20px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 14px; }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; }
+  .card h2 { font-size: 14px; font-weight: 600; margin: 0 0 4px; }
+  .key { font-size: 11px; color: var(--text-faint); font-family: 'JetBrains Mono', monospace; margin-bottom: 6px; }
+  .story { font-size: 12.5px; color: var(--text-dim); line-height: 1.5; margin-bottom: 8px; }
+  .tools { display: flex; flex-wrap: wrap; gap: 4px; }
+  .tools span { padding: 2px 5px; background: var(--card-2); border-radius: 3px; font-size: 10px; color: var(--accent-2); }
+  .topbar { display: flex; align-items: baseline; gap: 14px; margin-bottom: 20px; }
+  .topbar a { color: var(--text-dim); text-decoration: none; font-size: 13px; }
+  .topbar a:hover { color: var(--text); }
+</style>
+</head>
+<body>
+  <div class="topbar">
+    <h1>Concept Taxonomy</h1>
+    <a href="/dashboard">Diagnose</a>
+    <a href="/practice">Practice</a>
+  </div>
+  <div class="sub">{{ concepts | length }} concepts · The Loop maps every JD concept to one of these. Hover "?" on any dashboard row to see why.</div>
+  <div class="grid">
+    {% for c in concepts %}
+    <div class="card">
+      <h2>{{ c.name }}</h2>
+      <div class="key">{{ c.key }}</div>
+      {% if c.story %}<div class="story">{{ c.story }}</div>{% endif %}
+      {% if c.tools %}
+      <div class="tools">{% for t in c.tools %}<span>{{ t }}</span>{% endfor %}</div>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+</body>
+</html>

@@ -1125,6 +1125,25 @@ def index():
     return redirect("/dashboard")
 
 
+@app.route("/taxonomy")
+def taxonomy():
+    """Reference page listing all concepts, descriptions, and example tools."""
+    from collections import defaultdict
+    tool_examples = defaultdict(list)
+    for tool, concept in CONCEPT_NORMALIZATION.items():
+        if concept in CONCEPT_TAXONOMY:
+            tool_examples[concept].append(tool)
+    concepts = []
+    for key in CONCEPT_TAXONOMY:
+        concepts.append({
+            "key": key,
+            "name": key.replace("_", " ").title(),
+            "story": WAR_STORIES.get(key, ""),
+            "tools": sorted(tool_examples.get(key, []))[:8],
+        })
+    return render_template("taxonomy.html", concepts=concepts)
+
+
 @app.route("/practice")
 def practice():
     jd = PROGRESS.get("_jd", {})
