@@ -627,31 +627,32 @@ def api_test_login():
         PROGRESS.clear()
         save_progress()
     # try login first
+    session = None
+    user_id = None
     try:
         res = c.auth.sign_in_with_password({"email": TEST_EMAIL, "password": TEST_PASSWORD})
-    except Exception as e:
-        return jsonify({"error": f"test login failed: {e}"}), 500
-    if getattr(res, "error", None):
+        if getattr(res, "error", None):
+            raise Exception(str(res.error))
+        session = res.session
+        user_id = res.user.id if res.user else None
+    except Exception:
         # user doesn't exist — sign up
         try:
             res2 = c.auth.sign_up({"email": TEST_EMAIL, "password": TEST_PASSWORD})
+            if getattr(res2, "error", None):
+                return jsonify({"error": str(res2.error)}), 400
+            session = res2.session
+            user_id = res2.user.id if res2.user else None
+            if user_id and session:
+                try:
+                    c.auth.set_session(session.access_token, session.refresh_token)
+                    c.table("profiles").upsert({
+                        "id": user_id, "email": TEST_EMAIL, "display_name": "Test User",
+                    }).execute()
+                except Exception:
+                    pass
         except Exception as e:
             return jsonify({"error": f"test signup failed: {e}"}), 500
-        if getattr(res2, "error", None):
-            return jsonify({"error": str(res2.error)}), 400
-        session = res2.session
-        user_id = res2.user.id if res2.user else None
-        if user_id and session:
-            try:
-                c.auth.set_session(session.access_token, session.refresh_token)
-                c.table("profiles").upsert({
-                    "id": user_id, "email": TEST_EMAIL, "display_name": "Test User",
-                }).execute()
-            except Exception:
-                pass
-    else:
-        session = res.session
-        user_id = res.user.id if res.user else None
     if not session:
         return jsonify({"error": "could not authenticate"}), 500
     return jsonify({
