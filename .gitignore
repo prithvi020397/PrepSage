@@ -10,5 +10,6 @@ progress.json
 replay_comments.json
 research_cache.json
 sample_rubric_from_internet/
+.venv/
 
 graphify-out/

@@ -49,6 +49,16 @@ except Exception:
     scan_code = None
     has_blocker = None
 
+# ponytail: Supabase multi-user layer is OPTIONAL. When SUPABASE_URL/SUPABASE_KEY
+# are unset, supabase_client degrades to the legacy file-based single-user backend,
+# so the app runs unchanged in local mode. Import failure must never break startup.
+try:
+    import supabase_client as sb
+    SUPABASE_ENABLED = sb.SUPABASE_ENABLED
+except Exception:
+    sb = None
+    SUPABASE_ENABLED = False
+
 
 def chat_content(resp):
     """Safely pull text out of an OpenAI chat-completions response.
@@ -511,6 +521,84 @@ def _atomic_json(path, data):
 
 def save_progress():
     _atomic_json(PROGRESS_FILE, PROGRESS)
+
+
+# ---------------------------------------------------------------------------
+# Supabase multi-user auth (optional). When SUPABASE_ENABLED is False these
+# endpoints return 404 and the rest of the app runs in legacy single-user mode.
+# When enabled, they issue Supabase Auth JWTs and resolve the caller's id.
+# ---------------------------------------------------------------------------
+def current_user_id():
+    """Return the Supabase auth user id for the current request, or None.
+
+    None means: Supabase is off, or no valid bearer token — callers should
+    fall back to the legacy global PROGRESS/HISTORY/CHATS state.
+    """
+    if not SUPABASE_ENABLED or sb is None:
+        return None
+    from flask import request as _req
+    return sb.get_user_id_from_request(_req)
+
+
+@app.route("/api/signup", methods=["POST"])
+def api_signup():
+    if not SUPABASE_ENABLED or sb is None:
+        return jsonify({"error": "auth not configured"}), 404
+    data = request.json or {}
+    email = (data.get("email") or "").strip()
+    password = data.get("password") or ""
+    if not email or not password:
+        return jsonify({"error": "email and password required"}), 400
+    c = sb.get_client()
+    res = c.auth.sign_up({"email": email, "password": password})
+    if getattr(res, "error", None):
+        return jsonify({"error": str(res.error)}), 400
+    # Create profile row directly (GoTrue triggers on auth.users are unreliable).
+    # Set the user's session so RLS sees auth.uid() = user id.
+    user_id = res.user.id if res.user else None
+    session = res.session
+    if user_id and session:
+        c.auth.set_session(session.access_token, session.refresh_token)
+        display_name = email.split("@")[0]
+        c.table("profiles").upsert({
+            "id": user_id,
+            "email": email,
+            "display_name": display_name,
+        }).execute()
+    return jsonify({
+        "ok": True,
+        "user": user_id,
+        "access_token": session.access_token if session else None,
+    })
+
+
+@app.route("/api/login", methods=["POST"])
+def api_login():
+    if not SUPABASE_ENABLED or sb is None:
+        return jsonify({"error": "auth not configured"}), 404
+    data = request.json or {}
+    email = (data.get("email") or "").strip()
+    password = data.get("password") or ""
+    c = sb.get_client()
+    res = c.auth.sign_in_with_password({"email": email, "password": password})
+    if getattr(res, "error", None):
+        return jsonify({"error": str(res.error)}), 401
+    session = res.session
+    return jsonify({
+        "access_token": session.access_token,
+        "refresh_token": session.refresh_token,
+        "user_id": res.user.id if res.user else None,
+    })
+
+
+@app.route("/api/me", methods=["GET"])
+def api_me():
+    if not SUPABASE_ENABLED or sb is None:
+        return jsonify({"user_id": None, "mode": "legacy"})
+    uid = current_user_id()
+    if not uid:
+        return jsonify({"user_id": None, "mode": "anonymous"}), 401
+    return jsonify({"user_id": uid, "mode": "supabase"})
 
 
 # ponytail: reset wipes the *working state* of a question (saved code, trace, pattern,

@@ -1012,6 +1012,177 @@
   .rev-chat-bubble { padding:6px 10px; border-radius:8px; font-size:12px; line-height:1.4; max-width:85%; }
   .rev-chat-bubble.user { background:var(--accent-soft); color:var(--accent); align-self:flex-end; border-bottom-right-radius:3px; }
   .rev-chat-bubble.candidate { background:var(--card-2); border:1px solid var(--border-soft); color:var(--text-dim); align-self:flex-start; border-bottom-left-radius:3px; }
+
+  /* ── login overlay (split layout) ── */
+  #auth-overlay {
+    position: fixed; inset: 0; z-index: 9999;
+    display: flex; align-items: stretch; justify-content: center;
+    background: var(--bg);
+    overflow: hidden;
+    transition: opacity 0.35s ease;
+  }
+  /* subtle drifting aurora behind everything */
+  #auth-overlay::before {
+    content: '';
+    position: absolute; inset: -40%;
+    background:
+      radial-gradient(40% 40% at 30% 30%, rgba(124,108,246,0.18), transparent 70%),
+      radial-gradient(45% 45% at 70% 60%, rgba(94,230,216,0.12), transparent 70%),
+      radial-gradient(35% 35% at 50% 80%, rgba(34,197,94,0.10), transparent 70%);
+    filter: blur(20px);
+    animation: authAurora 18s ease-in-out infinite alternate;
+    pointer-events: none;
+  }
+  @keyframes authAurora {
+    0%   { transform: translate(0,0) rotate(0deg) scale(1); }
+    50%  { transform: translate(4%, -3%) rotate(8deg) scale(1.08); }
+    100% { transform: translate(-3%, 4%) rotate(-6deg) scale(1.04); }
+  }
+  #auth-overlay.hidden { opacity: 0; pointer-events: none; }
+  #auth-shell {
+    position: relative; z-index: 1;
+    width: 100%; max-width: none; height: 100%;
+    display: flex;
+    border-radius: 0; overflow: hidden;
+    box-shadow: none;
+    animation: authCardIn 0.5s cubic-bezier(0.16,1,0.3,1) both;
+  }
+  @keyframes authCardIn {
+    from { opacity: 0; transform: translateY(18px) scale(0.985); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
+  }
+  #auth-overlay.hidden #auth-shell { animation: none; transform: translateY(12px); opacity: 0; transition: opacity 0.3s, transform 0.3s; }
+
+  /* ── left brand panel ── */
+  #auth-brand {
+    flex: 0 0 58%; position: relative;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    padding: 60px 56px;
+    background:
+      radial-gradient(120% 120% at 0% 0%, rgba(124,108,246,0.22), transparent 55%),
+      radial-gradient(120% 120% at 100% 100%, rgba(94,230,216,0.16), transparent 55%),
+      var(--panel);
+    border-right: 1px solid var(--border);
+    overflow: hidden;
+    text-align: center;
+  }
+  #auth-brand .auth-loop-mark {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 56px; height: 56px; border-radius: 16px;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    color: #0e1015; margin-bottom: 32px; flex-shrink: 0;
+    animation: authLoopFloat 4.5s ease-in-out infinite;
+  }
+  #auth-brand .auth-loop-mark svg { width: 32px; height: 32px; }
+  @keyframes authLoopFloat {
+    0%, 100% { transform: rotate(-6deg) translateY(0); }
+    50%      { transform: rotate(6deg) translateY(-4px); }
+  }
+  #auth-brand .auth-loop-mark:hover { animation: authLoopSpin 1.1s cubic-bezier(0.34,1.56,0.64,1) infinite; }
+  @keyframes authLoopSpin {
+    0%   { transform: rotate(0deg); box-shadow: 0 0 0 0 rgba(124,108,246,0.5); }
+    70%  { box-shadow: 0 0 0 9px rgba(124,108,246,0); }
+    100% { transform: rotate(360deg); box-shadow: 0 0 0 0 rgba(124,108,246,0); }
+  }
+  #auth-brand .auth-wordmark {
+    display: flex; align-items: baseline; gap: 0; flex-wrap: wrap;
+    font-family: 'Inter', sans-serif; font-weight: 800; line-height: 1;
+    letter-spacing: 0.04em; margin-bottom: 22px;
+  }
+  #auth-brand .auth-wordmark .lp {
+    font-size: 64px;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  #auth-brand .auth-wordmark .lp-l {
+    font-size: 64px; margin-left: 0.32em;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  #auth-brand .auth-wordmark .oo {
+    display: inline-flex; align-items: center; justify-content: center;
+    margin: 0 2px; flex-shrink: 0;
+    position: relative; top: -3px;
+  }
+  #auth-brand .auth-wordmark .oo svg {
+    width: 22px; height: 22px;
+    color: var(--accent-2);
+  }
+  #auth-brand .auth-tagline {
+    font-size: 16px; line-height: 1.5; color: var(--text-dim);
+    max-width: 300px; font-style: italic;
+  }
+
+  /* ── right form panel ── */
+  #auth-form {
+    flex: 0 0 42%; display: flex; flex-direction: column; justify-content: center;
+    padding: 60px 56px;
+    background: rgba(20,22,29,0.92);
+    backdrop-filter: blur(14px);
+  }
+  #auth-form h2 {
+    margin: 0 0 6px; font-size: 22px; font-weight: 700;
+    letter-spacing: -0.02em; color: var(--text);
+    animation: authFadeUp 0.5s ease 0.08s both;
+  }
+  #auth-form .auth-sub {
+    margin: 0 0 28px; font-size: 13px; color: var(--text-faint);
+    animation: authFadeUp 0.5s ease 0.14s both;
+  }
+  @keyframes authFadeUp {
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  #auth-form .auth-field { margin-bottom: 16px; text-align: left; animation: authFadeUp 0.5s ease 0.22s both; }
+  #auth-form .auth-field label {
+    display: block; font-size: 12px; font-weight: 500;
+    color: var(--text-dim); margin-bottom: 6px; letter-spacing: 0.02em;
+  }
+  #auth-form .auth-field input {
+    width: 100%; padding: 11px 14px;
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 8px; color: var(--text); font-size: 14px;
+    font-family: 'Inter', sans-serif; outline: none;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  }
+  #auth-form .auth-field input:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(124,108,246,0.15);
+  }
+  #auth-form .auth-field input::placeholder { color: var(--text-faint); }
+  #auth-form .auth-error {
+    margin-bottom: 16px; padding: 10px 12px;
+    background: var(--error-soft); color: var(--error);
+    border-radius: 8px; font-size: 13px; display: none;
+    animation: authFadeUp 0.3s ease both;
+  }
+  #auth-form .auth-error.show { display: block; }
+  #auth-form .auth-submit {
+    width: 100%; padding: 12px; margin-bottom: 20px;
+    background: #22C55E; color: #0e1015; border: none;
+    border-radius: 8px; font-size: 15px; font-weight: 600;
+    font-family: 'Inter', sans-serif; cursor: pointer;
+    transition: background 0.15s ease, transform 0.1s ease, box-shadow 0.2s ease;
+    animation: authFadeUp 0.5s ease 0.30s both;
+  }
+  #auth-form .auth-submit:hover { background: #16A34A; box-shadow: 0 6px 20px rgba(34,197,94,0.28); }
+  #auth-form .auth-submit:active { transform: scale(0.98); }
+  #auth-form .auth-submit:disabled { opacity: 0.5; cursor: not-allowed; }
+  #auth-form .auth-toggle {
+    font-size: 13px; color: var(--text-faint);
+    animation: authFadeUp 0.5s ease 0.38s both;
+  }
+  #auth-form .auth-toggle a {
+    color: var(--accent); text-decoration: none; cursor: pointer;
+    font-weight: 500; transition: color 0.15s ease;
+  }
+  #auth-form .auth-toggle a:hover { color: var(--accent-2); }
+
+  @media (max-width: 720px) {
+    #auth-shell { flex-direction: column; max-width: 420px; min-height: 0; }
+    #auth-brand { border-right: none; border-bottom: 1px solid var(--border); padding: 36px 32px; }
+    #auth-brand .auth-wordmark .lp { font-size: 46px; }
+  }
 </style>
 </head>
 <body>
@@ -1041,6 +1212,40 @@
   <symbol id="i-more" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></symbol>
   <symbol id="i-check" viewBox="0 0 24 24"><polyline points="4 12 10 18 20 6"/></symbol>
 </svg>
+
+<div id="auth-overlay">
+  <div id="auth-shell">
+    <div id="auth-brand">
+      <span class="auth-loop-mark">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><use href="#i-loop"/></svg>
+      </span>
+      <div class="auth-wordmark">
+        <span class="lp">T</span><span class="lp">h</span><span class="lp">e</span>
+        <span class="lp-l">L</span>
+        <span class="oo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><use href="#i-repeat"/></svg></span>
+        <span class="oo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><use href="#i-repeat"/></svg></span>
+        <span class="lp">P</span>
+      </div>
+      <p class="auth-tagline">prepare like having a senior dev in your pocket</p>
+    </div>
+    <div id="auth-form">
+      <h2 id="auth-title">Welcome back</h2>
+      <p class="auth-sub">Log in to pick up where you left off.</p>
+      <div class="auth-error" id="auth-error"></div>
+      <div class="auth-field">
+        <label for="auth-email">Email</label>
+        <input id="auth-email" type="email" placeholder="you@example.com" autocomplete="email">
+      </div>
+      <div class="auth-field">
+        <label for="auth-password">Password</label>
+        <input id="auth-password" type="password" placeholder="••••••••" autocomplete="current-password">
+      </div>
+      <button class="auth-submit" id="auth-submit" onclick="authSubmit()">Log in</button>
+      <p class="auth-toggle"><span id="auth-toggle-text">No account?</span> <a id="auth-toggle-link" onclick="authToggle()">Sign up</a></p>
+    </div>
+  </div>
+</div>
+
 <div id="topbar">
   <a class="brand" href="/dashboard" title="Back to your dashboard"><span class="logo-mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><use href="#i-loop"/></svg></span><span class="brand-text">The Loop</span></a>
   <span class="tagline">Interview prep that adapts to you, with a tutor watching your back</span>
@@ -4475,6 +4680,104 @@ function refreshStreak() {
 }
 
 document.getElementById('q-search').addEventListener('input', applySidebarFilter);
+
+/* ── auth overlay logic ── */
+let authMode = 'login'; // 'login' | 'signup'
+const authOverlay = document.getElementById('auth-overlay');
+const authTitle = document.getElementById('auth-title');
+const authError = document.getElementById('auth-error');
+const authSubmitBtn = document.getElementById('auth-submit');
+const authToggleText = document.getElementById('auth-toggle-text');
+const authToggleLink = document.getElementById('auth-toggle-link');
+const authEmail = document.getElementById('auth-email');
+const authPassword = document.getElementById('auth-password');
+
+function authToggle() {
+  authMode = authMode === 'login' ? 'signup' : 'login';
+  authError.classList.remove('show');
+  if (authMode === 'signup') {
+    authTitle.textContent = 'Create account';
+    authSubmitBtn.textContent = 'Sign up';
+    authToggleText.textContent = 'Have an account?';
+    authToggleLink.textContent = 'Log in';
+  } else {
+    authTitle.textContent = 'Welcome back';
+    authSubmitBtn.textContent = 'Log in';
+    authToggleText.textContent = 'No account?';
+    authToggleLink.textContent = 'Sign up';
+  }
+  authEmail.focus();
+}
+
+function authShowError(msg) {
+  authError.textContent = msg;
+  authError.classList.add('show');
+}
+
+async function authSubmit() {
+  const email = authEmail.value.trim();
+  const password = authPassword.value;
+  if (!email || !password) { authShowError('Email and password required.'); return; }
+  authSubmitBtn.disabled = true;
+  authError.classList.remove('show');
+  try {
+    const endpoint = authMode === 'signup' ? '/api/signup' : '/api/login';
+    const r = await fetch(endpoint, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({email, password}),
+    });
+    const data = await r.json();
+    if (r.status === 404) {
+      authShowError('Sign-up is not enabled yet.');
+      return;
+    }
+    if (!r.ok || data.error) {
+      authShowError(data.error || 'Something went wrong.');
+      return;
+    }
+    if (data.access_token) {
+      localStorage.setItem('loop_token', data.access_token);
+    }
+    authOverlay.classList.add('hidden');
+    setTimeout(() => authOverlay.style.display = 'none', 400);
+  } catch (e) {
+    authShowError('Network error — try again.');
+  } finally {
+    authSubmitBtn.disabled = false;
+  }
+}
+
+// Enter key submits
+document.getElementById('auth-password').addEventListener('keydown', e => { if (e.key === 'Enter') authSubmit(); });
+document.getElementById('auth-email').addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('auth-password').focus(); });
+
+// On load: check existing token → skip login if valid; skip overlay entirely in legacy mode
+(async function checkAuth() {
+  try {
+    const r = await fetch('/api/me');
+    const data = await r.json();
+    if (data.mode === 'legacy') {
+      authOverlay.classList.add('hidden');
+      authOverlay.style.display = 'none';
+      return;
+    }
+  } catch { /* Supabase may be unreachable — still show overlay */ }
+
+  const token = localStorage.getItem('loop_token');
+  if (!token) { authEmail.focus(); return; }
+  try {
+    const r2 = await fetch('/api/me', { headers: {'Authorization': 'Bearer ' + token} });
+    const data2 = await r2.json();
+    if (data2.user_id) {
+      authOverlay.classList.add('hidden');
+      setTimeout(() => authOverlay.style.display = 'none', 400);
+    } else {
+      localStorage.removeItem('loop_token');
+      authEmail.focus();
+    }
+  } catch { authEmail.focus(); }
+})();
 
 async function loadDeadline() {
   const r = await fetch('/api/deadline');
