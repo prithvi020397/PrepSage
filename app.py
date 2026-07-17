@@ -2399,6 +2399,27 @@ def dashboard():
     total_solved = sum(1 for qid in PROGRESS if is_solved(qid))
     postmortems = [h for h in HISTORY if h.get("event") == "postmortem"]
 
+    role_readiness = _compute_role_readiness()
+
+    # build combined concept list for the self-diagnose card
+    jd_concept_list = []
+    seen = set()
+    for group, status in [("real_gaps", "gap"), ("self_reported", "self_reported"),
+                           ("verify", "verify"), ("covered", "covered"),
+                           ("translations", "translation")]:
+        for item in role_readiness.get(group, []):
+            c = item.get("concept") or item.get("raw") or ""
+            if c in seen:
+                continue
+            seen.add(c)
+            jd_concept_list.append({
+                "name": c.replace("_", " ").title(),
+                "concept": c,
+                "status": status,
+                "importance": item.get("importance", "must_have"),
+                "evidence": item.get("evidence", ""),
+            })
+
     return render_template(
         "dashboard.html",
         total_questions=total_questions,
@@ -2411,8 +2432,9 @@ def dashboard():
         jd_loaded=bool(PROGRESS.get("_jd")),
         jd=PROGRESS.get("_jd", {}),
         concept_match=_compute_concept_match(),
-        role_readiness=_compute_role_readiness(),
+        role_readiness=role_readiness,
         first_use=(total_solved == 0 and bool(PROGRESS.get("_jd")) and bool(PROGRESS.get("_resume"))),
+        jd_concept_list=jd_concept_list,
     )
 
 
