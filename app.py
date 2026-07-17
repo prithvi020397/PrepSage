@@ -1,16 +1,18 @@
 import difflib
 import json
+import logging
 import os
 import random
 import re
 import sqlite3
 import subprocess
 import tempfile
+import time
 from datetime import datetime, timedelta
 from io import BytesIO
 
 from dotenv import load_dotenv
-from flask import Flask, jsonify, request, render_template, redirect
+from flask import Flask, jsonify, request, render_template, redirect, g
 from openai import OpenAI
 
 # resume parsing — optional, graceful fallback if missing
@@ -26,6 +28,18 @@ except Exception:
 load_dotenv()
 
 app = Flask(__name__)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
+log = logging.getLogger("theloop")
+
+@app.before_request
+def _req_start():
+    g._t0 = time.time()
+
+@app.after_request
+def _req_log(resp):
+    ms = int((time.time() - getattr(g, "_t0", time.time())) * 1000)
+    log.info("%s %s %s %dms", request.method, request.path, resp.status_code, ms)
+    return resp
 # The Loop: single-user local interview prep platform
 HEADROOM_ENABLED = os.environ.get("HEADROOM_ENABLED", "").lower() in ("1", "true", "yes")
 API_BASE = "http://localhost:9090/v1" if HEADROOM_ENABLED else "https://openrouter.ai/api/v1"
@@ -64,6 +78,12 @@ try:
 except Exception:
     sb = None
     SUPABASE_ENABLED = False
+
+# LEGACY_MODE=1 forces single-user file-based mode (bypasses Supabase). Useful locally
+# during a Supabase outage. Production leaves this unset so Supabase auth stays on.
+if os.environ.get("LEGACY_MODE", "").lower() in ("1", "true", "yes"):
+    SUPABASE_ENABLED = False
+    sb = None
 
 
 def chat_content(resp):
@@ -546,10 +566,17 @@ def current_user_id():
     return sb.get_user_id_from_request(_req)
 
 
+LEGACY_FAKE_TOKEN = "legacy-local-mode"
+
 @app.route("/api/signup", methods=["POST"])
 def api_signup():
     if not SUPABASE_ENABLED or sb is None:
-        return jsonify({"error": "auth not configured"}), 404
+        data = request.json or {}
+        return jsonify({
+            "ok": True,
+            "user": "legacy-user",
+            "access_token": LEGACY_FAKE_TOKEN,
+        })
     data = request.json or {}
     email = (data.get("email") or "").strip()
     password = data.get("password") or ""
@@ -589,7 +616,12 @@ def api_signup():
 @app.route("/api/login", methods=["POST"])
 def api_login():
     if not SUPABASE_ENABLED or sb is None:
-        return jsonify({"error": "auth not configured"}), 404
+        data = request.json or {}
+        return jsonify({
+            "access_token": LEGACY_FAKE_TOKEN,
+            "refresh_token": LEGACY_FAKE_TOKEN,
+            "user_id": "legacy-user",
+        })
     data = request.json or {}
     email = (data.get("email") or "").strip()
     password = data.get("password") or ""
@@ -618,7 +650,16 @@ TEST_PASSWORD = "test-loop-2024"
 def api_test_login():
     """Login or signup a test user. If ?fresh=1, wipe progress first."""
     if not SUPABASE_ENABLED or sb is None:
-        return jsonify({"error": "auth not configured"}), 404
+        fresh = request.args.get("fresh") == "1"
+        if fresh:
+            PROGRESS.clear()
+            save_progress()
+        return jsonify({
+            "access_token": LEGACY_FAKE_TOKEN,
+            "refresh_token": LEGACY_FAKE_TOKEN,
+            "user_id": "legacy-user",
+            "fresh": fresh,
+        })
     c = sb.get_client()
     if not c:
         return jsonify({"error": "supabase client unavailable"}), 500
@@ -4780,7 +4821,7 @@ def smart_start():
             return jsonify({"id": due[0], "reason": "due_review"})
 
     # weak-area bias: use recent miss topics to pick an unsolved question in a weak topic
-    weak = {t for t, _ in recurring_missed_topics()}
+    weak = set(recurring_missed_topics())
     unsolved = [(qid, q) for qid, q in QUESTIONS.items() if not is_solved(qid)]
     weak_hits = [(qid, q) for qid, q in unsolved if topic_for(q) in weak and q["lang"] in ("sql", "python")]
     if lane == "weak":

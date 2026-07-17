@@ -2569,12 +2569,12 @@ async function gradeTradeoff() {
   if (res.ok) markSolved(current.id);
 }
 
-async function rerollTradeoff() {
-  function setQuestionTitle(title) {
-    const prefix = window.JD_CONTEXT ? window.JD_CONTEXT + ' — ' : '';
-    document.getElementById('title').textContent = prefix + title;
-  }
+function setQuestionTitle(title) {
+  const prefix = window.JD_CONTEXT ? window.JD_CONTEXT + ' — ' : '';
+  document.getElementById('title').textContent = prefix + title;
+}
 
+async function rerollTradeoff() {
   const btn = document.getElementById('tradeoff-reroll-btn');
   btn.disabled = true;
   btn.textContent = 'Loading…';
@@ -2770,7 +2770,14 @@ function sendIdleNudge() {
 cm.on('change', resetIdleTimer);
 
 async function loadList() {
-  const qs = await (await fetch('/api/questions')).json();
+  let qs;
+  try {
+    const r = await fetch('/api/questions');
+    qs = await r.json();
+  } catch (e) {
+    console.error('loadList failed:', e);
+    return;
+  }
   const sb = document.getElementById('sidebar-list');
 
   const groups = [
@@ -3183,6 +3190,7 @@ async function loadQuestion(id) {
   onPlanInput();
   resetIdleTimer();
   } catch (e) { showToast('Could not open question: ' + e.message); }
+}
 
 function makeTable(columns, rows) {
   const table = document.createElement('table');
