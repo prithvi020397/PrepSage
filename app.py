@@ -29,7 +29,7 @@ app = Flask(__name__)
 # The Loop: single-user local interview prep platform
 HEADROOM_ENABLED = os.environ.get("HEADROOM_ENABLED", "").lower() in ("1", "true", "yes")
 API_BASE = "http://localhost:9090/v1" if HEADROOM_ENABLED else "https://openrouter.ai/api/v1"
-client = OpenAI(base_url=API_BASE, api_key=os.environ.get("OPENROUTER_API_KEY", ""))
+client = OpenAI(base_url=API_BASE, api_key=os.environ.get("OPENROUTER_API_KEY", "sk-placeholder-not-used"))
 MODEL = "deepseek/deepseek-v4-flash"
 
 # ponytail: TAXONOMY_VERSION stamps every LLM extraction (resume/JD) so we can detect
