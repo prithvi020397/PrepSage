@@ -597,6 +597,47 @@ def api_login():
     })
 
 
+TEST_EMAIL = "test@theloop.dev"
+TEST_PASSWORD = "test-loop-2024"
+
+
+@app.route("/api/test-login", methods=["POST"])
+def api_test_login():
+    """Login or signup a test user. If ?fresh=1, wipe progress first."""
+    if not SUPABASE_ENABLED or sb is None:
+        return jsonify({"error": "auth not configured"}), 404
+    c = sb.get_client()
+    fresh = request.args.get("fresh") == "1"
+    if fresh:
+        PROGRESS.clear()
+        save_progress()
+    # try login first
+    res = c.auth.sign_in_with_password({"email": TEST_EMAIL, "password": TEST_PASSWORD})
+    if getattr(res, "error", None):
+        # user doesn't exist — sign up
+        res2 = c.auth.sign_up({"email": TEST_EMAIL, "password": TEST_PASSWORD})
+        if getattr(res2, "error", None):
+            return jsonify({"error": str(res2.error)}), 400
+        session = res2.session
+        user_id = res2.user.id if res2.user else None
+        if user_id and session:
+            c.auth.set_session(session.access_token, session.refresh_token)
+            c.table("profiles").upsert({
+                "id": user_id, "email": TEST_EMAIL, "display_name": "Test User",
+            }).execute()
+    else:
+        session = res.session
+        user_id = res.user.id if res.user else None
+    if not session:
+        return jsonify({"error": "could not authenticate"}), 500
+    return jsonify({
+        "access_token": session.access_token,
+        "refresh_token": session.refresh_token,
+        "user_id": user_id,
+        "fresh": fresh,
+    })
+
+
 @app.route("/api/me", methods=["GET"])
 def api_me():
     if not SUPABASE_ENABLED or sb is None:

@@ -1243,6 +1243,7 @@
       </div>
       <button class="auth-submit" id="auth-submit" onclick="authSubmit()">Log in</button>
       <p class="auth-toggle"><span id="auth-toggle-text">No account?</span> <a id="auth-toggle-link" onclick="authToggle()">Sign up</a></p>
+      <p style="text-align:center; margin:0; font-size:12px; color:var(--text-faint);"><a style="cursor:pointer; color:var(--accent); text-decoration:none;" onclick="testLogin(false)">⚡ Test drive</a> · <a style="cursor:pointer; color:var(--accent); text-decoration:none;" onclick="testLogin(true)">🍃 Fresh start</a></p>
     </div>
   </div>
 </div>
@@ -4816,6 +4817,20 @@ async function authSubmit() {
   } finally {
     authSubmitBtn.disabled = false;
   }
+}
+
+async function testLogin(fresh) {
+  authSubmitBtn.disabled = true;
+  authError.classList.remove('show');
+  try {
+    const r = await fetch('/api/test-login' + (fresh ? '?fresh=1' : ''), {method: 'POST'});
+    const data = await r.json();
+    if (!r.ok || data.error) { authShowError(data.error || 'Test login failed.'); authSubmitBtn.disabled = false; return; }
+    if (data.access_token) localStorage.setItem('loop_token', data.access_token);
+    authOverlay.classList.add('hidden');
+    setTimeout(() => authOverlay.style.display = 'none', 400);
+    if (data.fresh) setTimeout(() => location.reload(), 500);
+  } catch (e) { authShowError('Network error — try again.'); authSubmitBtn.disabled = false; }
 }
 
 // Enter key submits
