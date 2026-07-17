@@ -1376,6 +1376,105 @@ Critical: if the JD says 'Kafka' or 'Flink', the concept is 'streaming_paradigm'
         return None
 
 
+def _fallback_extract_jd(text):
+    """Basic regex-based JD extraction when the LLM is unavailable.
+    Extracts role title, tool keywords, and concept-level guesses from raw text."""
+    title = ""
+    lines = [l.strip() for l in text.split("\n") if l.strip()]
+    for l in lines[:15]:
+        l_clean = l.strip()
+        if l_clean and len(l_clean) < 120 and not l_clean.startswith(("http", "About", "Job", "Location", "Salary", "Type", "Posted")):
+            # likely a job title — first substantive short line
+            if any(w in l_clean.lower() for w in ("engineer", "scientist", "architect", "developer", "manager", "intern", "analyst")):
+                title = l_clean
+                break
+            elif "|" not in l_clean and "@" not in l_clean:
+                title = l_clean
+                break
+    known_tools = set(JD_CONCEPT_TRANSLATIONS.keys())
+    tool_keywords = []
+    text_lower = text.lower()
+    for tool in sorted(known_tools, key=len, reverse=True):
+        if tool in text_lower and tool not in tool_keywords:
+            tool_keywords.append(tool)
+    concept_matches = {}
+    for tool, concept in JD_CONCEPT_TRANSLATIONS.items():
+        if tool in text_lower:
+            concept_matches.setdefault(concept, []).append(tool)
+    concepts_required = []
+    for concept, tools in concept_matches.items():
+        concepts_required.append({
+            "concept": concept,
+            "evidence": f"Mentions: {', '.join(tools[:3])}",
+            "importance": "must_have",
+        })
+    return {
+        "role_title": title or "Unknown Role",
+        "seniority": "mid",
+        "domain": "",
+        "concepts_required": concepts_required,
+        "capabilities_required": [],
+        "tool_keywords": tool_keywords[:20],
+        "signal_framing": "Extracted by fallback (no LLM available). Concepts are based on tool-name matching — less precise than AI extraction.",
+    }
+
+
+def _fallback_extract_resume(text):
+    """Basic regex-based resume extraction when the LLM is unavailable.
+    Extracts skill candidates, project-like paragraphs, and domain guesses."""
+    lines = [l.strip() for l in text.split("\n") if l.strip()]
+    # collect capitalized terms as skill candidates
+    words = re.findall(r'\b[A-Z][a-z++#.]{1,}\b', text)
+    skip = {"The", "This", "That", "With", "From", "They", "What", "When", "Where",
+            "Also", "Have", "Has", "Had", "Our", "Your", "You", "We", "I", "It", "Its",
+            "Not", "All", "Each", "Every", "Some", "Most", "Few", "Many", "Much",
+            "More", "Less", "And", "But", "Or", "For", "Nor", "Yet", "So", "Both",
+            "Either", "Neither", "January", "February", "March", "April", "May", "June",
+            "July", "August", "September", "October", "November", "December",
+            "Email", "Phone", "Address", "City", "State"}
+    skill_set = set()
+    for w in words:
+        wl = w.lower()
+        if w in skip or len(w) < 3:
+            continue
+        if wl in skill_set:
+            continue
+        skill_set.add(wl)
+    skills = [{"name": s.title(), "depth": "moderate", "context": ""} for s in list(skill_set)[:30]]
+    projects = []
+    for l in lines[10:40]:
+        if len(l) > 60 and any(c in l for c in (".", ":", "—")):
+            projects.append({
+                "name": l.split("—")[0].split(":")[0].strip()[:60] or "Project",
+                "description": l[:150],
+                "tech": [],
+                "specificity": "low",
+            })
+    return {
+        "target_role": "Unknown",
+        "years_experience": None,
+        "skills": skills,
+        "projects": projects[:5],
+        "domains": [],
+        "strongest_skills": [s["name"] for s in skills[:5]],
+        "weakest_signals": [],
+    }
+
+
+def _extraction_fallback_chain(extract_fn, fallback_fn, text, label):
+    """Try LLM extraction first, fall back to deterministic extraction on failure.
+    Returns (data: dict | None, method: str)."""
+    data = extract_fn(text)
+    if data:
+        return data, "llm"
+    print(f"[{label}] LLM extraction failed — using fallback", flush=True)
+    fb = fallback_fn(text)
+    if fb:
+        return fb, "fallback"
+    print(f"[{label}] Fallback also failed — returning None", flush=True)
+    return None, "none"
+
+
 @app.route("/api/upload-jd", methods=["POST"])
 def upload_jd():
     """Accept a PDF/DOCX/TXT job description, extract concepts via LLM, store in progress."""
@@ -1391,13 +1490,15 @@ def upload_jd():
     if not text or len(text.strip()) < 30:
         return jsonify({"error": "could not extract text — try a different file format"}), 400
 
-    jd_data = _extract_concepts_from_jd(text)
+    jd_data, method = _extraction_fallback_chain(
+        _extract_concepts_from_jd, _fallback_extract_jd, text, "JD")
     if not jd_data:
         return jsonify({"error": "could not parse JD — try again"}), 500
 
     jd_data["raw_text_preview"] = text[:300]
     jd_data["uploaded_at"] = datetime.now().isoformat()
     jd_data["filename"] = file.filename
+    jd_data["_extraction_method"] = method
     _stamp_taxonomy(jd_data)
     PROGRESS["_jd"] = jd_data
     save_progress()
@@ -1422,13 +1523,15 @@ def upload_jd_text():
     if not text or len(text) < 30:
         return jsonify({"error": "JD text too short — paste at least a paragraph"}), 400
 
-    jd_data = _extract_concepts_from_jd(text)
+    jd_data, method = _extraction_fallback_chain(
+        _extract_concepts_from_jd, _fallback_extract_jd, text, "JD-text")
     if not jd_data:
         return jsonify({"error": "could not parse JD — try again"}), 500
 
     jd_data["raw_text_preview"] = text[:300]
     jd_data["uploaded_at"] = datetime.now().isoformat()
     jd_data["filename"] = "pasted"
+    jd_data["_extraction_method"] = method
     _stamp_taxonomy(jd_data)
     PROGRESS["_jd"] = jd_data
     save_progress()
@@ -1454,13 +1557,15 @@ def upload_resume():
     if not text or len(text.strip()) < 50:
         return jsonify({"error": "could not extract text — try a different file format"}), 400
 
-    skills_data = _extract_skills_from_resume(text)
+    skills_data, method = _extraction_fallback_chain(
+        _extract_skills_from_resume, _fallback_extract_resume, text, "resume")
     if not skills_data:
-        return jsonify({"error": "could not parse resume — LLM extraction failed. Check Render logs for details."}), 500
+        return jsonify({"error": "could not parse resume — try again"}), 500
 
     skills_data["raw_text_preview"] = text[:500]
     skills_data["uploaded_at"] = datetime.now().isoformat()
     skills_data["filename"] = file.filename
+    skills_data["_extraction_method"] = method
     _stamp_taxonomy(skills_data)
     PROGRESS["_resume"] = skills_data
     save_progress()
