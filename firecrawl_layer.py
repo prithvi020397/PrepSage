@@ -23,6 +23,7 @@ are free and the feature still works offline after the first successful scrape.
 """
 import json
 import os
+import urllib.parse
 import urllib.request
 import urllib.error
 from dotenv import load_dotenv
@@ -32,6 +33,18 @@ load_dotenv()
 FIRECRAWL_API_KEY = os.environ.get("FIRECRAWL_API_KEY")
 FIRECRAWL_ENABLED = os.environ.get("FIRECRAWL_ENABLED", "true").lower() not in ("0", "false", "no")
 FIRECRAWL_BASE = "https://api.firecrawl.dev/v2"
+
+# ponytail: ScrapeGraphAI is an OPTIONAL, soft fallback for the Firecrawl search layer. It only
+# activates if the package is installed AND a DeepSeek key is present (we run it in local mode with
+# DeepSeek as the OpenAI-compatible LLM). If either is missing, we skip it and the caller falls back
+# to the precomputed question bank. No hard dependency is added to requirements.
+DEEPSEEK_API_KEY = os.environ.get("DEEPSEEK_API_KEY")
+_use_scrapegraph = bool(DEEPSEEK_API_KEY)
+if _use_scrapegraph:
+    try:
+        from scrapegraphai.graphs import SmartScraperGraph
+    except Exception:
+        _use_scrapegraph = False
 
 CACHE_FILE = "research_cache.json"
 CACHE_TTL = 60 * 60 * 24 * 30  # 30 days — a "fresh angle" stays fresh for a month
@@ -124,6 +137,19 @@ def scrape_markdown(url, timeout=15):
 
 
 def search(query, limit=4):
+    """Web search returning a list of {url, title, description}, or [] on failure.
+
+    Primary path: Firecrawl v2 search. Fallback path: ScrapeGraphAI SmartScraperGraph against a
+    search-engine URL (only if ScrapeGraphAI is installed and Firecrawl is unavailable). The caller
+    treats an empty list as "use the precomputed bank", so any failure degrades gracefully.
+    """
+    results = _search_firecrawl(query, limit)
+    if results:
+        return results
+    return _search_scrapegraph(query, limit)
+
+
+def _search_firecrawl(query, limit=4):
     """Firecrawl v2 web search. Returns a list of {url, title, description}, or [] on failure.
 
     Search is far more robust than fixed seed URLs — it always returns concept-relevant sources
@@ -152,6 +178,51 @@ def search(query, limit=4):
             for r in results if r.get("url")
         ]
     except (urllib.error.URLError, urllib.error.HTTPError, ValueError, TimeoutError, Exception):
+        return []
+
+
+def _search_scrapegraph(query, limit=4):
+    """ScrapeGraphAI fallback search. Mirrors the SmartScraperGraph pattern ("prompt + source ->
+    structured JSON") against a DuckDuckGo results page, then flattens the hits into our result shape.
+    Returns [] if ScrapeGraphAI is not installed, unconfigured, or any step fails."""
+    if not _use_scrapegraph:
+        return []
+    try:
+        from scrapegraphai.graphs import SmartScraperGraph
+    except Exception:
+        return []
+
+    search_url = f"https://duckduckgo.com/html/?q={urllib.parse.quote(query)}"
+    prompt = (
+        "Extract the top organic search results as a JSON list named 'results'. "
+        "Each item must have: 'title' (string), 'url' (string), 'description' (string). "
+        "Return ONLY JSON, no markdown."
+    )
+    graph_config = {
+        "llm": {
+            "model": "deepseek/deepseek-chat",
+            "model_kwargs": {"base_url": "https://api.deepseek.com/v1"},
+            "api_key": DEEPSEEK_API_KEY,
+        },
+        "embeddings": {
+            "model": "deepseek/deepseek-embedding",
+            "api_key": DEEPSEEK_API_KEY,
+        },
+    }
+    try:
+        graph = SmartScraperGraph(
+            prompt=prompt, source=search_url, config=graph_config,
+        )
+        out = graph.run()
+        raw = out.get("results") if isinstance(out, dict) else out
+        if not isinstance(raw, list):
+            return []
+        return [
+            {"url": r.get("url"), "title": r.get("title"), "description": r.get("description")}
+            for r in raw
+            if isinstance(r, dict) and r.get("url")
+        ][:limit]
+    except Exception:
         return []
 
 

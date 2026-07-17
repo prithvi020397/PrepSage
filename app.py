@@ -59,6 +59,26 @@ def chat_content(resp):
 
 QUESTIONS = {q["id"]: q for q in json.load(open("questions.json"))}
 
+# ponytail: LLM-derived mapping of question -> gap concepts it builds, produced offline by
+# precompute.py (gen_concept_links). Loaded lazily and cached so runtime stays free; absent
+# file => framed-practice falls back to the legacy GAP_TO_QUESTIONS dict.
+_CONCEPT_LINKS_CACHE = None
+
+
+def _load_concept_links():
+    global _CONCEPT_LINKS_CACHE
+    if _CONCEPT_LINKS_CACHE is not None:
+        return _CONCEPT_LINKS_CACHE
+    path = "question_concept_links.json"
+    if not os.path.exists(path):
+        _CONCEPT_LINKS_CACHE = {}
+        return _CONCEPT_LINKS_CACHE
+    try:
+        _CONCEPT_LINKS_CACHE = json.load(open(path))
+    except Exception:
+        _CONCEPT_LINKS_CACHE = {}
+    return _CONCEPT_LINKS_CACHE
+
 # ponytail: in-memory, single-user, resets on restart — fine for a local tutor
 ATTEMPTS = {}
 STRUGGLES = {}  # qid -> {"title", "concept", "fails"} — for cross-question pattern callouts
@@ -1020,12 +1040,44 @@ def save_onboarding():
     return jsonify({"ok": True})
 
 
+def _ocr_with_stirling(file_bytes, filename):
+    """Fallback OCR via a self-hosted Stirling-PDF instance (default http://localhost:8080).
+    Activates only when STIRLING_PDF_URL is set (or default local instance is reachable) and
+    pdfplumber returned no text (e.g. a scanned/image PDF). Returns extracted text or None.
+    Fails silently — caller keeps using whatever it already had."""
+    base = os.environ.get("STIRLING_PDF_URL", "http://localhost:8080").rstrip("/")
+    if not base:
+        return None
+    try:
+        resp = urllib.request.urlopen(
+            f"{base}/api/v1/convert/pdf/ocr",
+            data=file_bytes, timeout=60,
+            headers={"Content-Type": "application/pdf"},
+        )
+        out = resp.read()
+        # OCR endpoint returns a PDF; re-run pdfplumber on it to get text
+        if pdfplumber and out:
+            with pdfplumber.open(BytesIO(out)) as pdf:
+                text = "\n".join(page.extract_text() or "" for page in pdf.pages)
+            return text or None
+    except Exception:
+        return None
+    return None
+
+
 def _extract_text_from_resume(file_bytes, filename):
-    """Extract plain text from a PDF or DOCX file."""
+    """Extract plain text from a PDF or DOCX file. Falls back to Stirling-PDF OCR
+    for scanned/image PDFs that pdfplumber can't read."""
     lower = filename.lower()
     if lower.endswith(".pdf") and pdfplumber:
         with pdfplumber.open(BytesIO(file_bytes)) as pdf:
-            return "\n".join(page.extract_text() or "" for page in pdf.pages)
+            text = "\n".join(page.extract_text() or "" for page in pdf.pages)
+        # empty => likely a scanned PDF; try OCR before giving up
+        if not text.strip() and os.environ.get("STIRLING_PDF_URL", "http://localhost:8080"):
+            ocr = _ocr_with_stirling(file_bytes, filename)
+            if ocr:
+                return ocr
+        return text
     elif lower.endswith((".docx", ".doc")) and docx:
         doc = docx.Document(BytesIO(file_bytes))
         return "\n".join(p.text for p in doc.paragraphs)
@@ -1131,7 +1183,8 @@ Be strict about depth: "familiar with X" or just listing X = shallow. "Built Y u
 # ponytail: CONCEPT_TAXONOMY (defined near the top of this file) is the shared vocabulary
 # the JD extractor maps into. JD tool-keywords ("Kafka", "Flink") are intentionally
 # translated to the UNDERLYING CONCEPT ("streaming paradigm") so matching against the
-# resume happens at the concept level, not the tool level. Azure↔AWS↔GCP are treated
+# resume happens via tool-to-concept mapping, not raw tool-keyword matching. Azure↔AWS↔GCP
+# are treated
 # as the same concept (cloud platform) — a translation, not a gap.
 JD_CONCEPT_TRANSLATIONS = {
     "azure": "cloud_platform", "aws": "cloud_platform", "gcp": "cloud_platform",
@@ -1603,19 +1656,22 @@ CONCEPT_NORMALIZATION = {
     "stream processing": "streaming_paradigm", "real-time": "streaming_paradigm",
     "real time": "streaming_paradigm", "realtime": "streaming_paradigm",
     "streaming paradigm": "streaming_paradigm", "kafka": "streaming_paradigm",
-    "flink": "streaming_paradigm", "event streaming": "streaming_paradigm",
+    "flink": "streaming_paradigm", "kinesis": "streaming_paradigm",
+    "event streaming": "streaming_paradigm", "pub/sub": "streaming_paradigm",
     "batch": "batch_paradigm", "batch processing": "batch_paradigm",
     "batch paradigm": "batch_paradigm", "etl": "batch_paradigm",
+    "pyspark": "batch_paradigm", "spark": "batch_paradigm", "dataproc": "batch_paradigm",
     "cloud": "cloud_platform", "cloud platform": "cloud_platform",
     "cloud provider": "cloud_platform", "azure": "cloud_platform",
-    "aws": "cloud_platform", "gcp": "cloud_platform", "databricks": "cloud_platform",
+    "aws": "cloud_platform", "gcp": "cloud_platform", "google cloud": "cloud_platform",
+    "databricks": "cloud_platform",
     "partitioning": "partitioning_hot_key_skew", "hot key": "partitioning_hot_key_skew",
     "skew": "partitioning_hot_key_skew", "data skew": "partitioning_hot_key_skew",
     "idempotency": "idempotency_dedup", "dedup": "idempotency_dedup",
     "idempotent": "idempotency_dedup", "exactly once": "idempotency_dedup",
     "backfill": "backfill_reprocessing", "reprocessing": "backfill_reprocessing",
     "replay": "backfill_reprocessing", "reprocess": "backfill_reprocessing",
-    "schema evolution": "schema_evolution_compat", "schema": "schema_evolution_compat",
+    "schema evolution": "schema_evolution_compat",
     "watermark": "late_data_watermarks", "late data": "late_data_watermarks",
     "late arrival": "late_data_watermarks", "event time": "late_data_watermarks",
     "data quality": "data_quality_observability", "observability": "data_quality_observability",
@@ -1627,8 +1683,11 @@ CONCEPT_NORMALIZATION = {
     "scoping": "clarifying_requirements", "orchestration": "orchestration",
     "scheduler": "orchestration", "iac": "iac", "infrastructure as code": "iac",
     "data modeling": "data_modeling", "modeling": "data_modeling",
-    "warehouse": "warehouse", "sql": "sql_database", "relational": "sql_database",
-    "kubernetes": "container_orchestration", "containers": "containers",
+    "warehouse": "warehouse", "snowflake": "warehouse", "bigquery": "warehouse",
+    "redshift": "warehouse", "sql": "sql_database", "relational": "sql_database",
+    "kubernetes": "container_orchestration", "k8s": "container_orchestration",
+    "eks": "container_orchestration", "aks": "container_orchestration",
+    "gke": "container_orchestration", "containers": "containers",
     "grain": "grain_awareness", "star schema": "grain_awareness",
     "scd": "scd_strategy", "slowly changing": "scd_strategy",
     "entity": "entity_enumeration", "dimension": "missing_dimension_audit",
@@ -1713,7 +1772,7 @@ def _concept_is_present(concept, evidence_text, evidence_skills):
 
 
 def _compute_concept_match():
-    """Concept-level gap analysis: map JD required concepts against resume evidence.
+    """Tool-to-concept gap analysis: map JD required concepts against resume evidence.
     Returns real gaps (concept not evidenced) vs translations (tool differs but concept
     is present, e.g. Azure→AWS) vs covered. This is the core of the JD feature."""
     jd = PROGRESS.get("_jd")
@@ -1765,6 +1824,19 @@ def _compute_concept_match():
     concepts_required = list(jd.get("concepts_required", []))
     cap_text = " ".join(jd.get("capabilities_required", [])).lower()
     seen_concepts = {_normalize_concept(c.get("concept", "")) for c in concepts_required}
+
+    # The JD extractor sometimes parks a cloud-platform brand (aws/azure/gcp) only in
+    # tool_keywords and never emits the 'cloud_platform' concept. Without that concept,
+    # the Azure->AWS translation never fires even when the resume shows a sibling cloud.
+    # Synthesize the concept from tool_keywords so the translation path is reachable.
+    CLOUD_TOOL_KEYWORDS = ["aws", "azure", "gcp", "google cloud", "databricks", "cloud platform", "cloud"]
+    if "cloud_platform" not in seen_concepts and any(
+            kw in jd_tool_set for kw in CLOUD_TOOL_KEYWORDS):
+        cloud_evidence = next((t for t in jd.get("tool_keywords", [])
+                               if t.lower() in CLOUD_TOOL_KEYWORDS), "cloud platform")
+        concepts_required.append({"concept": "cloud_platform", "evidence": cloud_evidence,
+                                  "importance": "must_have", "from_tool_keyword": True})
+
     for concept_key, kws in CAPABILITY_CONCEPT_KEYWORDS.items():
         if concept_key in seen_concepts:
             continue
@@ -1799,10 +1871,20 @@ def _compute_concept_match():
                                "importance": c.get("importance", "must_have"),
                                "note": "Weak signal in resume — verify you've actually done this."})
             else:
-                covered.append({"concept": concept, "raw": raw_concept,
-                                "evidence": c.get("evidence", ""),
-                                "importance": c.get("importance", "must_have"),
-                                "confidence": confidence})
+                entry = {"concept": concept, "raw": raw_concept,
+                         "evidence": c.get("evidence", ""),
+                         "importance": c.get("importance", "must_have"),
+                         "confidence": confidence}
+                # if the JD names a different cloud brand than the resume, attach a
+                # translation note so the candidate can frame Azure<->AWS equivalence
+                if concept == "cloud_platform":
+                    jd_tool = _translation_source(concept, jd_tool_set)
+                    sibling = _find_translation_sibling(concept, resume_tool_set)
+                    if jd_tool and sibling and jd_tool != sibling:
+                        entry["translation_note"] = (
+                            f"JD mentions {jd_tool}; your resume shows {sibling} — "
+                            f"same concept (cloud platform), a translation not a gap.")
+                covered.append(entry)
             continue
         # not directly evidenced — check if it's a tool translation
         jd_tool = _translation_source(concept, jd_tool_set)
@@ -1889,7 +1971,7 @@ def _find_translation_sibling(concept, resume_tool_set):
 
 @app.route("/api/jd-gap", methods=["GET"])
 def jd_gap():
-    """Concept-level gap analysis between the loaded JD and resume."""
+    """Tool-to-concept gap analysis between the loaded JD and resume."""
     return jsonify(_compute_concept_match())
 
 
@@ -1933,8 +2015,10 @@ def _compute_role_readiness():
                       + match["covered_count"] + match["verify_count"] + match["self_reported_count"])
     proven = match["covered_count"] + match["translation_count"]
     self_reported = match["self_reported_count"]
-    coverage = round(100 * (proven + self_reported) / total_concepts) if total_concepts else 0
-    proven_coverage = round(100 * proven / total_concepts) if total_concepts else 0
+    # Headline = proven only. verify stays in the denominator (uncertain != covered),
+    # and self-reported is shown separately and never folded into the headline number.
+    coverage = round(100 * proven / total_concepts) if total_concepts else 0
+    proven_coverage = coverage
 
     # lens 2: resume claim validation (skills practiced at >=70%)
     cv = _compute_claim_validation()
@@ -1956,9 +2040,13 @@ def _compute_role_readiness():
 
     # framed practice: map each real gap (or low-confidence verify item) to SPECIFIC
     # questions from the bank that exercise the transferable skill. The bank is classic
-    # algo/SQL, not DE-streaming, so we pick the questions that genuinely build the
-    # underlying pattern (windowing, dedup, self-join-by-date, rank, pivot, group-by grain)
-    # rather than fuzzy keyword matching (which pulled trivial JOINs before).
+    # algo/SQL, not DE-streaming, so we pick questions whose SKILL transfers to the gap.
+    #
+    # The mapping is NOT a hand-authored dict (that was an unverified author assertion).
+    # It comes from question_concept_links.json — produced offline by precompute.py, where
+    # the LLM judges, per question, which gap-concepts it genuinely builds (with a reason).
+    # If that file is absent we fall back to the legacy GAP_TO_QUESTIONS dict so the feature
+    # never breaks.
     GAP_TO_QUESTIONS = {
         "late_data_watermarks": ["sql-3", "sql-49", "py-2"],
         "streaming_paradigm": ["sql-49", "py-2", "sql-45"],
@@ -1978,21 +2066,46 @@ def _compute_role_readiness():
         "domain_alignment": ["sql-34", "sql-52", "sql-40"],
         "clarifying_requirements": ["sql-37", "sql-42"],
     }
+    _concept_links = _load_concept_links()
+    use_links = bool(_concept_links)
+
     gap_concepts = [g["concept"] for g in match["real_gaps"]]
     gap_concepts += [v["concept"] for v in match.get("verify", [])]
     framed = []
     seen = set()
-    for concept in gap_concepts:
-        for qid in GAP_TO_QUESTIONS.get(concept, []):
-            q = QUESTIONS.get(qid)
-            if not q or qid in seen or is_solved(qid):
-                continue
-            framed.append({"id": qid, "title": q["title"], "lang": q["lang"], "gap": concept})
-            seen.add(qid)
+    if use_links:
+        # invert links: concept -> [(qid, reason, relevance)]
+        by_concept = {}
+        for qid, links in _concept_links.items():
+            for link in links:
+                by_concept.setdefault(link["concept"], []).append(
+                    (qid, link.get("reason", ""), link.get("relevance", 1)))
+        for concept in gap_concepts:
+            for qid, reason, rel in sorted(by_concept.get(concept, []),
+                                           key=lambda x: -x[2]):
+                q = QUESTIONS.get(qid)
+                if not q or qid in seen or is_solved(qid):
+                    continue
+                framed.append({"id": qid, "title": q["title"], "lang": q["lang"],
+                               "gap": concept, "reason": reason})
+                seen.add(qid)
+                if len(framed) >= 5:
+                    break
             if len(framed) >= 5:
                 break
-        if len(framed) >= 5:
-            break
+    else:
+        # legacy fallback
+        for concept in gap_concepts:
+            for qid in GAP_TO_QUESTIONS.get(concept, []):
+                q = QUESTIONS.get(qid)
+                if not q or qid in seen or is_solved(qid):
+                    continue
+                framed.append({"id": qid, "title": q["title"], "lang": q["lang"], "gap": concept})
+                seen.add(qid)
+                if len(framed) >= 5:
+                    break
+            if len(framed) >= 5:
+                break
 
     return {
         "jd_loaded": True,

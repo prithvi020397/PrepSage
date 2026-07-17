@@ -284,8 +284,8 @@
         <div>
           <div class="label">Concept coverage</div>
           <div class="big">{{ role_readiness.coverage }}<span class="unit">%</span></div>
-          <div class="sub">concepts covered or translatable
-            {% if role_readiness.self_reported_count %}· <span style="color:var(--warn);">{{ role_readiness.proven_coverage }}% proven, {{ role_readiness.self_reported_count }} self-reported</span>{% endif %}
+          <div class="sub">concepts proven (verified in resume)
+            {% if role_readiness.self_reported_count %}· <span style="color:var(--warn);">{{ role_readiness.self_reported_count }} self-reported, not counted</span>{% endif %}
           </div>
         </div>
         {% if role_readiness.claim_readiness is not none %}
@@ -310,6 +310,19 @@
       <div class="gap-row">
         <div class="gap-label">{{ t.concept.replace('_',' ') }}</div>
         <div style="font-size:12px; color:var(--text-dim);">{{ t.your_tool }} → {{ t.jd_tool }}</div>
+      </div>
+      {% endfor %}
+      {% endif %}
+
+      {% if role_readiness.covered %}
+      <div class="sub" style="margin:12px 0 6px; color:var(--success); font-weight:600;">✔ Covered — evidenced in your resume</div>
+      {% for cov in role_readiness.covered %}
+      <div class="gap-row">
+        <div class="gap-label">{{ (cov.raw or cov.concept).replace('_',' ') }}</div>
+        <div style="font-size:12px; color:var(--text-dim); flex:1;">
+          {{ cov.translation_note if cov.translation_note else (cov.evidence or '') }}
+        </div>
+        <span class="gap-count" style="color: var(--success); width:auto; margin-right:8px;">{{ cov.confidence }}</span>
       </div>
       {% endfor %}
       {% endif %}
@@ -351,8 +364,9 @@
       <div class="sub" style="margin:12px 0 6px; color:var(--accent-2); font-weight:600;">🛠 Framed practice — questions that build the missing concepts</div>
       <div style="display:flex; flex-wrap:wrap; gap:8px;">
         {% for q in role_readiness.framed_practice %}
-        <a href="/?q={{ q.id }}" style="font-size:12px; color:var(--text); text-decoration:none; padding:6px 10px; background:var(--card-2); border:1px solid var(--border); border-radius:6px;">
+        <a href="/?q={{ q.id }}" title="{{ q.reason or '' }}" style="font-size:12px; color:var(--text); text-decoration:none; padding:6px 10px; background:var(--card-2); border:1px solid var(--border); border-radius:6px; max-width:100%;">
           {{ q.title }} <span style="color:var(--text-faint); font-size:10px;">· {{ q.lang }}</span>
+          {% if q.reason %}<div style="color:var(--text-dim); font-size:10px; margin-top:2px;">{{ q.reason }}</div>{% endif %}
         </a>
         {% endfor %}
       </div>

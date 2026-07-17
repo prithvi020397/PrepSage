@@ -15,6 +15,22 @@ TRACE_FILE = "traces.json"
 CONCEPT_FILE = "concept_maps.json"
 SOLUTION_FILE = "solutions.json"
 CONTEXT_FILE = "question_contexts.json"
+LINK_FILE = "question_concept_links.json"
+
+# Gap concepts a JD might require. The framed-practice feature maps a candidate's real
+# gaps to bank questions that BUILD the underlying pattern. Instead of a hand-authored
+# dict (author assertion, unverified), we ask the LLM once, per question, which of these
+# concepts the question actually exercises. Cached to LINK_FILE so runtime is free.
+GAP_CONCEPTS = [
+    "clarifying_requirements", "batch_vs_stream_choice", "partitioning_hot_key_skew",
+    "idempotency_dedup", "backfill_reprocessing", "schema_evolution_compat",
+    "replication_consistency", "data_quality_observability", "storage_format_choice",
+    "late_data_watermarks", "domain_alignment", "entity_enumeration",
+    "grain_awareness", "scd_strategy", "missing_dimension_audit",
+    "streaming_paradigm", "batch_paradigm", "feature_store", "cloud_platform",
+    "orchestration", "iac", "warehouse", "sql_database",
+    "container_orchestration", "containers",
+]
 
 TOPIC_KEYWORDS = [
     ("window function", "window functions"), ("over (partition", "window functions"),
@@ -311,11 +327,59 @@ Respond ONLY with the code, no markdown fences, no commentary."""
         return ""
 
 
+def gen_concept_links(q):
+    """Ask the LLM which JD gap-concepts this question actually builds. Returns a list of
+    {concept, relevance (0-3), reason}. relevance 0 means 'not relevant' and is dropped by the
+    caller. This replaces the hand-authored GAP_TO_QUESTIONS dict with a verifiable,
+    reason-bearing mapping — every link is traceable to an LLM judgment, not an author guess."""
+    concept_block = "\n".join(f"- {c}" for c in GAP_CONCEPTS)
+    prompt = f"""You are auditing a coding-interview question bank for a data-engineering interview coach. For the question below, decide which of the listed data-engineering CONCEPTS it genuinely helps a candidate PRACTICE or BUILD — not just concepts it incidentally touches.
+
+Question title: {q['title']}
+Language: {q['lang']}
+Prompt: {q['prompt']}
+
+Concepts (pick the ones this question's SKILL transfers to):
+{concept_block}
+
+For each concept you judge relevant, give a relevance 1-3:
+  3 = core skill the question directly teaches
+  2 = meaningful secondary practice
+  1 = weak / tangential transfer only
+Skip concepts with no real transfer (treat as 0, do not list).
+
+Be strict: a plain GROUP BY does NOT build 'streaming_paradigm' or 'late_data_watermarks' unless the question actually involves windowing, event-time, ordering-by-date, or dedup-by-key. A JOIN does not build 'schema_evolution_compat' unless it touches versioned/evolving schemas.
+
+Respond ONLY strict JSON, no markdown:
+{{"links": [{{"concept": "concept_key", "relevance": 2, "reason": "one-line why it transfers"}}]}}"""
+
+    try:
+        resp = client.chat.completions.create(
+            model=MODEL, messages=[{"role": "user", "content": prompt}],
+            max_tokens=500, temperature=0, extra_body={"reasoning": {"enabled": False}},
+        )
+        raw = resp.choices[0].message.content.strip()
+        raw = raw[raw.index("{"):raw.rindex("}") + 1]
+        result = json.loads(raw)
+        links = result.get("links", [])
+        clean = []
+        for link in links:
+            c = link.get("concept")
+            r = int(link.get("relevance", 0))
+            if c in GAP_CONCEPTS and r >= 1:
+                clean.append({"concept": c, "relevance": r, "reason": str(link.get("reason", "")).strip()})
+        return clean
+    except Exception as e:
+        print(f"    link LLM error: {e}")
+        return []
+
+
 def main():
     traces = load_existing(TRACE_FILE)
     concepts = load_existing(CONCEPT_FILE)
     solutions = load_existing(SOLUTION_FILE)
     contexts = load_existing(CONTEXT_FILE)
+    links = load_existing(LINK_FILE)
 
     qids = list(QUESTIONS.keys())
     done = 0
@@ -354,6 +418,12 @@ def main():
         else:
             print("  solution cached")
 
+        if qid not in links:
+            links[qid] = gen_concept_links(q)
+            save_json(LINK_FILE, links)
+        else:
+            print("  concept-links cached")
+
         done += 1
 
     print(f"\nDone. {done} questions processed.")
@@ -361,6 +431,7 @@ def main():
     print(f"  traces: {len(traces)} questions")
     print(f"  concept_maps: {len(concepts)} questions")
     print(f"  solutions: {len(solutions)} questions")
+    print(f"  concept_links: {len(links)} questions")
 
 
 if __name__ == "__main__":
