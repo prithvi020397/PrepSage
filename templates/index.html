@@ -1498,6 +1498,16 @@
         <div style="font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:0.06em; color:var(--accent); margin-bottom:8px;">3 things to remember</div>
         <ol id="takeaways-list" style="margin:0; padding-left:18px; font-size:13px; line-height:1.55; color:var(--text);"></ol>
       </div>
+      <div id="whatif-box" style="display:none; margin:8px 12px 0; padding:12px 14px; border:1px solid var(--border); border-left:3px solid var(--accent-2); border-radius:8px; background:var(--card-2);">
+        <div style="font-size:12px; font-weight:600; color:var(--accent-2); margin-bottom:4px;">🌀 What if?</div>
+        <div id="whatif-scenario" style="font-size:13px; color:var(--text-dim); line-height:1.5; margin-bottom:8px;"></div>
+        <textarea id="whatif-input" rows="3" placeholder="Your reasoning..." style="width:100%; padding:8px 10px; background:var(--card); border:1px solid var(--border); border-radius:6px; color:var(--text); font-size:13px; font-family:'Inter',sans-serif; resize:vertical; outline:none; box-sizing:border-box;"></textarea>
+        <div style="display:flex; gap:8px; align-items:center; margin-top:8px;">
+          <button class="btn btn-ghost" id="whatif-btn" onclick="submitWhatIf()" style="font-size:12px;">Submit reasoning</button>
+          <span id="whatif-status" class="sub"></span>
+        </div>
+        <div id="whatif-feedback" style="margin-top:8px; font-size:13px; line-height:1.5;"></div>
+      </div>
       <div id="reversal-panel" style="display:none; background:var(--card); border:1px solid var(--border); border-radius:var(--radius); overflow:hidden;">
         <div style="display:flex; align-items:center; gap:10px; padding:8px 12px; background:var(--card-2); border-bottom:1px solid var(--border);">
           <span style="font-weight:600; font-size:12.5px;">🎭 Reverse interview — you're the interviewer</span>
@@ -2673,6 +2683,8 @@ async function submitDebrief() {
   narrationText = '';
   document.getElementById('narration-input').value = '';
   document.getElementById('narration-readout').style.display = 'none';
+  // trigger what-if after debrief
+  showWhatIf();
 }
 
 function renderTakeaways(items) {
@@ -2687,6 +2699,57 @@ function renderTakeaways(items) {
     list.appendChild(li);
   });
   box.style.display = '';
+}
+
+let whatifScenario = '';
+
+async function showWhatIf() {
+  const box = document.getElementById('whatif-box');
+  const scenario = document.getElementById('whatif-scenario');
+  const feedback = document.getElementById('whatif-feedback');
+  const input = document.getElementById('whatif-input');
+  box.style.display = 'none';
+  if (!current || !current.id) return;
+  try {
+    const r = await fetch('/api/whatif', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({question_id: current.id, code: cm.getValue()})
+    });
+    const res = await r.json();
+    if (!r.ok || res.error) return;
+    whatifScenario = res.what_if;
+    scenario.textContent = whatifScenario;
+    feedback.innerHTML = '';
+    input.value = '';
+    box.style.display = '';
+  } catch (e) { /* silent fail — what-if is optional */ }
+}
+
+async function submitWhatIf() {
+  const input = document.getElementById('whatif-input');
+  const answer = input.value.trim();
+  if (!answer) return;
+  const btn = document.getElementById('whatif-btn');
+  const status = document.getElementById('whatif-status');
+  const feedback = document.getElementById('whatif-feedback');
+  btn.disabled = true;
+  status.textContent = 'Grading…';
+  try {
+    const r = await fetch('/api/whatif', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({question_id: current.id, code: cm.getValue(), user_answer: answer, scenario: whatifScenario})
+    });
+    const res = await r.json();
+    if (!r.ok || res.error) { status.textContent = 'Could not grade — discuss in chat'; btn.disabled = false; return; }
+    status.textContent = '';
+    feedback.innerHTML = `<div style="color:${res.ok ? 'var(--success)' : 'var(--warn)'};">${res.ok ? '✓' : '💡'} ${res.feedback}</div>`;
+    input.disabled = true;
+    btn.disabled = true;
+    btn.textContent = 'Done';
+  } catch (e) {
+    status.textContent = 'Error — try again';
+    btn.disabled = false;
+  }
 }
 
 function resetIdleTimer() {

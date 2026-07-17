@@ -3327,6 +3327,70 @@ Respond with ONLY strict JSON, no markdown fences, no commentary:
         return jsonify(fallback)
 
 
+@app.route("/api/whatif", methods=["POST"])
+def whatif():
+    """Generate a 'what if' scenario for a solved+debriefed question, or grade the user's answer.
+    Phase 1 (no user_answer): returns a scenario. Phase 2 (with user_answer): grades it."""
+    data = request.json or {}
+    q = QUESTIONS.get(data.get("question_id"))
+    if not q:
+        return jsonify({"error": "not found"}), 404
+    code = data.get("code", "")
+    user_answer = (data.get("user_answer") or "").strip()
+    scenario = (data.get("scenario") or "").strip()
+
+    if not user_answer:
+        # Phase 1: generate a what-if scenario
+        lang = q["lang"]
+        twist_templates = {
+            "sql": "What if the input table had 100 million rows instead of 10,000? Would your query still perform, and what would you change?",
+            "python": "What if the input data arrived as a continuous stream instead of a static list? How would your solution change?",
+            "design": "What if the traffic / data volume doubled overnight? Which part of your design breaks first?",
+            "tradeoff": "What if the cost constraint were removed entirely — would you make a different choice?",
+        }
+        scenario = twist_templates.get(lang, "What if the requirements changed significantly? How would your approach differ?")
+        return jsonify({"what_if": scenario})
+    else:
+        # Phase 2: grade the user's answer
+        prompt = f"""You are a terse technical interviewer. The candidate just solved a problem and now faces a what-if twist.
+
+Problem: {q['title']}
+{q['prompt']}
+
+Candidate's passing code:
+```{q['lang']}
+{code[:2000]}
+```
+
+What-if scenario: "{scenario}"
+
+Candidate's reasoning: "{user_answer}"
+
+Judge their reasoning:
+- Is it technically sound?
+- Does it show understanding of tradeoffs, not just a yes/no?
+- Would it pass an interviewer's follow-up?
+
+Respond with strict JSON:
+{{"ok": true or false, "feedback": "one short sentence of Socratic feedback — if wrong, guide them; if right, still challenge deeper"}}"""
+        try:
+            resp = client.chat.completions.create(
+                model=MODEL, messages=[{"role": "user", "content": prompt}],
+                max_tokens=250, temperature=0.3,
+                extra_body={"reasoning": {"enabled": False}},
+            )
+            raw = chat_content(resp)
+            raw = raw[raw.index("{"):raw.rindex("}") + 1]
+            result = json.loads(raw)
+            return jsonify({
+                "ok": bool(result.get("ok")),
+                "feedback": result.get("feedback", "Could not grade — proceed."),
+                "scenario": scenario,
+            })
+        except Exception:
+            return jsonify({"ok": True, "feedback": "(could not auto-grade — discuss in chat)", "scenario": scenario})
+
+
 @app.route("/api/concept-map", methods=["POST"])
 def concept_map():
     data = request.json
