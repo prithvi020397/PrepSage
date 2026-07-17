@@ -31,6 +31,12 @@ HEADROOM_ENABLED = os.environ.get("HEADROOM_ENABLED", "").lower() in ("1", "true
 API_BASE = "http://localhost:9090/v1" if HEADROOM_ENABLED else "https://openrouter.ai/api/v1"
 client = OpenAI(base_url=API_BASE, api_key=os.environ["OPENROUTER_API_KEY"])
 MODEL = "deepseek/deepseek-v4-flash"
+
+# ponytail: TAXONOMY_VERSION stamps every LLM extraction (resume/JD) so we can detect
+# drift when JD_CONCEPT_TRANSLATIONS / CONCEPT_TAXONOMY change. Old extractions keep
+# working (matching is deterministic at read time), but a stale stamp signals "re-parse
+# recommended" instead of silently serving concepts mapped under an old taxonomy.
+TAXONOMY_VERSION = "2026-07-17"
 # ponytail: separate client — OpenRouter doesn't proxy Whisper transcription, needs a real OpenAI key
 whisper_client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY", "")) if os.environ.get("OPENAI_API_KEY") else None
 
@@ -1287,6 +1293,15 @@ Be strict about depth: "familiar with X" or just listing X = shallow. "Built Y u
         return None
 
 
+def _stamp_taxonomy(data):
+    """Tag an extraction with the taxonomy version that produced it.
+    Called at creation time so we can detect stale mappings later without
+    re-calling the LLM."""
+    if isinstance(data, dict):
+        data["taxonomy_version"] = TAXONOMY_VERSION
+    return data
+
+
 # ponytail: CONCEPT_TAXONOMY (defined near the top of this file) is the shared vocabulary
 # the JD extractor maps into. JD tool-keywords ("Kafka", "Flink") are intentionally
 # translated to the UNDERLYING CONCEPT ("streaming paradigm") so matching against the
@@ -1383,6 +1398,7 @@ def upload_jd():
     jd_data["raw_text_preview"] = text[:300]
     jd_data["uploaded_at"] = datetime.now().isoformat()
     jd_data["filename"] = file.filename
+    _stamp_taxonomy(jd_data)
     PROGRESS["_jd"] = jd_data
     save_progress()
     return jsonify({"ok": True, "role_title": jd_data.get("role_title"),
@@ -1413,6 +1429,7 @@ def upload_jd_text():
     jd_data["raw_text_preview"] = text[:300]
     jd_data["uploaded_at"] = datetime.now().isoformat()
     jd_data["filename"] = "pasted"
+    _stamp_taxonomy(jd_data)
     PROGRESS["_jd"] = jd_data
     save_progress()
     return jsonify({"ok": True, "role_title": jd_data.get("role_title"),
@@ -1444,6 +1461,7 @@ def upload_resume():
     skills_data["raw_text_preview"] = text[:500]
     skills_data["uploaded_at"] = datetime.now().isoformat()
     skills_data["filename"] = file.filename
+    _stamp_taxonomy(skills_data)
     PROGRESS["_resume"] = skills_data
     save_progress()
     # build summary for response
@@ -2038,9 +2056,15 @@ def _compute_concept_match():
     # before the longer concepts_required list so they aren't sliced off the end
     real_gaps.sort(key=lambda g: (0 if g["importance"] == "must_have" else 1,
                                    0 if g.get("from_capability") else 1))
+    # flag stale taxonomy: if either extraction predates the current taxonomy
+    # version, the concept mappings may be out of date. Matching still runs on
+    # the stored data, but the dashboard can prompt a re-parse.
+    stale = (jd.get("taxonomy_version") != TAXONOMY_VERSION
+             or resume.get("taxonomy_version") != TAXONOMY_VERSION)
     return {
         "jd_loaded": True,
         "resume_loaded": True,
+        "taxonomy_stale": stale,
         "role_title": jd.get("role_title"),
         "seniority": jd.get("seniority"),
         "domain": jd.get("domain"),
@@ -2240,6 +2264,7 @@ def _compute_role_readiness():
 
     return {
         "jd_loaded": True,
+        "taxonomy_stale": match.get("taxonomy_stale", False),
         "role_title": match.get("role_title"),
         "seniority": match.get("seniority"),
         "domain": match.get("domain"),
