@@ -1547,6 +1547,48 @@ def get_jd():
     return jsonify(PROGRESS.get("_jd", {}))
 
 
+@app.route("/api/set-profile", methods=["POST"])
+def set_profile():
+    """Generate a synthetic JD profile from role + industry + cloud, matching against the resume."""
+    data = request.json or {}
+    role = (data.get("role") or "").strip()
+    industry = (data.get("industry") or "").strip()
+    cloud = (data.get("cloud") or "").strip()
+    if not role:
+        return jsonify({"error": "Role is required"}), 400
+    resume = PROGRESS.get("_resume")
+    resume_text = (resume or {}).get("raw_text", "")
+    # build a minimal text to feed into the JD extractor
+    profile_text = f"Job Title: {role}\n"
+    if industry:
+        profile_text += f"Industry: {industry}\n"
+    if cloud:
+        profile_text += f"Cloud: {cloud}\n"
+    profile_text += f"\nWe are hiring a {role}"
+    if industry:
+        profile_text += f" in the {industry} industry"
+    profile_text += ". This role requires strong data engineering skills."
+    if cloud:
+        profile_text += f" Experience with {cloud} is required."
+    profile_text += " The ideal candidate can design, build, and maintain data pipelines at scale."
+    jd_data, method = _extraction_fallback_chain(
+        _extract_concepts_from_jd, _fallback_extract_jd, profile_text, "profile")
+    if not jd_data:
+        return jsonify({"error": "could not generate profile — try again"}), 500
+    jd_data["synthetic"] = True
+    jd_data["raw_text_preview"] = profile_text[:300]
+    jd_data["raw_text"] = profile_text
+    jd_data["uploaded_at"] = datetime.now().isoformat()
+    jd_data["filename"] = "profile"
+    jd_data["_extraction_method"] = method
+    _stamp_taxonomy(jd_data)
+    PROGRESS["_jd"] = jd_data
+    save_progress()
+    return jsonify({"ok": True, "role_title": jd_data.get("role_title"),
+                    "concepts_required": len(jd_data.get("concepts_required", [])),
+                    "synthetic": True})
+
+
 @app.route("/api/upload-jd-text", methods=["POST"])
 def upload_jd_text():
     """Accept raw JD text (pasted), extract concepts via LLM, store in progress."""
@@ -2478,6 +2520,7 @@ def dashboard():
         claim_validation=_compute_claim_validation(),
         jd_loaded=bool(PROGRESS.get("_jd")),
         jd=PROGRESS.get("_jd", {}),
+        jd_synthetic=bool((PROGRESS.get("_jd") or {}).get("synthetic")),
         concept_match=_compute_concept_match(),
         role_readiness=role_readiness,
         first_use=(total_solved == 0 and bool(PROGRESS.get("_jd")) and bool(PROGRESS.get("_resume"))),

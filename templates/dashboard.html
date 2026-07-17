@@ -342,7 +342,8 @@
     <div class="card" style="border-color: rgba(124,108,246,0.3);">
       <div class="section-title" style="color:var(--accent);">🎯 Job description</div>
       {% if jd_loaded %}
-        <div class="sub" style="margin-bottom:8px;">Uploaded {{ jd.uploaded_at[:10] }} — <strong style="color:var(--text);">{{ jd.role_title }}</strong> ({{ jd.seniority }}) · {{ jd.domain }}</div>
+        <div class="sub" style="margin-bottom:8px;">{% if jd_synthetic %}Synthetic profile{% else %}Uploaded {{ jd.uploaded_at[:10] }}{% endif %} — <strong style="color:var(--text);">{{ jd.role_title }}</strong>{% if jd.seniority %} ({{ jd.seniority }}){% endif %}{% if jd.domain %} · {{ jd.domain }}{% endif %}</div>
+        {% if not jd_synthetic %}
         {% if jd.tool_keywords %}
         <div class="resume-skills" style="margin-bottom:6px;">
           <span class="sub" style="margin-right:6px;">Tools named:</span>
@@ -363,11 +364,13 @@
           <button class="btn" onclick="uploadJDText('jd-repaste-input')" style="margin-top:8px; font-size:13px;">Parse JD</button>
           <span id="jd-text-status" class="sub" style="margin-left:8px;"></span>
         </div>
+        {% endif %}
       {% else %}
-        <div class="sub" style="margin-bottom:10px;">Upload the JD to map its <strong>concepts</strong> against your resume — we match paradigms (streaming, cloud), not tool names.</div>
+        <div class="sub" style="margin-bottom:10px;">Map your resume against a real job post or a synthetic profile.</div>
         <div style="display:flex; gap:8px; margin-bottom:10px;">
           <button class="btn btn-ghost" id="jd-mode-file" onclick="setJdMode('file')" style="font-size:12px; border:1px solid var(--accent);">📄 Upload file</button>
           <button class="btn btn-ghost" id="jd-mode-text" onclick="setJdMode('text')" style="font-size:12px;">📋 Paste text</button>
+          <button class="btn btn-ghost" id="jd-mode-profile" onclick="setJdMode('profile')" style="font-size:12px;">👤 Quick profile</button>
         </div>
         <div id="jd-file-section">
           <div class="resume-upload">
@@ -383,6 +386,46 @@
           <textarea id="jd-text-input" rows="8" placeholder="Paste the full job description here..." style="width:100%; padding:10px 12px; background:var(--card); border:1px solid var(--border); border-radius:8px; color:var(--text); font-size:13px; font-family:'Inter',sans-serif; resize:vertical; outline:none;"></textarea>
           <button class="btn" onclick="uploadJDText()" style="margin-top:8px; font-size:13px;">Parse JD</button>
           <span id="jd-text-status" class="sub" style="margin-left:8px;"></span>
+        </div>
+        <div id="jd-profile-section" style="display:none;">
+          <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:end;">
+            <div>
+              <div class="sub" style="margin-bottom:3px;">Target role</div>
+              <select id="profile-role" style="background:var(--card-2); border:1px solid var(--border); border-radius:6px; color:var(--text); padding:7px 10px; font-size:12.5px;">
+                <option value="">Select role…</option>
+                <option value="data engineer">Data Engineer</option>
+                <option value="senior data engineer">Senior Data Engineer</option>
+                <option value="data scientist">Data Scientist</option>
+                <option value="machine learning engineer">ML Engineer</option>
+                <option value="backend engineer">Backend Engineer</option>
+                <option value="analytics engineer">Analytics Engineer</option>
+                <option value="data architect">Data Architect</option>
+              </select>
+            </div>
+            <div>
+              <div class="sub" style="margin-bottom:3px;">Industry</div>
+              <select id="profile-industry" style="background:var(--card-2); border:1px solid var(--border); border-radius:6px; color:var(--text); padding:7px 10px; font-size:12.5px;">
+                <option value="">General</option>
+                <option value="adtech">AdTech</option>
+                <option value="fintech">FinTech</option>
+                <option value="healthcare">Healthcare</option>
+                <option value="ecommerce">E-Commerce</option>
+                <option value="saas">SaaS</option>
+                <option value="gaming">Gaming</option>
+              </select>
+            </div>
+            <div>
+              <div class="sub" style="margin-bottom:3px;">Cloud</div>
+              <select id="profile-cloud" style="background:var(--card-2); border:1px solid var(--border); border-radius:6px; color:var(--text); padding:7px 10px; font-size:12.5px;">
+                <option value="">Any</option>
+                <option value="AWS">AWS</option>
+                <option value="Azure">Azure</option>
+                <option value="GCP">GCP</option>
+              </select>
+            </div>
+            <button class="btn" onclick="submitProfile()" style="background:var(--accent); color:#0e1015; border:none; border-radius:6px; padding:8px 14px; font-size:12.5px; font-weight:600; cursor:pointer;">Generate profile</button>
+          </div>
+          <span id="profile-status" class="sub" style="margin-top:6px; display:block;"></span>
         </div>
       {% endif %}
     </div>
@@ -785,18 +828,35 @@
     function setJdMode(mode) {
       const fileSection = document.getElementById('jd-file-section');
       const textSection = document.getElementById('jd-text-section');
+      const profileSection = document.getElementById('jd-profile-section');
       const fileBtn = document.getElementById('jd-mode-file');
       const textBtn = document.getElementById('jd-mode-text');
-      if (mode === 'file') {
-        fileSection.style.display = '';
-        textSection.style.display = 'none';
-        fileBtn.style.borderColor = 'var(--accent)';
-        textBtn.style.borderColor = '';
-      } else {
-        fileSection.style.display = 'none';
-        textSection.style.display = '';
-        fileBtn.style.borderColor = '';
-        textBtn.style.borderColor = 'var(--accent)';
+      const profileBtn = document.getElementById('jd-mode-profile');
+      [fileSection, textSection, profileSection].forEach(s => { if (s) s.style.display = 'none'; });
+      [fileBtn, textBtn, profileBtn].forEach(b => { if (b) b.style.borderColor = ''; });
+      if (mode === 'file') { fileSection.style.display = ''; fileBtn.style.borderColor = 'var(--accent)'; }
+      else if (mode === 'text') { textSection.style.display = ''; textBtn.style.borderColor = 'var(--accent)'; }
+      else if (mode === 'profile') { profileSection.style.display = ''; profileBtn.style.borderColor = 'var(--accent)'; }
+    }
+
+    async function submitProfile() {
+      const role = document.getElementById('profile-role').value;
+      const industry = document.getElementById('profile-industry').value;
+      const cloud = document.getElementById('profile-cloud').value;
+      const status = document.getElementById('profile-status');
+      if (!role) { status.textContent = 'Select a target role'; return; }
+      status.textContent = 'Generating profile…';
+      try {
+        const r = await fetch('/api/set-profile', {
+          method: 'POST', headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({role, industry, cloud})
+        });
+        const res = await r.json();
+        if (!r.ok || res.error) { status.textContent = res.error || 'Failed'; return; }
+        status.textContent = `Profile generated — reloading…`;
+        setTimeout(() => location.reload(), 800);
+      } catch (e) {
+        status.textContent = 'Failed — try again';
       }
     }
 
