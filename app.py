@@ -556,7 +556,12 @@ def api_signup():
     if not email or not password:
         return jsonify({"error": "email and password required"}), 400
     c = sb.get_client()
-    res = c.auth.sign_up({"email": email, "password": password})
+    if not c:
+        return jsonify({"error": "supabase client unavailable"}), 500
+    try:
+        res = c.auth.sign_up({"email": email, "password": password})
+    except Exception as e:
+        return jsonify({"error": f"signup failed: {e}"}), 500
     if getattr(res, "error", None):
         return jsonify({"error": str(res.error)}), 400
     # Create profile row directly (GoTrue triggers on auth.users are unreliable).
@@ -564,13 +569,16 @@ def api_signup():
     user_id = res.user.id if res.user else None
     session = res.session
     if user_id and session:
-        c.auth.set_session(session.access_token, session.refresh_token)
-        display_name = email.split("@")[0]
-        c.table("profiles").upsert({
-            "id": user_id,
-            "email": email,
-            "display_name": display_name,
-        }).execute()
+        try:
+            c.auth.set_session(session.access_token, session.refresh_token)
+            display_name = email.split("@")[0]
+            c.table("profiles").upsert({
+                "id": user_id,
+                "email": email,
+                "display_name": display_name,
+            }).execute()
+        except Exception:
+            pass
     return jsonify({
         "ok": True,
         "user": user_id,
@@ -586,7 +594,12 @@ def api_login():
     email = (data.get("email") or "").strip()
     password = data.get("password") or ""
     c = sb.get_client()
-    res = c.auth.sign_in_with_password({"email": email, "password": password})
+    if not c:
+        return jsonify({"error": "supabase client unavailable"}), 500
+    try:
+        res = c.auth.sign_in_with_password({"email": email, "password": password})
+    except Exception as e:
+        return jsonify({"error": f"login failed: {e}"}), 500
     if getattr(res, "error", None):
         return jsonify({"error": str(res.error)}), 401
     session = res.session
@@ -607,24 +620,35 @@ def api_test_login():
     if not SUPABASE_ENABLED or sb is None:
         return jsonify({"error": "auth not configured"}), 404
     c = sb.get_client()
+    if not c:
+        return jsonify({"error": "supabase client unavailable"}), 500
     fresh = request.args.get("fresh") == "1"
     if fresh:
         PROGRESS.clear()
         save_progress()
     # try login first
-    res = c.auth.sign_in_with_password({"email": TEST_EMAIL, "password": TEST_PASSWORD})
+    try:
+        res = c.auth.sign_in_with_password({"email": TEST_EMAIL, "password": TEST_PASSWORD})
+    except Exception as e:
+        return jsonify({"error": f"test login failed: {e}"}), 500
     if getattr(res, "error", None):
         # user doesn't exist — sign up
-        res2 = c.auth.sign_up({"email": TEST_EMAIL, "password": TEST_PASSWORD})
+        try:
+            res2 = c.auth.sign_up({"email": TEST_EMAIL, "password": TEST_PASSWORD})
+        except Exception as e:
+            return jsonify({"error": f"test signup failed: {e}"}), 500
         if getattr(res2, "error", None):
             return jsonify({"error": str(res2.error)}), 400
         session = res2.session
         user_id = res2.user.id if res2.user else None
         if user_id and session:
-            c.auth.set_session(session.access_token, session.refresh_token)
-            c.table("profiles").upsert({
-                "id": user_id, "email": TEST_EMAIL, "display_name": "Test User",
-            }).execute()
+            try:
+                c.auth.set_session(session.access_token, session.refresh_token)
+                c.table("profiles").upsert({
+                    "id": user_id, "email": TEST_EMAIL, "display_name": "Test User",
+                }).execute()
+            except Exception:
+                pass
     else:
         session = res.session
         user_id = res.user.id if res.user else None
