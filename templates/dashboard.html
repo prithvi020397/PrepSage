@@ -554,7 +554,7 @@
 
     {% if study_plan %}
     <div class="card">
-      <div class="section-title">📋 Study plan — personalized for {{ resume.target_role or 'your target role' }}</div>
+      <div class="section-title">📋 Study plan — personalized for {{ resume.target_role if resume.target_role and resume.target_role != 'Unknown' else 'your target role' }}</div>
       <div class="sub" style="margin-bottom:10px;">Based on your resume claims and practice performance.</div>
       {% for item in study_plan %}
       <div class="metric-row">

@@ -1337,6 +1337,48 @@ def _call_json_extract(prompt, max_tokens=1800):
         return None
 
 
+def _clean_pdf_artifacts(text):
+    """Strip PostScript character names (cid:xxx), ligature codes, and Unicode garbage
+    that leak from PDF text extraction (e.g. '(cid:136)' for ⚠️)."""
+    text = re.sub(r"\(cid:\d+\)", "", text)
+    text = re.sub(r"\(cid\d+\)", "", text)
+    text = re.sub(r"\(U\+[0-9A-Fa-f]{4,6}\)", "", text)
+    text = re.sub(r"\(0x[0-9A-Fa-f]{2,4}\)", "", text)
+    return text
+
+
+# Common English words that LLMs hallucinate as "skills" from resume text
+_NON_TECH_SKILL_BLACKLIST = {
+    "sam", "designed", "power", "questease", "programming", "compliance",
+    "automated", "computer", "data", "engineer", "engineering", "bachelor",
+    "master", "university", "college", "school", "institute", "team",
+    "leader", "leadership", "communication", "collaboration", "problem",
+    "solving", "analytical", "detail", "oriented", "self", "motivated",
+    "experience", "years", "year", "role", "position", "company", "corp",
+    "inc", "llc", "ltd", "technologies", "tools", "systems", "solutions",
+    "services", "platform", "platforms", "infrastructure", "environment",
+    "environments", "development", "development", "management", "operations",
+    "production", "process", "processes", "projects", "project", "product",
+    "products", "business", "stakeholders", "clients", "customers",
+    "requirements", "specifications", "documentation", "standards",
+    "best practices", "methodologies", "frameworks", "approach",
+    "strategic", "strategic planning", "cross-functional", "cross-functional",
+    "amazon web services", "google cloud", "microsoft azure",
+}
+
+
+def _is_technical_skill(name):
+    """Check if a skill name looks like a genuine technical skill, not a random word."""
+    n = name.lower().strip()
+    if len(n) <= 2:
+        return False
+    if n in _NON_TECH_SKILL_BLACKLIST:
+        return False
+    if re.match(r"^[a-z]+$", n) and len(n) <= 5:
+        return False
+    return True
+
+
 def _extract_skills_from_resume(text):
     """Use LLM to extract structured skills, projects, and domain from resume text.
     Returns rich data including depth signals, project specificity, and skill context."""
@@ -1378,10 +1420,23 @@ CRITICAL: ONLY extract genuine technical skills. Do not include company names, p
         return None
     try:
         obj = json.loads(raw[raw.index("{"):raw.rindex("}") + 1])
+        skills = obj.get("skills", [])
+        filtered = []
+        for s in skills:
+            name = s.get("name", "") if isinstance(s, dict) else str(s)
+            if _is_technical_skill(name):
+                filtered.append(s)
+        projects = []
+        for p in obj.get("projects", []):
+            if isinstance(p, dict):
+                p["name"] = _clean_pdf_artifacts(p.get("name", ""))
+                p["description"] = _clean_pdf_artifacts(p.get("description", ""))
+            projects.append(p)
+        domains = [_clean_pdf_artifacts(d) for d in obj.get("domains", [])]
         return {
-            "skills": obj.get("skills", []),
-            "projects": obj.get("projects", []),
-            "domains": obj.get("domains", []),
+            "skills": filtered,
+            "projects": projects,
+            "domains": domains,
             "years_experience": obj.get("years_experience"),
             "target_role": obj.get("target_role"),
             "strongest_skills": obj.get("strongest_skills", []),
@@ -1587,6 +1642,7 @@ def upload_jd():
     text = _extract_text_from_resume(raw_bytes, file.filename or "jd.pdf")
     if not text or len(text.strip()) < 30:
         return jsonify({"error": "could not extract text — try a different file format"}), 400
+    text = _clean_pdf_artifacts(text)
 
     jd_data, method = _extraction_fallback_chain(
         _extract_concepts_from_jd, _fallback_extract_jd, text, "JD")
@@ -1720,6 +1776,7 @@ def upload_resume():
     text = _extract_text_from_resume(raw_bytes, file.filename or "resume.pdf")
     if not text or len(text.strip()) < 50:
         return jsonify({"error": "could not extract text — try a different file format"}), 400
+    text = _clean_pdf_artifacts(text)
 
     skills_data, method = _extraction_fallback_chain(
         _extract_skills_from_resume, _fallback_extract_resume, text, "resume")
@@ -2631,7 +2688,7 @@ def reparse_stale():
     result = {}
     if jd and jd.get("raw_text"):
         jd_data, method = _extraction_fallback_chain(
-            _extract_concepts_from_jd, _fallback_extract_jd, jd["raw_text"], "JD-reparse")
+            _extract_concepts_from_jd, _fallback_extract_jd, _clean_pdf_artifacts(jd["raw_text"]), "JD-reparse")
         if jd_data:
             jd_data["raw_text_preview"] = jd["raw_text"][:300]
             jd_data["raw_text"] = jd["raw_text"]
@@ -2642,8 +2699,9 @@ def reparse_stale():
             PROGRESS["_jd"] = jd_data
             result["jd"] = len(jd_data.get("concepts_required", []))
     if resume and resume.get("raw_text"):
+        cleaned_text = _clean_pdf_artifacts(resume["raw_text"])
         skills_data, method = _extraction_fallback_chain(
-            _extract_skills_from_resume, _fallback_extract_resume, resume["raw_text"], "resume-reparse")
+            _extract_skills_from_resume, _fallback_extract_resume, cleaned_text, "resume-reparse")
         if skills_data:
             skills_data["raw_text_preview"] = resume["raw_text"][:500]
             skills_data["raw_text"] = resume["raw_text"]
