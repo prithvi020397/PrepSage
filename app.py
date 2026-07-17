@@ -2395,92 +2395,13 @@ def role_readiness():
 
 @app.route("/dashboard")
 def dashboard():
-    total_by_lang = {"sql": 0, "python": 0}
-    for q in QUESTIONS.values():
-        total_by_lang[q["lang"]] = total_by_lang.get(q["lang"], 0) + 1
-
-    solved_by_lang = {"sql": 0, "python": 0}
-    for qid in PROGRESS:
-        q = QUESTIONS.get(qid)
-        if q and is_solved(qid):
-            solved_by_lang[q["lang"]] = solved_by_lang.get(q["lang"], 0) + 1
-
-    due_count = sum(1 for qid in PROGRESS if is_due(qid))
-
-    def rate(events, key):
-        return round(100 * sum(1 for e in events if e[key]) / len(events)) if events else None
-
-    debriefs = [h for h in HISTORY if h["event"] == "debrief"]
-    recent_debriefs = debriefs[-10:]
-    narrated_debriefs = [h for h in debriefs if "narration_ok" in h]
-    recent_narrated = narrated_debriefs[-10:]
-
-    fails = [h for h in HISTORY if h["event"] == "submit" and not h["passed"]]
-    debrief_misses = [h for h in debriefs if not h.get("complexity_ok", True) or not h.get("edge_ok", True)]
-    topic_counts = {}
-    for f in fails:
-        topic_counts[f["topic"]] = topic_counts.get(f["topic"], 0) + 1
-    for h in debrief_misses:
-        if h.get("topic"):
-            topic_counts[h["topic"]] = topic_counts.get(h["topic"], 0) + 1
-
+    total_questions = len(QUESTIONS)
+    total_solved = sum(1 for qid in PROGRESS if is_solved(qid))
     postmortems = [h for h in HISTORY if h.get("event") == "postmortem"]
-    for h in postmortems:
-        if h["qtype"] in ("sql", "python") and not h["ok"] and h.get("topic"):
-            topic_counts[h["topic"]] = topic_counts.get(h["topic"], 0) + 1
-    weak_areas = sorted(topic_counts.items(), key=lambda kv: -kv[1])[:8]
-    max_weak = max((c for _, c in weak_areas), default=1)
-
-    design_debriefs = [h for h in HISTORY if h.get("event") == "design_debrief"]
-    concept_counts = {}
-    for h in design_debriefs:
-        for c in h.get("missed_concepts", []):
-            concept_counts[c] = concept_counts.get(c, 0) + 1
-    for h in postmortems:
-        if h["qtype"] == "design" and not h["ok"] and h.get("concept"):
-            concept_counts[h["concept"]] = concept_counts.get(h["concept"], 0) + 1
-    concept_misses = sorted(concept_counts.items(), key=lambda kv: -kv[1])[:8]
-    max_concept_miss = max((c for _, c in concept_misses), default=1)
-    rushed_count = sum(1 for h in design_debriefs if h.get("rushed_to_design"))
-    rushed_pct = round(100 * rushed_count / len(design_debriefs)) if design_debriefs else None
-
-    # ponytail: concept_tag -> tradeoff qid, powers the "practice this" deep link on the dashboard
-    concept_to_tradeoff = {q["concept_tag"]: qid for qid, q in QUESTIONS.items()
-                            if q["lang"] == "tradeoff" and q.get("concept_tag")}
-
-    # Mastery map: per-topic pass rate across every SQL/Python submit (pass+fail), weakest first.
-    # ponytail: SQL/Python is the only mode with clean per-attempt pass/fail data — design's
-    # concept_misses only counts misses (no attempt total), so a blended cross-mode % would be
-    # misleading. Add design/tradeoff into this if they grow attempt-level tracking.
-    topic_attempts, topic_fails = {}, {}
-    for h in HISTORY:
-        if h.get("event") == "submit" and h.get("topic"):
-            t = h["topic"]
-            topic_attempts[t] = topic_attempts.get(t, 0) + 1
-            if not h["passed"]:
-                topic_fails[t] = topic_fails.get(t, 0) + 1
-    mastery_map = sorted(
-        ((t, round(100 * (n - topic_fails.get(t, 0)) / n), n) for t, n in topic_attempts.items()),
-        key=lambda row: row[1],
-    )
 
     return render_template(
         "dashboard.html",
-        total_by_lang=total_by_lang, solved_by_lang=solved_by_lang,
-        total_solved=sum(1 for qid in PROGRESS if is_solved(qid)), total_questions=len(QUESTIONS),
-        due_count=due_count, debrief_count=len(debriefs),
-        complexity_recent=rate(recent_debriefs, "complexity_ok"),
-        complexity_alltime=rate(debriefs, "complexity_ok"),
-        edge_recent=rate(recent_debriefs, "edge_ok"),
-        edge_alltime=rate(debriefs, "edge_ok"),
-        narrated_count=len(narrated_debriefs),
-        narration_recent=rate(recent_narrated, "narration_ok"),
-        narration_alltime=rate(narrated_debriefs, "narration_ok"),
-        weak_areas=weak_areas, max_weak=max_weak,
-        concept_misses=concept_misses, max_concept_miss=max_concept_miss,
-        concept_to_tradeoff=concept_to_tradeoff,
-        design_debrief_count=len(design_debriefs), rushed_pct=rushed_pct,
-        mastery_map=mastery_map,
+        total_questions=total_questions,
         postmortems=list(reversed(postmortems))[:15],
         resume_loaded=bool(PROGRESS.get("_resume")),
         resume=PROGRESS.get("_resume", {}),
