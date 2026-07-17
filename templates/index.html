@@ -1184,6 +1184,7 @@
     #auth-brand .auth-wordmark .lp { font-size: 46px; }
   }
 </style>
+<script>window.JD_CONTEXT = {{ jd_context | tojson | safe }};</script>
 </head>
 <body>
 <!-- inline SVG icon sprite — <symbol> with viewBox for reliable cross-SVG <use> references -->
@@ -2556,6 +2557,11 @@ async function gradeTradeoff() {
 }
 
 async function rerollTradeoff() {
+  function setQuestionTitle(title) {
+    const prefix = window.JD_CONTEXT ? window.JD_CONTEXT + ' — ' : '';
+    document.getElementById('title').textContent = prefix + title;
+  }
+
   const btn = document.getElementById('tradeoff-reroll-btn');
   btn.disabled = true;
   btn.textContent = 'Loading…';
@@ -2568,7 +2574,7 @@ async function rerollTradeoff() {
   if (res.error) { showToast('Could not generate a new scenario: ' + res.error); return; }
   current.title = res.title;
   current.prompt = res.prompt;
-  document.getElementById('title').textContent = res.title;
+  setQuestionTitle(res.title);
   document.getElementById('prompt').textContent = res.prompt;
   document.getElementById('tradeoff-input').value = '';
   document.getElementById('tradeoff-feedback').outerHTML = '<div id="tradeoff-feedback"></div>';
@@ -2973,7 +2979,7 @@ async function loadQuestion(id) {
   card.classList.remove('fade-in');
   void card.offsetWidth;
   card.classList.add('fade-in');
-  document.getElementById('title').textContent = q.title;
+  setQuestionTitle(q.title);
   document.getElementById('prompt').textContent = q.prompt;
   renderQuestionContext(q.context);
   const langBadge = document.getElementById('lang-badge');

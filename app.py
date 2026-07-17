@@ -1127,7 +1127,19 @@ def index():
 
 @app.route("/practice")
 def practice():
-    return render_template("index.html", concept_taxonomies={"data": CONCEPT_TAXONOMY, "ai": CONCEPT_TAXONOMY_AI})
+    jd = PROGRESS.get("_jd", {})
+    role = jd.get("role_title", "")
+    domain = jd.get("domain", "")
+    if role and domain:
+        jd_context = f"{role} at a {domain} company"
+    elif role:
+        jd_context = role
+    else:
+        jd_context = ""
+    return render_template("index.html",
+                           concept_taxonomies={"data": CONCEPT_TAXONOMY, "ai": CONCEPT_TAXONOMY_AI},
+                           jd_context=jd_context,
+                           jd_loaded=bool(jd))
 
 
 @app.route("/onboarding")
