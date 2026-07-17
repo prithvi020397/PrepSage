@@ -2250,14 +2250,19 @@ def _compute_concept_match():
     resume = PROGRESS.get("_resume")
     if not jd:
         return {"jd_loaded": False, "resume_loaded": bool(resume), "real_gaps": [],
-                "translations": [], "covered": []}
+                "translations": [], "covered": [],
+                "real_gap_count": 0, "translation_count": 0, "covered_count": 0,
+                "verify_count": 0, "self_reported_count": 0}
     if not resume:
         # JD loaded but no resume — report every required concept as unverifiable
+        real_gaps = [{"concept": c.get("concept"), "evidence": c.get("evidence", ""),
+                       "importance": c.get("importance", "must_have")}
+                      for c in jd.get("concepts_required", [])]
         return {"jd_loaded": True, "resume_loaded": False,
-                "real_gaps": [{"concept": c.get("concept"), "evidence": c.get("evidence", ""),
-                                "importance": c.get("importance", "must_have")}
-                               for c in jd.get("concepts_required", [])],
-                "translations": [], "covered": []}
+                "real_gaps": real_gaps, "translations": [], "covered": [],
+                "verify": [], "self_reported": [],
+                "real_gap_count": len(real_gaps), "translation_count": 0, "covered_count": 0,
+                "verify_count": 0, "self_reported_count": 0}
 
     evidence_text, evidence_skills = _resume_concept_evidence()
 

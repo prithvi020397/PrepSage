@@ -1258,8 +1258,9 @@
   <span id="deadline-widget" style="color: var(--text-dim); font-size: 13px; cursor: pointer;" onclick="setInterviewDeadline()" title="Set your interview date — review intervals compress as it approaches"></span>
   <span id="streak-widget" style="color: var(--text-dim); font-size: 13px;" title="Practice streak (days in a row you've done at least one question)">🔥 <span id="streak-count">0</span>d</span>
   <button class="btn btn-ghost" style="margin-left: 8px;" onclick="startMockLoop()" title="Chain a SQL/Python, design, and tradeoff question into one continuous mock interview">🔁 Mock interview</button>
-  <a href="/dashboard" style="color: var(--text-dim); text-decoration: none; font-size: 13px;">📊 Diagnose</a>
-  <a href="/taxonomy" style="color: var(--text-dim); text-decoration: none; font-size: 13px; margin-left: 8px;">📖 Taxonomy</a>
+  <a href="/dashboard" style="color: var(--text-dim); text-decoration: none; font-size: 13px;">Diagnose</a>
+  <a href="/taxonomy" style="color: var(--text-dim); text-decoration: none; font-size: 13px; margin-left: 10px;">Taxonomy</a>
+  <a href="#" onclick="event.preventDefault(); localStorage.removeItem('loop_token'); document.getElementById('auth-overlay').classList.remove('hidden'); document.getElementById('auth-overlay').style.display=''; document.getElementById('auth-email').focus();" style="color: var(--text-dim); text-decoration: none; font-size: 12px; margin-left: 10px; opacity:0.6;" title="Log out">Logout</a>
 </div>
 <div id="mock-loop-bar" style="display:none; align-items:center; gap:10px; padding:8px 24px; background:var(--panel); border-bottom:1px solid var(--border); font-size:13px;">
   <span id="mock-loop-label"></span>
@@ -3027,6 +3028,7 @@ function renderEmptyState(qs) {
 }
 
 async function loadQuestion(id) {
+  try {
   if (document.getElementById('replay-bar').style.display !== 'none') exitReplay();
   window.speechSynthesis && window.speechSynthesis.cancel();
   clearPacingNudge();
@@ -3180,7 +3182,7 @@ async function loadQuestion(id) {
   setEditorLocked(!planApproved);
   onPlanInput();
   resetIdleTimer();
-}
+  } catch (e) { showToast('Could not open question: ' + e.message); }
 
 function makeTable(columns, rows) {
   const table = document.createElement('table');
@@ -4811,7 +4813,7 @@ async function authSubmit() {
       localStorage.setItem('loop_token', data.access_token);
     }
     authOverlay.classList.add('hidden');
-    setTimeout(() => authOverlay.style.display = 'none', 400);
+    authOverlay.style.display = 'none';
   } catch (e) {
     authShowError('Network error — try again.');
   } finally {
@@ -4828,7 +4830,7 @@ async function testLogin(fresh) {
     if (!r.ok || data.error) { authShowError(data.error || 'Test login failed.'); authSubmitBtn.disabled = false; return; }
     if (data.access_token) localStorage.setItem('loop_token', data.access_token);
     authOverlay.classList.add('hidden');
-    setTimeout(() => authOverlay.style.display = 'none', 400);
+    authOverlay.style.display = 'none';
     if (data.fresh) setTimeout(() => location.reload(), 500);
   } catch (e) { authShowError('Network error — try again.'); authSubmitBtn.disabled = false; }
 }
@@ -4856,7 +4858,7 @@ document.getElementById('auth-email').addEventListener('keydown', e => { if (e.k
     const data2 = await r2.json();
     if (data2.user_id) {
       authOverlay.classList.add('hidden');
-      setTimeout(() => authOverlay.style.display = 'none', 400);
+      authOverlay.style.display = 'none';
     } else {
       localStorage.removeItem('loop_token');
       authEmail.focus();

@@ -11,10 +11,22 @@
     --bg: #0e1015; --panel: #14161d; --card: #1b1e27; --card-2: #20232e;
     --border: rgba(255,255,255,0.08); --text: #e7e9ee; --text-dim: #9299ab;
     --text-faint: #656c7e; --accent: #7c6cf6; --accent-2: #5ee6d8;
+    --accent-soft: rgba(124,108,246,0.14); --success: #3ddc97;
+    --success-soft: rgba(61,220,151,0.12); --error: #ff6b6b;
+    --error-soft: rgba(255,107,107,0.12); --warn: #f5c542;
   }
   * { box-sizing: border-box; }
-  body { font-family: 'Inter', sans-serif; margin: 0; background: var(--bg); color: var(--text); font-size: 14px; padding: 24px; }
-  h1 { font-size: 18px; margin: 0 0 4px; }
+  body { font-family: 'Inter', sans-serif; margin: 0; background: var(--bg); color: var(--text); font-size: 14px; }
+  #topbar {
+    display: flex; align-items: baseline; gap: 14px;
+    padding: 16px 24px;
+    background: linear-gradient(180deg, var(--panel), var(--bg));
+    border-bottom: 1px solid var(--border);
+  }
+  #topbar h1 { font-size: 16px; margin: 0; letter-spacing: 0.02em; }
+  #topbar a { color: var(--text-dim); text-decoration: none; font-size: 13px; }
+  #topbar a:hover { color: var(--text); }
+  main { max-width: 1100px; margin: 0 auto; padding: 24px; }
   .sub { color: var(--text-dim); font-size: 13px; margin-bottom: 20px; }
   .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 14px; }
   .card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; }
@@ -23,29 +35,121 @@
   .story { font-size: 12.5px; color: var(--text-dim); line-height: 1.5; margin-bottom: 8px; }
   .tools { display: flex; flex-wrap: wrap; gap: 4px; }
   .tools span { padding: 2px 5px; background: var(--card-2); border-radius: 3px; font-size: 10px; color: var(--accent-2); }
-  .topbar { display: flex; align-items: baseline; gap: 14px; margin-bottom: 20px; }
-  .topbar a { color: var(--text-dim); text-decoration: none; font-size: 13px; }
-  .topbar a:hover { color: var(--text); }
+  /* auth overlay */
+  #auth-overlay { position: fixed; inset: 0; z-index: 9999; display: flex; align-items: stretch; justify-content: center; background: var(--bg); overflow: hidden; transition: opacity 0.35s ease; }
+  #auth-overlay::before { content: ''; position: absolute; inset: -40%; background: radial-gradient(40% 40% at 30% 30%, rgba(124,108,246,0.18), transparent 70%), radial-gradient(45% 45% at 70% 60%, rgba(94,230,216,0.12), transparent 70%), radial-gradient(35% 35% at 50% 80%, rgba(34,197,94,0.10), transparent 70%); filter: blur(20px); animation: authAurora 18s ease-in-out infinite alternate; pointer-events: none; }
+  @keyframes authAurora { 0% { transform: translate(0,0) rotate(0deg) scale(1); } 50% { transform: translate(4%, -3%) rotate(8deg) scale(1.08); } 100% { transform: translate(-3%, 4%) rotate(-6deg) scale(1.04); } }
+  #auth-overlay.hidden { opacity: 0; pointer-events: none; }
+  #auth-shell { position: relative; z-index: 1; width: 100%; max-width: none; height: 100%; display: flex; border-radius: 0; overflow: hidden; animation: authCardIn 0.5s cubic-bezier(0.16,1,0.3,1) both; }
+  @keyframes authCardIn { from { opacity: 0; transform: translateY(18px) scale(0.985); } to { opacity: 1; transform: translateY(0) scale(1); } }
+  #auth-overlay.hidden #auth-shell { animation: none; transform: translateY(12px); opacity: 0; transition: opacity 0.3s, transform 0.3s; }
+  #auth-brand { flex: 0 0 58%; position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 60px 56px; background: radial-gradient(120% 120% at 0% 0%, rgba(124,108,246,0.22), transparent 55%), radial-gradient(120% 120% at 100% 100%, rgba(94,230,216,0.16), transparent 55%), var(--panel); border-right: 1px solid var(--border); overflow: hidden; text-align: center; }
+  #auth-brand .auth-loop-mark { display: inline-flex; align-items: center; justify-content: center; width: 56px; height: 56px; border-radius: 16px; background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: #0e1015; margin-bottom: 32px; flex-shrink: 0; animation: authLoopFloat 4.5s ease-in-out infinite; }
+  #auth-brand .auth-loop-mark svg { width: 32px; height: 32px; }
+  @keyframes authLoopFloat { 0%, 100% { transform: rotate(-6deg) translateY(0); } 50% { transform: rotate(6deg) translateY(-4px); } }
+  #auth-brand .auth-wordmark { display: flex; align-items: baseline; gap: 0; flex-wrap: wrap; font-family: 'Inter', sans-serif; font-weight: 800; line-height: 1; letter-spacing: 0.04em; margin-bottom: 22px; }
+  #auth-brand .auth-wordmark .lp { font-size: 64px; background: linear-gradient(135deg, var(--accent), var(--accent-2)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  #auth-brand .auth-wordmark .lp-l { font-size: 64px; margin-left: 0.32em; background: linear-gradient(135deg, var(--accent), var(--accent-2)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  #auth-brand .auth-wordmark .oo { display: inline-flex; align-items: center; justify-content: center; margin: 0 2px; flex-shrink: 0; position: relative; top: -3px; }
+  #auth-brand .auth-wordmark .oo svg { width: 22px; height: 22px; color: var(--accent-2); }
+  #auth-brand .auth-tagline { font-size: 16px; line-height: 1.5; color: var(--text-dim); max-width: 300px; font-style: italic; }
+  #auth-form { flex: 0 0 42%; display: flex; flex-direction: column; justify-content: center; padding: 60px 56px; background: rgba(20,22,29,0.92); backdrop-filter: blur(14px); }
+  #auth-form h2 { margin: 0 0 6px; font-size: 22px; font-weight: 700; letter-spacing: -0.02em; color: var(--text); animation: authFadeUp 0.5s ease 0.08s both; }
+  #auth-form .auth-sub { margin: 0 0 28px; font-size: 13px; color: var(--text-faint); animation: authFadeUp 0.5s ease 0.14s both; }
+  @keyframes authFadeUp { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+  #auth-form .auth-field { margin-bottom: 16px; text-align: left; animation: authFadeUp 0.5s ease 0.22s both; }
+  #auth-form .auth-field label { display: block; font-size: 12px; font-weight: 500; color: var(--text-dim); margin-bottom: 6px; letter-spacing: 0.02em; }
+  #auth-form .auth-field input { width: 100%; padding: 11px 14px; background: var(--card); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 14px; font-family: 'Inter', sans-serif; outline: none; transition: border-color 0.15s ease, box-shadow 0.15s ease; }
+  #auth-form .auth-field input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(124,108,246,0.15); }
+  #auth-form .auth-field input::placeholder { color: var(--text-faint); }
+  #auth-form .auth-error { margin-bottom: 16px; padding: 10px 12px; background: var(--error-soft); color: var(--error); border-radius: 8px; font-size: 13px; display: none; animation: authFadeUp 0.3s ease both; }
+  #auth-form .auth-error.show { display: block; }
+  #auth-form .auth-submit { width: 100%; padding: 12px; margin-bottom: 20px; background: #22C55E; color: #0e1015; border: none; border-radius: 8px; font-size: 15px; font-weight: 600; font-family: 'Inter', sans-serif; cursor: pointer; transition: background 0.15s ease, transform 0.1s ease, box-shadow 0.2s ease; animation: authFadeUp 0.5s ease 0.30s both; }
+  #auth-form .auth-submit:hover { background: #16A34A; box-shadow: 0 6px 20px rgba(34,197,94,0.28); }
+  #auth-form .auth-submit:active { transform: scale(0.98); }
+  #auth-form .auth-submit:disabled { opacity: 0.5; cursor: not-allowed; }
+  #auth-form .auth-toggle { font-size: 13px; color: var(--text-faint); animation: authFadeUp 0.5s ease 0.38s both; }
+  #auth-form .auth-toggle a { color: var(--accent); text-decoration: none; cursor: pointer; font-weight: 500; transition: color 0.15s ease; }
+  #auth-form .auth-toggle a:hover { color: var(--accent-2); }
+  @media (max-width: 720px) { #auth-shell { flex-direction: column; max-width: 420px; min-height: 0; } #auth-brand { border-right: none; border-bottom: 1px solid var(--border); padding: 36px 32px; } #auth-brand .auth-wordmark .lp { font-size: 46px; } }
 </style>
 </head>
 <body>
-  <div class="topbar">
-    <h1>Concept Taxonomy</h1>
-    <a href="/dashboard">Diagnose</a>
-    <a href="/practice">Practice</a>
-  </div>
-  <div class="sub">{{ concepts | length }} concepts · The Loop maps every JD concept to one of these. Hover "?" on any dashboard row to see why.</div>
-  <div class="grid">
-    {% for c in concepts %}
-    <div class="card">
-      <h2>{{ c.name }}</h2>
-      <div class="key">{{ c.key }}</div>
-      {% if c.story %}<div class="story">{{ c.story }}</div>{% endif %}
-      {% if c.tools %}
-      <div class="tools">{% for t in c.tools %}<span>{{ t }}</span>{% endfor %}</div>
-      {% endif %}
+<svg style="position:absolute;width:0;height:0" aria-hidden="true">
+  <symbol id="i-loop" viewBox="0 0 24 24"><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/><path d="M3 21v-5h5"/></symbol>
+  <symbol id="i-repeat" viewBox="0 0 24 24"><polyline points="17 2 21 6 17 10"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 22 3 18 7 14"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></symbol>
+</svg>
+<div id="auth-overlay">
+  <div id="auth-shell">
+    <div id="auth-brand">
+      <span class="auth-loop-mark">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><use href="#i-loop"/></svg>
+      </span>
+      <div class="auth-wordmark">
+        <span class="lp">T</span><span class="lp">h</span><span class="lp">e</span>
+        <span class="lp-l">L</span>
+        <span class="oo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><use href="#i-repeat"/></svg></span>
+        <span class="oo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><use href="#i-repeat"/></svg></span>
+        <span class="lp">P</span>
+      </div>
+      <p class="auth-tagline">prepare like having a senior dev in your pocket</p>
     </div>
-    {% endfor %}
+    <div id="auth-form">
+      <h2 id="auth-title">Welcome back</h2>
+      <p class="auth-sub">Log in to pick up where you left off.</p>
+      <div class="auth-error" id="auth-error"></div>
+      <div class="auth-field">
+        <label for="auth-email">Email</label>
+        <input id="auth-email" type="email" placeholder="you@example.com" autocomplete="email">
+      </div>
+      <div class="auth-field">
+        <label for="auth-password">Password</label>
+        <input id="auth-password" type="password" placeholder="&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;" autocomplete="current-password">
+      </div>
+      <button class="auth-submit" id="auth-submit" onclick="authSubmit()">Log in</button>
+      <p class="auth-toggle"><span id="auth-toggle-text">No account?</span> <a id="auth-toggle-link" onclick="authToggle()">Sign up</a></p>
+      <p style="text-align:center; margin:0; font-size:12px; color:var(--text-faint);"><a style="cursor:pointer; color:var(--accent); text-decoration:none;" onclick="testLogin(false)">&#9889; Test drive</a> &middot; <a style="cursor:pointer; color:var(--accent); text-decoration:none;" onclick="testLogin(true)">&#127807; Fresh start</a></p>
+    </div>
   </div>
+</div>
+  <div id="topbar">
+    <h1>Concept Taxonomy</h1>
+    <a href="/dashboard" style="margin-left:auto;">Diagnose</a>
+    <a href="/practice" style="margin-left:10px;">Practice</a>
+    <a href="#" onclick="event.preventDefault(); localStorage.removeItem('loop_token'); document.getElementById('auth-overlay').classList.remove('hidden'); document.getElementById('auth-overlay').style.display=''; document.getElementById('auth-email').focus();" style="margin-left:10px; font-size:12px; opacity:0.6;">Logout</a>
+  </div>
+  <main>
+    <div class="sub">{{ concepts | length }} concepts &middot; The Loop maps every JD concept to one of these. Hover "?" on any dashboard row to see why.</div>
+    <div class="grid">
+      {% for c in concepts %}
+      <div class="card">
+        <h2>{{ c.name }}</h2>
+        <div class="key">{{ c.key }}</div>
+        {% if c.story %}<div class="story">{{ c.story }}</div>{% endif %}
+        {% if c.tools %}
+        <div class="tools">{% for t in c.tools %}<span>{{ t }}</span>{% endfor %}</div>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+  </main>
+<script>
+let authMode = 'login';
+const authOverlay = document.getElementById('auth-overlay');
+const authTitle = document.getElementById('auth-title');
+const authError = document.getElementById('auth-error');
+const authSubmitBtn = document.getElementById('auth-submit');
+const authToggleText = document.getElementById('auth-toggle-text');
+const authToggleLink = document.getElementById('auth-toggle-link');
+const authEmail = document.getElementById('auth-email');
+const authPassword = document.getElementById('auth-password');
+function authToggle() { authMode = authMode === 'login' ? 'signup' : 'login'; authError.classList.remove('show'); if (authMode === 'signup') { authTitle.textContent = 'Create account'; authSubmitBtn.textContent = 'Sign up'; authToggleText.textContent = 'Have an account?'; authToggleLink.textContent = 'Log in'; } else { authTitle.textContent = 'Welcome back'; authSubmitBtn.textContent = 'Log in'; authToggleText.textContent = 'No account?'; authToggleLink.textContent = 'Sign up'; } authEmail.focus(); }
+function authShowError(msg) { authError.textContent = msg; authError.classList.add('show'); }
+async function authSubmit() { const email = authEmail.value.trim(); const password = authPassword.value; if (!email || !password) { authShowError('Email and password required.'); return; } authSubmitBtn.disabled = true; authError.classList.remove('show'); try { const endpoint = authMode === 'signup' ? '/api/signup' : '/api/login'; const r = await fetch(endpoint, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({email, password}) }); const data = await r.json(); if (r.status === 404) { authShowError('Sign-up is not enabled yet.'); return; } if (!r.ok || data.error) { authShowError(data.error || 'Something went wrong.'); return; } if (data.access_token) localStorage.setItem('loop_token', data.access_token); authOverlay.classList.add('hidden'); setTimeout(() => { authOverlay.style.display = 'none'; location.reload(); }, 400); } catch (e) { authShowError('Network error \u2014 try again.'); } finally { authSubmitBtn.disabled = false; } }
+async function testLogin(fresh) { authSubmitBtn.disabled = true; authError.classList.remove('show'); try { const r = await fetch('/api/test-login' + (fresh ? '?fresh=1' : ''), {method: 'POST'}); const data = await r.json(); if (!r.ok || data.error) { authShowError(data.error || 'Test login failed.'); authSubmitBtn.disabled = false; return; } if (data.access_token) localStorage.setItem('loop_token', data.access_token); authOverlay.classList.add('hidden'); setTimeout(() => { authOverlay.style.display = 'none'; location.reload(); }, 400); } catch (e) { authShowError('Network error \u2014 try again.'); authSubmitBtn.disabled = false; } }
+document.getElementById('auth-password').addEventListener('keydown', e => { if (e.key === 'Enter') authSubmit(); });
+document.getElementById('auth-email').addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('auth-password').focus(); });
+(async function checkAuth() { try { const r = await fetch('/api/me'); const data = await r.json(); if (data.mode === 'legacy') { authOverlay.classList.add('hidden'); authOverlay.style.display = 'none'; return; } } catch {} const token = localStorage.getItem('loop_token'); if (!token) { authOverlay.classList.remove('hidden'); authOverlay.style.display = ''; authEmail.focus(); return; } try { const r = await fetch('/api/me', { headers: { 'Authorization': 'Bearer ' + token } }); const data = await r.json(); if (data.user_id) { authOverlay.classList.add('hidden'); authOverlay.style.display = 'none'; } else { localStorage.removeItem('loop_token'); authOverlay.classList.remove('hidden'); authOverlay.style.display = ''; authEmail.focus(); } } catch { authOverlay.classList.remove('hidden'); authOverlay.style.display = ''; authEmail.focus(); } })();
+</script>
 </body>
 </html>
