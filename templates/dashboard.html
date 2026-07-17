@@ -214,6 +214,11 @@
   }
   .why:hover .tp { display: block; }
   .tp-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-faint); margin-bottom: 2px; }
+/* signal badges */
+.sig { display: inline-block; font-size: 9px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; padding: 1px 5px; border-radius: 3px; margin-left: 5px; }
+.sig-inferred { background: rgba(255,107,107,0.15); color: var(--error); }
+.sig-self_rated { background: rgba(245,197,66,0.15); color: var(--warn); }
+.sig-measured { background: rgba(61,220,151,0.15); color: var(--success); }
 </style>
 </head>
 <body>
@@ -253,7 +258,7 @@
       {% for c in jd_concept_list %}
       <div class="gap-row" id="sd-{{ c.concept }}">
         <div class="gap-label" style="width:200px;">{{ c.name }}</div>
-        <span class="gap-count" style="width:auto; margin-right:10px; font-size:11px; text-transform:uppercase; letter-spacing:0.04em; color:{{ 'var(--success)' if c.status == 'covered' else ('var(--warn)' if c.status == 'self_reported' else ('var(--accent-2)' if c.status == 'translation' else ('var(--text-faint)' if c.status == 'verify' else 'var(--error)'))) }};">{{ c.status.replace('_', ' ') }}</span>
+        <span class="sig sig-{{ c.signal }}">{{ c.signal.replace('_', ' ') }}</span>
         <button class="sd-btn" onclick="selfDiagnose(this, '{{ c.concept }}', {{ 'false' if c.status == 'self_reported' else 'true' }})" style="display:inline-flex; align-items:center; gap:4px; padding:3px 8px; background:transparent; border:1px solid {{ 'var(--success)' if c.status == 'self_reported' else 'var(--border)' }}; border-radius:4px; color:{{ 'var(--success)' if c.status == 'self_reported' else 'var(--text-faint)' }}; font-size:11px; cursor:pointer; font-family:inherit;">
           {{ '✓ Done' if c.status == 'self_reported' else '✓' }}
         </button>
@@ -375,7 +380,7 @@
       <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(150px,1fr)); gap:12px; margin-bottom:12px;">
         <div>
           <div class="label">Concept coverage</div>
-          <div class="big">{{ role_readiness.coverage }}<span class="unit">%</span></div>
+          <div class="big">{{ role_readiness.coverage }}<span class="unit">%</span><span class="sig sig-{{ coverage_signal }}">{{ coverage_signal.replace('_', ' ') }}</span></div>
           <div class="sub">concepts proven (verified in resume)
             {% if role_readiness.self_reported_count %}· <span style="color:var(--warn);">{{ role_readiness.self_reported_count }} self-reported, not counted</span>{% endif %}
           </div>

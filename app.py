@@ -2414,6 +2414,9 @@ def dashboard():
     role_readiness = _compute_role_readiness()
 
     # build combined concept list for the self-diagnose card
+    STATUS_SIGNAL = {"gap": "inferred", "verify": "inferred",
+                     "self_reported": "self_rated", "covered": "measured",
+                     "translation": "measured"}
     jd_concept_list = []
     seen = set()
     for group, status in [("real_gaps", "gap"), ("self_reported", "self_reported"),
@@ -2428,9 +2431,19 @@ def dashboard():
                 "name": c.replace("_", " ").title(),
                 "concept": c,
                 "status": status,
+                "signal": STATUS_SIGNAL[status],
                 "importance": item.get("importance", "must_have"),
                 "evidence": item.get("evidence", ""),
             })
+
+    # composite coverage signal
+    signals = {c["signal"] for c in jd_concept_list}
+    if signals == {"measured"}:
+        coverage_signal = "measured"
+    elif "self_rated" in signals:
+        coverage_signal = "self_rated"
+    else:
+        coverage_signal = "inferred"
 
     return render_template(
         "dashboard.html",
@@ -2447,6 +2460,7 @@ def dashboard():
         role_readiness=role_readiness,
         first_use=(total_solved == 0 and bool(PROGRESS.get("_jd")) and bool(PROGRESS.get("_resume"))),
         jd_concept_list=jd_concept_list,
+        coverage_signal=coverage_signal,
     )
 
 
