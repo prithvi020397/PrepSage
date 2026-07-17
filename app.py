@@ -1326,7 +1326,7 @@ Return exactly this JSON shape:
   "years_experience": "estimated years or null",
   "skills": [
     {{
-      "name": "skill name (e.g. 'Python', 'PostgreSQL', 'Kafka')",
+      "name": "skill name — ONLY extract TECHNICAL skills: programming languages, frameworks, tools, platforms, databases, cloud services, libraries. IGNORE: soft skills, university names, company names, locations, personal names, degree names, generic terms like 'Engineering' or 'Bachelor'.",
       "depth": "deep | moderate | shallow — based on how it was used (built production system = deep, listed in skills section only = shallow)",
       "context": "where/how it was used (e.g. 'used in AdTech pipeline for 3B daily events') — be specific"
     }}
@@ -1340,12 +1340,13 @@ Return exactly this JSON shape:
     }}
   ],
   "domains": ["application domains e.g. 'ad tech', 'healthcare', 'payments', 'distributed systems'"],
-  "strongest_skills": ["top 3-5 skills based on depth and context"],
-  "weakest_signals": ["skills that appear only in the skills list with no project context — likely shallow"]
+  "strongest_skills": ["top 3-5 technical skills based on depth and context"],
+  "weakest_signals": ["skills with no project context — likely shallow"]
 }}
 
 Note: do NOT include interview questions/probes — those are generated on demand later.
-Be strict about depth: "familiar with X" or just listing X = shallow. "Built Y using X processing Z events/day" = deep."""
+Be strict about depth: "familiar with X" or just listing X = shallow. "Built Y using X processing Z events/day" = deep.
+CRITICAL: ONLY extract genuine technical skills. Do not include company names, person names, university names, cities, or generic English words."""
 
     raw = _call_json_extract(prompt, max_tokens=1800)
     if not raw:
@@ -1590,7 +1591,7 @@ def get_jd():
 
 @app.route("/api/set-profile", methods=["POST"])
 def set_profile():
-    """Generate a synthetic JD profile from role + industry + cloud, matching against the resume."""
+    """Generate a synthetic JD profile from role + industry + cloud via direct LLM prompt."""
     data = request.json or {}
     role = (data.get("role") or "").strip()
     industry = (data.get("industry") or "").strip()
@@ -1599,29 +1600,51 @@ def set_profile():
         return jsonify({"error": "Role is required"}), 400
     resume = PROGRESS.get("_resume")
     resume_text = (resume or {}).get("raw_text", "")
-    # build a minimal text to feed into the JD extractor
-    profile_text = f"Job Title: {role}\n"
-    if industry:
-        profile_text += f"Industry: {industry}\n"
-    if cloud:
-        profile_text += f"Cloud: {cloud}\n"
-    profile_text += f"\nWe are hiring a {role}"
-    if industry:
-        profile_text += f" in the {industry} industry"
-    profile_text += ". This role requires strong data engineering skills."
-    if cloud:
-        profile_text += f" Experience with {cloud} is required."
-    profile_text += " The ideal candidate can design, build, and maintain data pipelines at scale."
-    jd_data, method = _extraction_fallback_chain(
-        _extract_concepts_from_jd, _fallback_extract_jd, profile_text, "profile")
-    if not jd_data:
+    concept_list = ", ".join(CONCEPT_TAXONOMY)
+    prompt = f"""You are a technical interview coach. A user wants to practice for a target role.
+
+Target role: {role}
+{f'Industry: {industry}' if industry else ''}
+{f'Cloud platform: {cloud}' if cloud else ''}
+
+Based on this profile, generate a Job-Description-like analysis using our concept taxonomy:
+{concept_list}
+
+Your job: think about what concepts a {role} {f'in {industry} ' if industry else ''}would actually need to know {f'on {cloud}' if cloud else ''}. Be specific and thorough — list 5-10 concepts.
+
+Return ONLY this JSON — no markdown:
+{{
+  "role_title": "precise role title",
+  "seniority": "senior | mid | junior | staff",
+  "domain": "industry or 'general'",
+  "concepts_required": [
+    {{"concept": "concept_key_from_taxonomy", "evidence": "why this concept matters for this role profile", "importance": "must_have"}}
+  ],
+  "tool_keywords": ["cloud platform tools", "relevant tech for this profile"],
+  "signal_framing": "one sentence on what this profile demands"
+}}"""
+    raw = _call_json_extract(prompt, max_tokens=1200)
+    if not raw:
         return jsonify({"error": "could not generate profile — try again"}), 500
-    jd_data["synthetic"] = True
-    jd_data["raw_text_preview"] = profile_text[:300]
-    jd_data["raw_text"] = profile_text
-    jd_data["uploaded_at"] = datetime.now().isoformat()
-    jd_data["filename"] = "profile"
-    jd_data["_extraction_method"] = method
+    try:
+        obj = json.loads(raw[raw.index("{"):raw.rindex("}") + 1])
+    except Exception:
+        return jsonify({"error": "could not parse profile — try again"}), 500
+    jd_data = {
+        "role_title": obj.get("role_title", role),
+        "seniority": obj.get("seniority", "mid"),
+        "domain": obj.get("domain", industry or "general"),
+        "concepts_required": obj.get("concepts_required", []),
+        "capabilities_required": [],
+        "tool_keywords": obj.get("tool_keywords", []),
+        "signal_framing": obj.get("signal_framing", f"Profile for {role}."),
+        "synthetic": True,
+        "raw_text_preview": role[:300],
+        "raw_text": role,
+        "uploaded_at": datetime.now().isoformat(),
+        "filename": "profile",
+        "_extraction_method": "llm",
+    }
     _stamp_taxonomy(jd_data)
     PROGRESS["_jd"] = jd_data
     save_progress()
