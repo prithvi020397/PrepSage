@@ -2386,6 +2386,7 @@ def dashboard():
         jd=PROGRESS.get("_jd", {}),
         concept_match=_compute_concept_match(),
         role_readiness=_compute_role_readiness(),
+        first_use=(total_solved == 0 and bool(PROGRESS.get("_jd")) and bool(PROGRESS.get("_resume"))),
     )
 
 

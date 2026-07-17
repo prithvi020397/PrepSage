@@ -162,6 +162,37 @@
     padding: 8px 16px; font-weight: 600; cursor: pointer;
   }
   .btn-danger-solid:disabled { opacity: 0.4; cursor: not-allowed; }
+  /* first-use hero — "what? / shape of success / one next step" */
+  .hero {
+    border: 1px solid rgba(94,230,216,0.35);
+    border-radius: 14px;
+    background: linear-gradient(135deg, rgba(94,230,216,0.06), rgba(124,108,246,0.06));
+    padding: 22px 24px;
+  }
+  .hero-what { font-size: 17px; font-weight: 700; color: var(--text); line-height: 1.4; }
+  .hero-what .accent { color: var(--accent-2); }
+  .hero-shape { display: flex; align-items: center; gap: 16px; margin: 14px 0; }
+  .hero-shape .ghost-num {
+    font-size: 34px; font-weight: 800; color: var(--text-faint);
+    opacity: 0.5; line-height: 1;
+  }
+  .hero-shape .ghost-arrow { color: var(--text-faint); font-size: 22px; }
+  .hero-shape .ghost-target {
+    font-size: 13px; color: var(--text-dim); background: var(--card-2);
+    border: 1px dashed var(--border); border-radius: 8px; padding: 10px 14px; flex: 1;
+  }
+  .hero-shape .ghost-target b { color: var(--success); }
+  .hero-cta-row { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; margin-top: 6px; }
+  .hero-cta {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: var(--success); color: #0e1015; border: none;
+    border-radius: 8px; padding: 11px 20px; font-size: 14px; font-weight: 700;
+    cursor: pointer; text-decoration: none; font-family: inherit;
+  }
+  .hero-cta:hover { background: #4ff0a8; }
+  .hero-secondary { font-size: 12.5px; color: var(--text-dim); }
+  .hero-secondary a { color: var(--accent); text-decoration: none; }
+  .hero-secondary a:hover { text-decoration: underline; }
 </style>
 </head>
 <body>
@@ -170,6 +201,28 @@
     <a href="/practice">&larr; back to practice</a>
   </div>
   <main>
+    {% if first_use %}
+    <div class="hero">
+      <div class="hero-what">
+        You've mapped your resume to <span class="accent">{{ jd.role_title }}</span> &mdash;
+        here's where you stand and the one move that matters next.
+      </div>
+      <div class="hero-shape">
+        <div class="ghost-num">{{ role_readiness.coverage }}%</div>
+        <div class="ghost-arrow">&rarr;</div>
+        <div class="ghost-target">
+          After ~10 targeted questions, your concept coverage climbs to <b>~70%+</b>
+          and the gaps below fill in with proof instead of guesswork.
+        </div>
+      </div>
+      <div class="hero-cta-row">
+        <a class="hero-cta" href="/?q={% if role_readiness.framed_practice %}{{ role_readiness.framed_practice[0].id }}{% elif role_readiness.real_gaps %}{{ total_questions }}{% else %}{{ total_questions }}{% endif %}">
+          Solve your first real gap &rarr;
+        </a>
+        <span class="hero-secondary">or <a href="/?mode=mock">start a 20-min mock loop</a></span>
+      </div>
+    </div>
+    {% endif %}
     <div class="grid">
       <div class="card">
         <div class="label">Solved</div>
