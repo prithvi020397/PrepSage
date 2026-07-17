@@ -1397,6 +1397,30 @@ def get_jd():
     return jsonify(PROGRESS.get("_jd", {}))
 
 
+@app.route("/api/upload-jd-text", methods=["POST"])
+def upload_jd_text():
+    """Accept raw JD text (pasted), extract concepts via LLM, store in progress."""
+    data = request.json or {}
+    text = (data.get("text") or "").strip()
+    if not text or len(text) < 30:
+        return jsonify({"error": "JD text too short — paste at least a paragraph"}), 400
+
+    jd_data = _extract_concepts_from_jd(text)
+    if not jd_data:
+        return jsonify({"error": "could not parse JD — try again"}), 500
+
+    jd_data["raw_text_preview"] = text[:300]
+    jd_data["uploaded_at"] = datetime.now().isoformat()
+    jd_data["filename"] = "pasted"
+    PROGRESS["_jd"] = jd_data
+    save_progress()
+    return jsonify({"ok": True, "role_title": jd_data.get("role_title"),
+                    "seniority": jd_data.get("seniority"),
+                    "domain": jd_data.get("domain"),
+                    "concepts_required": len(jd_data.get("concepts_required", [])),
+                    "tool_keywords": jd_data.get("tool_keywords", [])})
+
+
 @app.route("/api/upload-resume", methods=["POST"])
 def upload_resume():
     """Accept a PDF/DOCX/TXT resume, extract text, pull skills via LLM, store in progress."""
