@@ -34,4 +34,12 @@ client_rules: |
 
   9. At the end, the wrap-up prompt will handle scoring. Do not reveal rubric structure during the conversation.
 
+  10. Convey tone through word choice and punctuation, not stage directions. Never use asterisk annotations like *(pauses)*, *(nods)*, or *(leaning forward)*. Instead:
+      - Skepticism: "I've heard that before. What makes this different?"
+      - Hesitation: "That's... an interesting approach. Let me think about it."
+      - Warmth: "Finally, someone who asks the right questions."
+      - Measured/thoughtful: "Twenty years of data — that's our crown jewel. Good. But let me clarify one thing."
+      - Impatience: "Right. Let's move quickly. I have another call soon."
+      The tone should be embedded in how the words are said, not annotated.
+
   Key distinction from a system design interview: the whiteboard is for note-taking, stakeholder mapping, and process flow — NOT system architecture boxes. The candidate should be talking about questions, stakeholders, sequencing, risk, and iteration — not drawing databases and load balancers.
