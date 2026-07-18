@@ -1576,8 +1576,8 @@
     </div>
     <button id="replay-btn" class="btn btn-ghost" style="display:none; margin:8px 12px 8px;" onclick="startReplay()">🕐 Replay session</button>
     <div id="chatinput">
-      <label class="mic-toggle" id="mic-toggle" title="Mic on by default — speak and it types live; or just type. Uses your browser's speech recognition (no cost).">
-        <span class="dot"></span><span id="mic-toggle-label">Mic</span>
+      <label class="mic-toggle" id="mic-toggle" title="Click to record — speak your answer, click again to stop. Transcribed via Deepgram for accuracy.">
+        <span class="dot"></span><span id="mic-toggle-label">Record</span>
       </label>
       <input id="chatbox" placeholder="ask a follow-up… (or just speak)" onkeydown="if(event.key==='Enter') sendMessage()">
       <button class="btn btn-primary btn-icon" onclick="sendMessage()">➤</button>
@@ -2040,14 +2040,13 @@ function serializeCanvasForLLM() {
 }
 
 // --- Phase: Mic-on by default (Option B) ---
-// Live, zero-cost speech recognition via webkitSpeechRecognition. Routes into whichever
-// text field is active (chat box for design/chat, narration box for SQL/Python debrief)
-// or drops a canvas note when voice-note mode is on. A single "Mic on" toggle controls it.
-// Typing always works — speech is additive. (Whisper /api/transcribe is kept server-side
-// for future high-accuracy recording but is no longer a visible button.)
-let micOn = true; // mic-on by default (Option B): speak and it types live; typing always works
-let liveRecog = null;
-let liveInterim = '';
+// Live, zero-cost speech recognition via webkitSpeechRecognition — replaced with
+// Deepgram-based recording + /api/transcribe for higher accuracy. Records audio on
+// mic toggle, sends to server for transcription, inserts result into active field.
+let micOn = false; // off by default (user clicks to record)
+let mediaRecorder = null;
+let audioChunks = [];
+let isRecording = false;
 
 function liveTargetField() {
   if (current && current.lang === 'design') return document.getElementById('chatbox');
@@ -2111,63 +2110,54 @@ function dropCanvasVoiceNote(text) {
   saveCurrentState();
 }
 
-function startLiveRecog() {
-  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (!SR) {
-    showToast('Live speech isn’t supported in this browser — just type instead.');
-    setMicOn(false);
-    return;
-  }
-  if (liveRecog) return;
-  const recog = new SR();
-  recog.continuous = true;
-  recog.interimResults = true;
-  recog.lang = 'en-US';
-  recog.onresult = (e) => {
-    let interim = '';
-    let final = '';
-    for (let i = e.resultIndex; i < e.results.length; i++) {
-      const txt = e.results[i][0].transcript;
-      if (e.results[i].isFinal) final += txt; else interim += txt;
-    }
-    liveInterim = interim;
-    const field = liveTargetField();
-    const indicator = document.getElementById('live-transcript');
-    if (indicator) indicator.textContent = interim ? '🎙 ' + interim : '';
-    if (final) {
-      if (field === 'CANVAS_NOTE') {
-        dropCanvasVoiceNote(final.trim());
-      } else {
-        const cur = field.value;
-        field.value = (cur ? cur + ' ' : '') + final.trim();
-        field.dispatchEvent(new Event('input'));
+function startRecording() {
+  navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
+    const mime = MediaRecorder.isTypeSupported('audio/webm;codecs=opus') ? 'audio/webm;codecs=opus' : 'audio/webm';
+    mediaRecorder = new MediaRecorder(stream, { mimeType: mime });
+    audioChunks = [];
+    mediaRecorder.ondataavailable = e => e.data.size && audioChunks.push(e.data);
+    mediaRecorder.onstop = async () => {
+      stream.getTracks().forEach(t => t.stop());
+      const blob = new Blob(audioChunks, { type: mime });
+      const formData = new FormData();
+      formData.append('audio', blob, 'recording.webm');
+      const indicator = document.getElementById('live-transcript');
+      if (indicator) indicator.textContent = '⏳ Transcribing…';
+      try {
+        const res = await fetch('/api/transcribe', { method: 'POST', body: formData });
+        const data = await res.json();
+        if (indicator) indicator.textContent = '';
+        if (data.transcript) {
+          const field = liveTargetField();
+          if (field === 'CANVAS_NOTE') {
+            dropCanvasVoiceNote(data.transcript.trim());
+          } else {
+            const cur = field.value;
+            field.value = (cur ? cur + ' ' : '') + data.transcript.trim();
+            field.dispatchEvent(new Event('input'));
+            field.focus();
+          }
+        }
+      } catch (e) {
+        if (indicator) indicator.textContent = '';
+        showToast('Transcription failed. Check Deepgram API key.');
       }
-      liveInterim = '';
-      if (indicator) indicator.textContent = '';
-    }
-  };
-  recog.onerror = (e) => {
-    if (e.error === 'not-allowed' || e.error === 'service-not-allowed') {
-      showToast('Microphone permission denied — you can still type.');
-      setMicOn(false);
-    }
-    // 'no-speech' / 'aborted' are transient; restart if still on
-    if (micOn && e.error !== 'not-allowed' && e.error !== 'service-not-allowed') {
-      try { recog.start(); } catch (_) {}
-    }
-  };
-  recog.onend = () => {
-    liveRecog = null;
-    if (micOn) { try { recog.start(); } catch (_) {} }  // keep listening while on
-  };
-  liveRecog = recog;
-  try { recog.start(); } catch (_) {}
+    };
+    mediaRecorder.start();
+    isRecording = true;
+    const indicator = document.getElementById('live-transcript');
+    if (indicator) indicator.textContent = '🔴 Recording… click Mic again to stop';
+  }).catch(() => {
+    showToast('Microphone access needed — type instead.');
+    setMicOn(false);
+  });
 }
 
-function stopLiveRecog() {
-  if (liveRecog) { try { liveRecog.stop(); } catch (_) {} liveRecog = null; }
-  const indicator = document.getElementById('live-transcript');
-  if (indicator) indicator.textContent = '';
+function stopRecording() {
+  if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+    mediaRecorder.stop();
+    isRecording = false;
+  }
 }
 
 function setMicOn(on) {
@@ -2175,17 +2165,12 @@ function setMicOn(on) {
   const toggle = document.getElementById('mic-toggle');
   if (toggle) {
     toggle.classList.toggle('on', on);
-    document.getElementById('mic-toggle-label').textContent = on ? 'Mic on' : 'Mic';
+    document.getElementById('mic-toggle-label').textContent = on ? 'Recording…' : 'Record';
   }
   if (on) {
-    navigator.mediaDevices.getUserMedia({ audio: true }).then(() => {
-      startLiveRecog();
-    }).catch(() => {
-      showToast('Microphone access needed for live speech — type instead.');
-      setMicOn(false);
-    });
+    startRecording();
   } else {
-    stopLiveRecog();
+    stopRecording();
   }
 }
 

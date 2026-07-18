@@ -4,6 +4,7 @@ import logging
 import os
 import random
 import re
+import requests
 import sqlite3
 import subprocess
 import tempfile
@@ -46,6 +47,8 @@ HEADROOM_ENABLED = os.environ.get("HEADROOM_ENABLED", "").lower() in ("1", "true
 API_BASE = "http://localhost:9090/v1" if HEADROOM_ENABLED else "https://openrouter.ai/api/v1"
 client = OpenAI(base_url=API_BASE, api_key=os.environ.get("OPENROUTER_API_KEY", "sk-placeholder-not-used"))
 MODEL = "deepseek/deepseek-v4-flash"
+
+DEEPGRAM_API_KEY = os.environ.get("DEEPGRAM_API_KEY", "")
 
 # ponytail: TAXONOMY_VERSION stamps every LLM extraction (resume/JD) so we can detect
 # drift when JD_CONCEPT_TRANSLATIONS / CONCEPT_TAXONOMY change. Old extractions keep
@@ -4804,6 +4807,40 @@ def export_session():
     judge_result = JUDGES.get(chat_key) if decomposition else None
     md = _generate_report(qid, q, turns, judge_result)
     return md, 200, {"Content-Type": "text/markdown; charset=utf-8"}
+
+
+@app.route("/api/transcribe", methods=["POST"])
+def transcribe_audio():
+    if not DEEPGRAM_API_KEY:
+        return jsonify({"error": "Deepgram API key not configured"}), 500
+    if "audio" not in request.files:
+        return jsonify({"error": "No audio file provided"}), 400
+    audio_file = request.files["audio"]
+    audio_bytes = audio_file.read()
+    if not audio_bytes:
+        return jsonify({"error": "Empty audio"}), 400
+    try:
+        resp = requests.post(
+            "https://api.deepgram.com/v1/listen",
+            headers={
+                "Authorization": f"Token {DEEPGRAM_API_KEY}",
+                "Content-Type": audio_file.content_type or "audio/webm",
+            },
+            params={"model": "nova-2", "punctuate": "true", "language": "en"},
+            data=audio_bytes,
+            timeout=30,
+        )
+        resp.raise_for_status()
+        result = resp.json()
+        transcript = (
+            result.get("results", {})
+            .get("channels", [{}])[0]
+            .get("alternatives", [{}])[0]
+            .get("transcript", "")
+        )
+        return jsonify({"transcript": transcript})
+    except Exception as e:
+        return jsonify({"error": f"Transcription failed: {str(e)}"}), 500
 
 
 WHITEBOARD_WRAP_RE = re.compile(r"^\[Candidate's current whiteboard\]\n(.*?)\n\n\[Candidate says\]\n(.*)$", re.S)
