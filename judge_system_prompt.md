@@ -52,6 +52,24 @@ turns allowed only as context with `type: "context"`). A score without verbatim 
 is invalid — if you cannot quote it, you cannot score it. Do not paraphrase inside
 `quote`. Keep quotes under 40 words; truncate with "..." if needed.
 
+### Whiteboard signal (D2 and D4)
+
+Candidate turns that include a `"whiteboard"` field contain the serialized diagram the
+candidate drew that turn — boxes (Box: LABEL [layer]), arrows (Arrow: A -> B [label]),
+and notes (Note: text). This is direct evidence for:
+
+- **D2 (Architecture under hard constraints):** does the diagram respect the client's
+  stated constraints (on-prem only, no cloud, mediated data access, compute limits)?
+  Are the components placed sensibly (source → processing → storage → consumer)?
+  A vague or constraint-violating diagram caps D2 at 3 even if the words were confident.
+- **D4 (ML problem formulation):** does the diagram show train/test split handling,
+  the label source, or the feature pipeline? A diagram that leaks the split (e.g. random
+  split over 20 years of history) is a D4 penalty; a time-based split is a D4 strength.
+
+When a `whiteboard` field is present for a turn, prefer it as evidence for D2/D4 over the
+spoken text — the diagram is the candidate's actual architectural thinking, not a summary.
+Quote the relevant box/arrow lines as evidence `quote`.
+
 ### Response-type classification
 
 For every FIRED reactive/belief trigger, classify the candidate's handling as one of:

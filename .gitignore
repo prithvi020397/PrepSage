@@ -9,6 +9,7 @@ chats.json
 progress.json
 replay_comments.json
 research_cache.json
+judges.json
 sample_rubric_from_internet/
 .venv/
 

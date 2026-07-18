@@ -1,4 +1,5 @@
 import difflib
+import glob
 import json
 import logging
 import os
@@ -42,6 +43,11 @@ def _req_log(resp):
     ms = int((time.time() - getattr(g, "_t0", time.time())) * 1000)
     log.info("%s %s %s %dms", request.method, request.path, resp.status_code, ms)
     return resp
+
+@app.route("/favicon.ico")
+def favicon():
+    return "", 204
+
 # The Loop: single-user local interview prep platform
 HEADROOM_ENABLED = os.environ.get("HEADROOM_ENABLED", "").lower() in ("1", "true", "yes")
 API_BASE = "http://localhost:9090/v1" if HEADROOM_ENABLED else "https://openrouter.ai/api/v1"
@@ -4189,6 +4195,47 @@ V2_SCENARIOS = json.load(open(V2_SCENARIOS_FILE)) if os.path.exists(V2_SCENARIOS
 # Merge v2 scenarios into QUESTIONS so they're available through the same lookup
 QUESTIONS.update({k: v for k, v in V2_SCENARIOS.items() if v.get("lang") == "decomposition"})
 
+# Calibration gold transcripts: precomputed strong/borderline/weak attempts with expected
+# dimension ranges, used by the "Calibrate vs gold" feature so candidates can see the gap
+# between their attempt and a known-good one dimension by dimension.
+CALIBRATION_FIXTURES = {}
+_CALIB_DIR = os.path.join(os.path.dirname(__file__), "fixtures")
+if os.path.isdir(_CALIB_DIR):
+    for _cf in glob.glob(os.path.join(_CALIB_DIR, "calibration_*.json")):
+        try:
+            _cd = json.load(open(_cf))
+            _sid = _cd.get("scenario_id")
+            if not _sid:
+                continue
+            CALIBRATION_FIXTURES.setdefault(_sid, []).append({
+                "file": os.path.basename(_cf),
+                "note": _cd.get("gold_label_note", ""),
+                "expected": _cd.get("expected", {}),
+            })
+        except Exception:
+            pass
+
+def build_judge_transcript(transcript_turns):
+    """Convert raw chat turns ({role, content, turn?}) into the judge-facing
+    transcript. Candidate turns that carry a whiteboard diagram get a structured
+    `whiteboard` field so D2 (architecture) and D4 (ML formulation) can be scored
+    from what was actually drawn, not just what was said."""
+    judge_transcript = []
+    for t in transcript_turns:
+        role = "candidate" if t["role"] == "user" else "client"
+        content = t["content"]
+        turn = {"turn": t.get("turn", len(judge_transcript)),
+                "role": role, "text": content[:2000]}
+        if role == "candidate":
+            wm = WHITEBOARD_WRAP_RE.match(content)
+            if wm:
+                diagram = wm.group(1).strip()
+                if diagram:
+                    turn["whiteboard"] = diagram
+        judge_transcript.append(turn)
+    return judge_transcript
+
+
 def run_judge(scenario_json, transcript_turns, session_id, scenario_id):
     """Call the judge model (separate from the client simulation) to score a
     completed decomposition session.
@@ -4220,11 +4267,7 @@ def run_judge(scenario_json, transcript_turns, session_id, scenario_id):
                              "costliest_moment": {"turn": 0, "note": ""}}}
 
     # Build transcript JSON for the judge (only user/assistant turns that have text)
-    judge_transcript = []
-    for t in transcript_turns:
-        role = "candidate" if t["role"] == "user" else "client"
-        judge_transcript.append({"turn": t.get("turn", len(judge_transcript)),
-                                  "role": role, "text": t["content"][:2000]})
+    judge_transcript = build_judge_transcript(transcript_turns)
 
     system = (JUDGE_SYSTEM_PROMPT
               .replace("{scenario_json}", json.dumps(scenario_json, indent=2))
@@ -4246,6 +4289,8 @@ def run_judge(scenario_json, transcript_turns, session_id, scenario_id):
             raw = raw.split("\n", 1)[1] if "\n" in raw else raw[3:]
             if raw.rstrip().endswith("```"):
                 raw = raw.rstrip()[:-3].strip()
+        if "{" in raw and "}" in raw:
+            raw = raw[raw.index("{"):raw.rindex("}") + 1]
         result = json.loads(raw)
     except Exception as e:
         return {"session_id": session_id, "scenario_id": scenario_id,
@@ -4785,7 +4830,14 @@ def _generate_report(qid, q, turns, judge_result):
             wm = WHITEBOARD_WRAP_RE.match(content)
             if wm:
                 text = wm.group(2).strip()
+                diagram_raw = wm.group(1).strip()
                 lines.append(f"**You:** {text}")
+                if diagram_raw:
+                    lines.append("")
+                    lines.append("**Whiteboard:**")
+                    lines.append("```")
+                    lines.append(diagram_raw)
+                    lines.append("```")
             else:
                 lines.append(f"**You:** {content}")
         elif role == "assistant":
@@ -4810,6 +4862,39 @@ def export_session():
     judge_result = JUDGES.get(chat_key) if decomposition else None
     md = _generate_report(qid, q, turns, judge_result)
     return md, 200, {"Content-Type": "text/markdown; charset=utf-8"}
+
+
+@app.route("/api/calibration", methods=["POST"])
+def calibration():
+    data = request.json
+    qid = data.get("question_id", "")
+    if not qid:
+        return jsonify({"error": "question_id required"}), 400
+    # Fixtures are keyed by canonical scenario id. decomposition-1 is an alias for
+    # decomp_hospital_readmission, so map it explicitly.
+    lookup_id = "decomp_hospital_readmission" if qid == "decomposition-1" else qid
+    golds = CALIBRATION_FIXTURES.get(lookup_id)
+    if not golds:
+        return jsonify({"error": "no calibration transcript for this scenario"}), 404
+    dims = {}
+    q = QUESTIONS.get(qid) or V2_SCENARIOS.get(qid) or {}
+    for d in (q.get("rubric", {}).get("dimensions", []) if q else []):
+        dims[d.get("id")] = {"name": d.get("name", ""), "weight": d.get("weight", 1.0)}
+    return jsonify({
+        "scenario_id": qid,
+        "dimensions": dims,
+        "golds": [
+            {
+                "file": g["file"],
+                "note": g["note"],
+                "band": g["expected"].get("band"),
+                "band_tolerance": g["expected"].get("band_tolerance", []),
+                "dimension_assertions": g["expected"].get("dimension_assertions", {}),
+                "red_flags_must_not_contain": g["expected"].get("red_flags_must_not_contain", []),
+            }
+            for g in golds
+        ],
+    })
 
 
 @app.route("/api/transcribe", methods=["POST"])
@@ -4844,6 +4929,31 @@ def transcribe_audio():
         return jsonify({"transcript": transcript})
     except Exception as e:
         return jsonify({"error": f"Transcription failed: {str(e)}"}), 500
+
+
+@app.route("/api/tts", methods=["POST"])
+def text_to_speech():
+    if not DEEPGRAM_API_KEY:
+        return jsonify({"error": "Deepgram API key not configured"}), 500
+    data = request.json
+    text = (data or {}).get("text", "").strip()
+    if not text:
+        return jsonify({"error": "text required"}), 400
+    try:
+        resp = requests.post(
+            "https://api.deepgram.com/v1/speak",
+            headers={
+                "Authorization": f"Token {DEEPGRAM_API_KEY}",
+                "Content-Type": "application/json",
+            },
+            params={"model": "aura-orion-en"},
+            json={"text": text},
+            timeout=30,
+        )
+        resp.raise_for_status()
+        return resp.content, 200, {"Content-Type": "audio/mpeg"}
+    except Exception as e:
+        return jsonify({"error": f"TTS failed: {str(e)}"}), 500
 
 
 SOLUTION_WORDS = re.compile(r"\b(use|build|deploy|implement|kafka|kubernetes|k8s|redis|postgresql|mongodb|spark|flink|airflow|docker|terraform)\b", re.I)
