@@ -2940,6 +2940,8 @@ def get_question(qid):
         resp = {"id": q["id"], "lang": q["lang"], "title": q["title"], "prompt": prompt}
         if q["lang"] in ("design", "decomposition"):
             resp["track"] = q.get("track", "data")
+        if q["lang"] == "decomposition" and q.get("archetypes"):
+            resp["archetypes"] = {k: {"label": v.get("label", k)} for k, v in q["archetypes"].items()}
         if q["lang"] == "tradeoff":
             roll = TRADEOFF_ROLLS.get(q["id"])
             resp["title"] = roll["title"] if roll else q["title"]
