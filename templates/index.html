@@ -717,6 +717,7 @@
   #results.pass, #results.fail { animation: resultIn 0.25s ease; }
   @keyframes resultIn { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: translateY(0); } }
   @keyframes cardIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
   #question-card.fade-in { animation: cardIn 0.18s ease; }
   .result-banner {
     display: flex;
@@ -3793,6 +3794,31 @@ async function requestHint(body) {
   }
 }
 
+async function requestCoach(body) {
+  try {
+    const r = await fetch('/api/coach', {
+      method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)
+    });
+    const res = await r.json();
+    if (res.hint) showCoachPill(res.hint);
+  } catch (_) {}
+}
+
+let coachPillTimer = null;
+
+function showCoachPill(text) {
+  const existing = document.getElementById('coach-pill');
+  if (existing) existing.remove();
+  if (coachPillTimer) clearTimeout(coachPillTimer);
+  const pill = document.createElement('div');
+  pill.id = 'coach-pill';
+  pill.style.cssText = 'background:#fef3c7; border:1px solid #f59e0b; border-radius:8px; padding:6px 12px; margin:4px 0; font-size:12px; color:#92400e; display:flex; align-items:center; gap:6px; animation:fadeIn .3s;';
+  pill.innerHTML = '<span style="font-size:14px;">💡</span> <span>' + text + '</span>';
+  const input = document.getElementById('chatinput');
+  if (input) input.parentNode.insertBefore(pill, input);
+  coachPillTimer = setTimeout(() => { if (pill.parentNode) pill.remove(); }, 8000);
+}
+
 function askHint() {
   addMsg('system', 'Hint requested');
   requestHint({question_id: current.id, code: cm.getValue(), actual: lastRunSummary, use_web: useWebAngle});
@@ -3873,6 +3899,8 @@ function sendMessage() {
     armPacingNudge();
   } else if (current.lang === 'decomposition') {
     requestInterview({question_id: current.id, message: text});
+    // Fire co-pilot in parallel — no extra LLM cost, just pattern matching
+    setTimeout(() => requestCoach({question_id: current.id, message: text, turn: document.querySelectorAll('.msg-user').length}), 100);
   } else {
     requestHint({question_id: current.id, code: cm.getValue(), actual: lastRunSummary, message: text});
     if (sqlClarifyMode) {

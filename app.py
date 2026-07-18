@@ -4844,6 +4844,44 @@ def transcribe_audio():
         return jsonify({"error": f"Transcription failed: {str(e)}"}), 500
 
 
+SOLUTION_WORDS = re.compile(r"\b(use|build|deploy|implement|kafka|kubernetes|k8s|redis|postgresql|mongodb|spark|flink|airflow|docker|terraform)\b", re.I)
+CONSTRAINT_WORDS = re.compile(r"\b(budget|timeline|deadline|compliance|gdpr|hipaa|regulation|data.sovereign|privacy|security|risk|cost|bottleneck|team|stakeholder|dpo|legal)\b", re.I)
+OVERSIMPLIFY_WORDS = re.compile(r"\b(we should just|obviously|clearly|trivially|easy|just need to|simply)\b", re.I)
+RISK_WORDS = re.compile(r"\b(risk|fallback|backup|contingency|rollback|pilot|poc|mvp|phased|iteration|incremental|canary|blue.green)\b", re.I)
+
+
+@app.route("/api/coach", methods=["POST"])
+def coach():
+    data = request.json
+    msg = (data.get("message") or "").strip()
+    turn = int(data.get("turn", 1))
+    if not msg or turn < 1:
+        return jsonify({"hint": None})
+
+    hints = []
+
+    # T1: Jumping to solution too early
+    if turn <= 3 and SOLUTION_WORDS.search(msg):
+        hints.append("You're proposing a solution. Step back — what clarifying questions do you still have about the problem?")
+
+    # T2: Missing constraints
+    if turn >= 3 and not CONSTRAINT_WORDS.search(msg):
+        hints.append("Have you asked about constraints yet? Budget, timeline, compliance, and stakeholder concerns all shape the approach.")
+
+    # T3: Oversimplifying
+    if OVERSIMPLIFY_WORDS.search(msg):
+        hints.append("That sounds like an oversimplification. What assumptions are you making and what could go wrong?")
+
+    # T4: No risk/fallback awareness by turn 5+
+    if turn >= 5 and not RISK_WORDS.search(msg):
+        hints.append("You haven't mentioned what happens if the first approach fails. Consider a fallback or contingency plan.")
+
+    if hints:
+        return jsonify({"hint": hints[0]})
+
+    return jsonify({"hint": None})
+
+
 WHITEBOARD_WRAP_RE = re.compile(r"^\[Candidate's current whiteboard\]\n(.*?)\n\n\[Candidate says\]\n(.*)$", re.S)
 
 
