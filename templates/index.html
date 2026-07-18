@@ -2050,6 +2050,9 @@ let micOn = false; // off by default (user clicks to record)
 let mediaRecorder = null;
 let audioChunks = [];
 let isRecording = false;
+let recTimer = null; // interval id for the visible recording timer
+let recSeconds = 0;
+const REC_MAX_SECONDS = 90; // auto-stop so audio never piles up silently
 
 function liveTargetField() {
   if (current && current.lang === 'design') return document.getElementById('chatbox');
@@ -2125,7 +2128,7 @@ function startRecording() {
       const formData = new FormData();
       formData.append('audio', blob, 'recording.webm');
       const indicator = document.getElementById('live-transcript');
-      if (indicator) indicator.textContent = '⏳ Transcribing…';
+      if (indicator) { indicator.textContent = '⏳ Transcribing…'; indicator.classList.remove('active'); }
       try {
         const res = await fetch('/api/transcribe', { method: 'POST', body: formData });
         const data = await res.json();
@@ -2140,6 +2143,8 @@ function startRecording() {
             field.dispatchEvent(new Event('input'));
             field.focus();
           }
+        } else if (data.error) {
+          showToast('Transcription failed: ' + data.error);
         }
       } catch (e) {
         if (indicator) indicator.textContent = '';
@@ -2148,8 +2153,19 @@ function startRecording() {
     };
     mediaRecorder.start();
     isRecording = true;
+    recSeconds = 0;
     const indicator = document.getElementById('live-transcript');
-    if (indicator) indicator.textContent = '🔴 Recording… click Mic again to stop';
+    const tick = () => {
+      recSeconds += 1;
+      if (indicator) indicator.textContent = `🔴 Recording… ${recSeconds}s (click Mic to stop, auto-stops at ${REC_MAX_SECONDS}s)`;
+      if (recSeconds >= REC_MAX_SECONDS) {
+        showToast('Max recording length reached — transcribing now.');
+        setMicOn(false);
+      }
+    };
+    if (indicator) indicator.classList.add('active');
+    tick();
+    recTimer = setInterval(tick, 1000);
   }).catch(() => {
     showToast('Microphone access needed — type instead.');
     setMicOn(false);
@@ -2157,6 +2173,7 @@ function startRecording() {
 }
 
 function stopRecording() {
+  if (recTimer) { clearInterval(recTimer); recTimer = null; }
   if (mediaRecorder && mediaRecorder.state !== 'inactive') {
     mediaRecorder.stop();
     isRecording = false;
