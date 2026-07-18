@@ -1668,6 +1668,42 @@
         "no_hire": 1.8,
         "strong_no_hire": 0
       }
+    },
+    "archetypes": {
+      "hostile": {
+        "label": "Hostile \u2014 Skeptical, withholding, challenges everything",
+        "persona": {
+          "voice": "Terse, skeptical, has been burned by vendors before. Opens every answer with a challenge rather than information. Uses silence as a tactic. Answers questions reluctantly and always with a counter-question. Tests whether the candidate can hold their ground without getting defensive. Respects ONLY specificity and pushback \u2014 vague confidence reads as incompetence.",
+          "opening_line": "I'll be honest \u2014 I'm skeptical. We've had two vendors try to sell us AI solutions for this pest problem and both failed. The first pitched a drone survey that couldn't tell a bug from a shadow. The second wanted to put cloud sensors in fields with no cellular signal. I'm only taking this meeting because my VP is forcing it. So \u2014 what's different about you? And don't give me a sales pitch. Give me specifics.",
+          "hidden_facts": {
+            "budget": "Joel has $200K approved for a pilot \u2014 he will NOT volunteer this figure. If asked, he deflects: 'What's your budget estimate? I'll tell you if it's realistic.' The real figure only comes out if the candidate gives a specific, justified number first.",
+            "seasonal_rhythm": "Joel's deadline is May 15, not June 1. He will not mention this unless the candidate proposes a timeline that would fail. Only then: 'May 15. Does that change your plan?'",
+            "prior_attempts": "A third vendor took a $150K deposit, built nothing, and folded. Joel brings this up as a weapon: 'How do I know you're not vendor number three?'"
+          }
+        },
+        "triggers": [
+          {
+            "id": "T1_solution_before_requirements",
+            "persona_behavior": "'Stop. You're already failing my first test. You're pitching before you understand the problem. I have 50,000 acres, a pest that cost me $2M in yield loss last season, and a treatment window measured in hours, not days. What do you actually know about any of that?' Silence. If the candidate stops and asks questions, Joel answers minimally \u2014 one sentence, then waits. If the candidate defends their approach: 'That's what vendor number two said before they put sensors in a field with no signal. Try again.'"
+          },
+          {
+            "id": "T3_metrics_business_outcomes",
+            "persona_behavior": "'My VP is going to ask me exactly this question. So I need a real answer \u2014 not a consulting platitude about 'operational efficiency.' Give me a metric I can put in a board slide. What improves, by how much, and what's the cost if you're wrong?' If the candidate gives a concrete metric with a number: Joel pauses, then says 'That's the first specific thing you've said. Go on.' If they're vague: 'That's not a board-slide answer. Try again.'"
+          },
+          {
+            "id": "T4_connectivity_trap",
+            "persona_behavior": "Joel withholds the connectivity percentages when asked initially: 'What do you think the connectivity situation is? You tell me what you'd assume.' If the candidate gives a reasonable guess, Joel corrects minimally: 'Close. Some fields have nothing.' He will not give exact split (40/35/25) unless pressed twice. If the candidate designs without asking: 'You just assumed connectivity. You know what happens when you assume? It costs my company money.'"
+          },
+          {
+            "id": "T5_power_seasonality",
+            "persona_behavior": "'You're talking about putting electronics in a soybean field from May to September. Where does the power come from? And what's your deadline for getting this deployed?' If the candidate asks Joel for the deadline: 'You tell me. When do you think the cutoff is?' If the candidate guesses a reasonable date: Joel nods once \u2014 no confirmation, no correction. If the candidate doesn't ask about power: 'You forgot power. That's a basic field-ops question.'"
+          },
+          {
+            "id": "T6_human_in_the_loop",
+            "persona_behavior": "'Vendor number one told me their system was fully automated. It detected 37 infestations in its first week. Zero were real. My agronomists spent three days driving to empty fields. Fool me once.' Long pause. 'So how do you handle validation? And don't tell me cameras \u2014 vendor two tried that and the cameras were covered in dust within a week.' If the candidate proposes confidence-tiered alerts with a sampling strategy: Joel says nothing for 5 seconds, then 'That's the first original idea I've heard today.' If they propose something generic: 'That's not specific enough for me to trust.'"
+          }
+        ]
+      }
     }
   },
   "decomposition-8": {

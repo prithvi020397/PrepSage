@@ -1593,6 +1593,7 @@ new ResizeObserver(() => cm.refresh()).observe(document.getElementById('editor-c
 let current = null;
 let clarifyMode = false;
 let selectedPersona = '';
+let selectedArchetype = '';
 let adversarialMode = false;
 let adversarialFlaws = [];
 let scalingMode = false;
@@ -3134,6 +3135,29 @@ async function loadQuestion(id) {
     if (cached) {
       document.getElementById('chatlog').innerHTML = cached.chatHTML;
     }
+    selectedArchetype = '';
+    if (q.archetypes) {
+      const archetypeNames = Object.keys(q.archetypes);
+      const picker = document.createElement('div');
+      picker.style.cssText = 'margin:8px 0; display:flex; gap:8px; align-items:center; flex-wrap:wrap;';
+      picker.innerHTML = '<span style="font-size:13px; font-weight:600;">Stakeholder style:</span>';
+      archetypeNames.forEach(key => {
+        const btn = document.createElement('button');
+        btn.className = 'btn btn-ghost';
+        btn.textContent = q.archetypes[key].label || key;
+        btn.style.cssText = 'font-size:12px; padding:4px 10px; border-radius:6px;';
+        btn.onclick = () => {
+          document.querySelectorAll('.archetype-btn').forEach(b => b.style.border = '');
+          btn.style.border = '2px solid var(--accent)';
+          selectedArchetype = key;
+        };
+        btn.className = 'btn btn-ghost archetype-btn';
+        picker.appendChild(btn);
+      });
+      // Default: standard (no archetype)
+      selectedArchetype = '';
+      document.getElementById('debrief-row').before(picker);
+    }
     resetIdleTimer();
     return;
   }
@@ -3997,6 +4021,7 @@ async function requestInterview(body) {
     const r = await fetch('/api/interview', {
       method: 'POST', headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({...body, diagram: clarifyMode ? '' : serializeCanvasForLLM(), persona: selectedPersona,
+                             archetype: selectedArchetype || undefined,
                              adversarial: adversarialMode, flaws: adversarialFlaws, scaling: scalingMode || undefined,
                              incident: incidentMode, incident_scenario: incidentScenario || undefined,
                              decomposition: current && current.lang === 'decomposition' || undefined})

@@ -4365,6 +4365,23 @@ The current incident (this is the real failure the candidate must respond to):
             # v2 — build client prompt from persona + triggers (no scoring content)
             p = q.get("persona", {})
             triggers = q.get("triggers", [])
+            # Archetype deep-merge — deep-copy then mutate p and triggers in-place
+            archetype_key = data.get("archetype")
+            if archetype_key and q.get("archetypes"):
+                a = q["archetypes"].get(archetype_key)
+                if a and "persona" in a:
+                    p = json.loads(json.dumps(p))  # deep-copy before mutatation
+                    for k, v in a["persona"].items():
+                        if isinstance(v, dict):
+                            p.setdefault(k, {}).update(v)
+                        else:
+                            p[k] = v
+                if a and "triggers" in a:
+                    triggers = json.loads(json.dumps(triggers))  # deep-copy before mutatation
+                    overrides = {t["id"]: t for t in a["triggers"]}
+                    for t in triggers:
+                        if t["id"] in overrides:
+                            t.update(overrides[t["id"]])
             # Filter judge_note out of trigger blocks that go to the client
             clean_triggers = []
             for tr in triggers:
