@@ -2936,7 +2936,8 @@ def get_question(qid):
         return jsonify({"error": "not found"}), 404
     if q["lang"] in ("design", "tradeoff", "decomposition"):
         # ponytail: no test_cases/starter_code for design/tradeoff/decomposition questions
-        resp = {"id": q["id"], "lang": q["lang"], "title": q["title"], "prompt": q["prompt"]}
+        prompt = q.get("prompt", "") or q.get("persona", {}).get("opening_line", "")
+        resp = {"id": q["id"], "lang": q["lang"], "title": q["title"], "prompt": prompt}
         if q["lang"] in ("design", "decomposition"):
             resp["track"] = q.get("track", "data")
         if q["lang"] == "tradeoff":
