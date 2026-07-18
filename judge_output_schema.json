@@ -1,0 +1,141 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "FDE Judge Output",
+  "type": "object",
+  "required": ["session_id", "scenario_id", "trigger_log", "dimensions", "disqualifiers", "weighted_total", "weights_used", "normalized_score", "band", "band_capped_by_disqualifier", "low_coverage", "red_flags", "coaching"],
+  "additionalProperties": false,
+  "properties": {
+    "session_id": { "type": "string" },
+    "scenario_id": { "type": "string" },
+    "insufficient_session": {
+      "type": "boolean",
+      "description": "True only when the transcript has no scorable candidate content."
+    },
+    "trigger_log": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["trigger_id", "fired"],
+        "additionalProperties": false,
+        "properties": {
+          "trigger_id": { "type": "string" },
+          "fired": { "type": "boolean" },
+          "first_turn": { "type": ["integer", "null"], "minimum": 0 }
+        }
+      }
+    },
+    "dimensions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "name", "weight", "opportunity_present", "score", "evidence", "response_type"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string", "pattern": "^D[1-8]$" },
+          "name": { "type": "string" },
+          "weight": { "type": "number", "enum": [1.0, 1.5] },
+          "opportunity_present": { "type": "boolean" },
+          "score": {
+            "type": ["number", "null"],
+            "minimum": 1,
+            "maximum": 5,
+            "description": "null iff opportunity_present is false. Half-points allowed."
+          },
+          "na_reason": { "type": ["string", "null"] },
+          "evidence": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["quote", "turn", "type"],
+              "additionalProperties": false,
+              "properties": {
+                "quote": { "type": "string", "maxLength": 400, "description": "Verbatim transcript text." },
+                "turn": { "type": "integer", "minimum": 0 },
+                "type": { "type": "string", "enum": ["skill", "miss", "recovery", "context"] }
+              }
+            }
+          },
+          "response_type": {
+            "type": ["string", "null"],
+            "enum": ["update", "defend", "deflect", "unaddressed", null]
+          }
+        }
+      }
+    },
+    "disqualifiers": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "triggered"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string", "pattern": "^DQ[0-9]+$" },
+          "triggered": { "type": "boolean" },
+          "evidence": {
+            "type": ["array", "null"],
+            "items": {
+              "type": "object",
+              "required": ["quote", "turn"],
+              "properties": { "quote": { "type": "string" }, "turn": { "type": "integer" } }
+            }
+          }
+        }
+      }
+    },
+    "weighted_total": { "type": ["number", "null"] },
+    "weights_used": { "type": ["number", "null"] },
+    "normalized_score": { "type": ["number", "null"], "minimum": 1.0, "maximum": 5.0 },
+    "band": {
+      "type": ["string", "null"],
+      "enum": ["strong_hire", "hire", "borderline", "no_hire", "strong_no_hire", null]
+    },
+    "band_capped_by_disqualifier": { "type": "boolean" },
+    "low_coverage": {
+      "type": "boolean",
+      "description": "True when fewer than 5 dimensions were scorable."
+    },
+    "red_flags": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["flag", "turn"],
+        "additionalProperties": false,
+        "properties": {
+          "flag": { "type": "string" },
+          "turn": { "type": ["integer", "null"] },
+          "detail": { "type": ["string", "null"] }
+        }
+      }
+    },
+    "coaching": {
+      "type": "object",
+      "required": ["summary", "per_dimension", "strongest_moment", "costliest_moment"],
+      "additionalProperties": false,
+      "properties": {
+        "summary": { "type": "string" },
+        "per_dimension": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["dimension_id", "note"],
+            "additionalProperties": false,
+            "properties": {
+              "dimension_id": { "type": "string", "pattern": "^D[1-8]$" },
+              "note": { "type": "string" }
+            }
+          }
+        },
+        "strongest_moment": {
+          "type": "object",
+          "required": ["turn", "note"],
+          "properties": { "turn": { "type": "integer" }, "note": { "type": "string" } }
+        },
+        "costliest_moment": {
+          "type": "object",
+          "required": ["turn", "note"],
+          "properties": { "turn": { "type": "integer" }, "note": { "type": "string" } }
+        }
+      }
+    }
+  }
+}

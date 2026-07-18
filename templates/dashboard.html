@@ -227,11 +227,12 @@
 /* ── auth overlay (split layout) ── */
 #auth-overlay {
   position: fixed; inset: 0; z-index: 9999;
-  display: flex; align-items: stretch; justify-content: center;
+  display: none; align-items: stretch; justify-content: center;
   background: var(--bg);
   overflow: hidden;
   transition: opacity 0.35s ease;
 }
+#auth-overlay.show { display: flex; }
 #auth-overlay::before {
   content: '';
   position: absolute; inset: -40%;
@@ -1201,36 +1202,34 @@
   document.getElementById('auth-email').addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('auth-password').focus(); });
 
   /* On load: if no token, show overlay. If token but /api/me says legacy, hide overlay. */
+  function showAuthOverlay() {
+    authOverlay.classList.remove('hidden');
+    authOverlay.classList.add('show');
+    authOverlay.style.display = 'flex';
+    if (typeof authEmail !== 'undefined' && authEmail) authEmail.focus();
+  }
+
   (async function checkAuth() {
     try {
       const r = await fetch('/api/me');
       const data = await r.json();
-      if (data.mode === 'legacy') {
-        authOverlay.classList.add('hidden');
-        authOverlay.style.display = 'none';
-        return;
-      }
+      if (data.mode === 'legacy') return; // legacy: never show overlay
     } catch {}
 
     const token = localStorage.getItem('loop_token');
-    if (!token) { authOverlay.classList.remove('hidden'); authOverlay.style.display = ''; authEmail.focus(); return; }
+    if (!token) { showAuthOverlay(); return; }
 
     try {
       const r = await fetch('/api/me', { headers: { 'Authorization': 'Bearer ' + token } });
       const data = await r.json();
       if (data.user_id) {
-        authOverlay.classList.add('hidden');
-        authOverlay.style.display = 'none';
+        // valid session — keep overlay hidden
       } else {
         localStorage.removeItem('loop_token');
-        authOverlay.classList.remove('hidden');
-        authOverlay.style.display = '';
-        authEmail.focus();
+        showAuthOverlay();
       }
     } catch {
-      authOverlay.classList.remove('hidden');
-      authOverlay.style.display = '';
-      authEmail.focus();
+      showAuthOverlay();
     }
   })();
   </script>

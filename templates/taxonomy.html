@@ -36,7 +36,8 @@
   .tools { display: flex; flex-wrap: wrap; gap: 4px; }
   .tools span { padding: 2px 5px; background: var(--card-2); border-radius: 3px; font-size: 10px; color: var(--accent-2); }
   /* auth overlay */
-  #auth-overlay { position: fixed; inset: 0; z-index: 9999; display: flex; align-items: stretch; justify-content: center; background: var(--bg); overflow: hidden; transition: opacity 0.35s ease; }
+  #auth-overlay { position: fixed; inset: 0; z-index: 9999; display: none; align-items: stretch; justify-content: center; background: var(--bg); overflow: hidden; transition: opacity 0.35s ease; }
+  #auth-overlay.show { display: flex; }
   #auth-overlay::before { content: ''; position: absolute; inset: -40%; background: radial-gradient(40% 40% at 30% 30%, rgba(124,108,246,0.18), transparent 70%), radial-gradient(45% 45% at 70% 60%, rgba(94,230,216,0.12), transparent 70%), radial-gradient(35% 35% at 50% 80%, rgba(34,197,94,0.10), transparent 70%); filter: blur(20px); animation: authAurora 18s ease-in-out infinite alternate; pointer-events: none; }
   @keyframes authAurora { 0% { transform: translate(0,0) rotate(0deg) scale(1); } 50% { transform: translate(4%, -3%) rotate(8deg) scale(1.08); } 100% { transform: translate(-3%, 4%) rotate(-6deg) scale(1.04); } }
   #auth-overlay.hidden { opacity: 0; pointer-events: none; }
@@ -149,7 +150,8 @@ async function authSubmit() { const email = authEmail.value.trim(); const passwo
 async function testLogin(fresh) { authSubmitBtn.disabled = true; authError.classList.remove('show'); try { const r = await fetch('/api/test-login' + (fresh ? '?fresh=1' : ''), {method: 'POST'}); const data = await r.json(); if (!r.ok || data.error) { authShowError(data.error || 'Test login failed.'); authSubmitBtn.disabled = false; return; } if (data.access_token) localStorage.setItem('loop_token', data.access_token); authOverlay.classList.add('hidden'); setTimeout(() => { authOverlay.style.display = 'none'; location.reload(); }, 400); } catch (e) { authShowError('Network error \u2014 try again.'); authSubmitBtn.disabled = false; } }
 document.getElementById('auth-password').addEventListener('keydown', e => { if (e.key === 'Enter') authSubmit(); });
 document.getElementById('auth-email').addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('auth-password').focus(); });
-(async function checkAuth() { try { const r = await fetch('/api/me'); const data = await r.json(); if (data.mode === 'legacy') { authOverlay.classList.add('hidden'); authOverlay.style.display = 'none'; return; } } catch {} const token = localStorage.getItem('loop_token'); if (!token) { authOverlay.classList.remove('hidden'); authOverlay.style.display = ''; authEmail.focus(); return; } try { const r = await fetch('/api/me', { headers: { 'Authorization': 'Bearer ' + token } }); const data = await r.json(); if (data.user_id) { authOverlay.classList.add('hidden'); authOverlay.style.display = 'none'; } else { localStorage.removeItem('loop_token'); authOverlay.classList.remove('hidden'); authOverlay.style.display = ''; authEmail.focus(); } } catch { authOverlay.classList.remove('hidden'); authOverlay.style.display = ''; authEmail.focus(); } })();
+function showAuthOverlay() { authOverlay.classList.remove('hidden'); authOverlay.classList.add('show'); authOverlay.style.display = 'flex'; if (typeof authEmail !== 'undefined' && authEmail) authEmail.focus(); }
+(async function checkAuth() { try { const r = await fetch('/api/me'); const data = await r.json(); if (data.mode === 'legacy') return; } catch {} const token = localStorage.getItem('loop_token'); if (!token) { showAuthOverlay(); return; } try { const r = await fetch('/api/me', { headers: { 'Authorization': 'Bearer ' + token } }); const data = await r.json(); if (data.user_id) { /* valid session */ } else { localStorage.removeItem('loop_token'); showAuthOverlay(); } } catch { showAuthOverlay(); } })();
 </script>
 </body>
 </html>

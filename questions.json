@@ -4845,5 +4845,53 @@
       "Operations: self-serve access request workflow with automated approval for low-sensitivity data and manual approval for PII, all recorded in the audit log",
       "Failure mode: what happens when a new table lands without a classification tag \u2014 deny-by-default prevents access, so a 'quarantine zone' with temporary 48-hour auto-access during classification processing"
     ]
+  },
+  {
+    "id": "decomposition-1",
+    "lang": "decomposition",
+    "track": "fde",
+    "title": "Legacy Hospital Data Migration",
+    "difficulty": "Hard",
+    "prompt": "A large hospital chain has 20 years of patient data locked in an on-prem SQL Server. They want to use your company's AI platform to predict 30-day readmission risk, but they have zero cloud presence, extreme HIPAA constraints, and their IT team is actively hostile to cloud migration. They also say all data must stay within EU borders. Walk me through how you'd approach this engagement \u2014 your first 30 days."
+  },
+  {
+    "id": "decomposition-2",
+    "lang": "decomposition",
+    "track": "fde",
+    "title": "5PB Ingestion Emergency",
+    "difficulty": "Hard",
+    "prompt": "A financial regulator calls in a panic. They have 5PB of trading data on-prem in a mix of flat files and legacy Oracle databases. They need it queryable in BigQuery within 48 hours for an emergency investigation. Internet bandwidth is limited to 100Mbps. They also need the data encrypted at rest and access-logged for compliance. Walk me through how you'd architect this and what you'd do in the first 48 hours."
+  },
+  {
+    "id": "decomposition-3",
+    "lang": "decomposition",
+    "track": "fde",
+    "title": "Real-Time Fraud Detection at a Bank",
+    "difficulty": "Hard",
+    "prompt": "A bank wants real-time fraud detection with sub-100ms latency using LLMs. Their current system uses a rules engine and misses sophisticated attacks. They want an AI-powered upgrade but cannot tolerate false positives slowing down legitimate transactions. They have real-time transaction streams from multiple channels (web, mobile, POS), a data lake in GCP, and a strict audit trail requirement. How would you approach decomposing and solving this problem?"
+  },
+  {
+    "id": "decomposition-4",
+    "lang": "decomposition",
+    "track": "fde",
+    "title": "Enterprise PDF Knowledge Base",
+    "difficulty": "Medium",
+    "prompt": "A financial services firm has 100,000+ PDFs of internal research, analyst reports, and regulatory filings \u2014 all unstructured, with tables, footnotes, and scanned documents. They want an internal 'assistant' that analysts can ask questions against, but every answer must be grounded in source documents and citable. They have strict compliance requirements: no data can leave their GCP project, and all queries must be auditable. Walk me through how you would approach this problem."
+  },
+  {
+    "id": "decomposition-5",
+    "lang": "decomposition",
+    "track": "fde",
+    "title": "Tactical Edge AI for Defense",
+    "difficulty": "Hard",
+    "prompt": "A defense client wants to deploy computer vision models on drones and ground vehicles operating in environments with intermittent or zero internet connectivity. The models need to detect and classify objects from satellite and drone imagery in near-real-time. Bandwidth is extremely limited, and model updates must be delivered via physical media. The client also needs the system to work without any cloud dependency once deployed. How would you approach this problem \u2014 from architecture to deployment to ongoing operations?"
+  },
+  {
+    "id": "decomposition-6",
+    "lang": "decomposition",
+    "track": "fde",
+    "title": "Manufacturing Supply Chain AI",
+    "difficulty": "Medium",
+    "prompt": "An automotive manufacturer wants to use your AI platform to optimize their global supply chain \u2014 predicting part shortages, rerouting shipments, and flagging supplier risk. They have ERP data in SAP, real-time IoT feeds from factory floors, supplier emails in Outlook, and Excel sheets that 'run the business.' Their IT landscape is a mix of on-prem and GCP, and different regions have different data sovereignty rules. How would you decompose this engagement and sequence the work?"
   }
 ]

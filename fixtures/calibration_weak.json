@@ -1,0 +1,46 @@
+{
+  "session_id": "cal_weak_001",
+  "scenario_id": "decomp_hospital_readmission",
+  "gold_label_note": "Derived from Transcript C (strong no hire, 11/50, three disqualifiers). Tests judge scores response-to-pushback rather than fluency.",
+  "turns": [
+    {"turn": 0, "role": "client", "text": "Thanks for making time. Here's our situation: we've got 20 years of patient data in an on-prem SQL Server, and leadership wants to use your AI platform to predict 30-day readmission risk. Fair warning — we have zero cloud presence, extreme HIPAA constraints, our IT team is openly hostile to anything cloud-shaped, and all data has to stay within EU borders. Where would you start?"},
+    {"turn": 1, "role": "candidate", "text": "Great use case — readmission risk is one of the highest-ROI applications of your kind of data. First step is getting the data somewhere we can actually work with it. I'd stand up an extraction pipeline from the SQL Server — a nightly job pushing to S3, and since you're EU, we'd use a bucket in eu-central-1, which takes care of the residency requirement. Our platform's tooling then sits on top of that. For HIPAA we'd execute a BAA, so the compliance side is covered from day one."},
+    {"turn": 2, "role": "client", "text": "I floated something like that past Markus, our IT director, last year. He didn't just say no — he was insulted. Two vendors have died on that hill already. Zero cloud presence wasn't a preference, it's a wall."},
+    {"turn": 3, "role": "candidate", "text": "I hear that a lot, and it's usually a perception problem more than a technical one. A VPC with a site-to-site VPN tunnel is effectively an extension of your own network — from a security standpoint it's basically the same as on-prem, just with better tooling. Once Markus sees our security whitepaper and our SOC 2 and ISO 27001 certifications, that objection tends to resolve itself. These certifications exist precisely so IT teams don't have to take our word for it."},
+    {"turn": 4, "role": "client", "text": "I don't think you heard me. Zero cloud. All data stays inside our buildings, inside Germany. And we're a German company — our DPO cares about GDPR, not HIPAA. Can you walk me through the 30 days under those conditions?"},
+    {"turn": 5, "role": "candidate", "text": "Sure — and HIPAA is the gold standard for health privacy, so if we're HIPAA-clean we'll satisfy GDPR too; the EU side is really handled by region choice anyway. The 30 days: week one, data migration and environment setup. Week two, feature engineering — demographics, diagnoses, prior admissions — and an XGBoost model, since readmission is a classic tabular problem; we could also embed the clinical notes with an LLM for extra signal. Week three, tuning — I'd target 0.85-plus AUROC, which is very achievable with this data volume. Week four, deploy behind an API and hand off. Thirty days, production readmission model. The modeling honestly isn't the risk; the bottleneck is the migration."},
+    {"turn": 6, "role": "client", "text": "Twenty years, all of it — that's our crown jewel. Though I should mention we switched EHR systems in 2016 and acquired two hospitals in 2019. Does any of that matter? And how do you validate the model?"},
+    {"turn": 7, "role": "candidate", "text": "It's mostly a formatting issue — older records will have missing fields and inconsistent codes, so we impute or drop those rows during cleaning. More data is more signal; I'd use all twenty years. For validation, standard 80/20 random split with cross-validation for robustness. With your volume, overfitting isn't a concern."},
+    {"turn": 8, "role": "client", "text": "A colleague who does data science told me random splits are dangerous with patient data — same patient on both sides of the split. Should that worry me?"},
+    {"turn": 9, "role": "candidate", "text": "That's what cross-validation is for — it averages across folds, so any leakage effect washes out. AUROC is the standard metric for this class of problem, so that's what we'd report; if your team wants additional metrics we can add them after the initial delivery. I'd really keep the focus on the migration timeline — that's the long pole."},
+    {"turn": 10, "role": "client", "text": "OK. Who uses these predictions on a Tuesday morning? What do my discharge planners do with a 0.85 AUROC?"},
+    {"turn": 11, "role": "candidate", "text": "That's really on your side of the fence. We deliver risk scores through an API and a dashboard; your clinical teams integrate them into their workflow however fits your operation. Our job is the platform and the model — we try not to prescribe hospital operations to hospitals."},
+    {"turn": 12, "role": "client", "text": "One more wall, then. I ran the data access question past Frau Keller, our DPO. No patient data — even pseudonymized — gets touched hands-on by anyone who isn't an employee. She can veto this project unilaterally. What's your plan that works with that?"},
+    {"turn": 13, "role": "candidate", "text": "Then I'd escalate to Dr. Weber's office, frankly. At some point your organization has to decide whether it wants this project. If legal keeps blocking data access, there isn't much an engineer can do — it becomes a commercial conversation. What usually unblocks these situations is a waiver or an NDA that covers our engineers as if they were staff; we've used that structure before."},
+    {"turn": 14, "role": "client", "text": "Last questions. Anything regulatory or fairness-related we should worry about, putting an AI risk score into EU clinical care? And your sales team promised us a production model in 30 days — realistic?"},
+    {"turn": 15, "role": "candidate", "text": "On regulatory, we'd follow whatever your legal team and ours conclude — that's their lane. On fairness, the clean solution is to drop sensitive attributes like race and gender from the feature set; then the model can't discriminate on them, and beyond that the data is what it is. And yes — production in 30 days is realistic with good data access. The modeling is a week of actual work; the rest is plumbing. If the migration slips it might be 45 days, but I wouldn't walk back the promise. That's what you bought, and we should deliver it."}
+  ],
+  "expected": {
+    "band": "strong_no_hire",
+    "band_tolerance": ["strong_no_hire", "no_hire"],
+    "normalized_score_range": [1.0, 1.8],
+    "disqualifiers_triggered_min": ["DQ1", "DQ2"],
+    "disqualifiers_triggered_expected": ["DQ1", "DQ2", "DQ3", "DQ4"],
+    "trigger_assertions": {
+      "T1_jurisdiction": true, "T2_cloud_egress": true, "T3_dpo_block": true,
+      "T4_data_history": true, "T5_overpromise": true, "T6_metrics_translation": true
+    },
+    "dimension_assertions": {
+      "D1": {"min": 1, "max": 1.5, "note": "HIPAA-supersedes-GDPR claim AFTER correction at turn 4."},
+      "D2": {"min": 1, "max": 1.5, "note": "S3 then VPN-equivalence defended after relayed refusal — DQ1 territory."},
+      "D3": {"min": 1, "max": 1.5, "note": "Whitepaper playbook; DPO via waiver/NDA — DQ3."},
+      "D4": {"min": 1, "max": 1.5, "note": "Random split defended after explicit leakage challenge at turn 8; 'more data is more signal' post-T4."},
+      "D5": {"min": 1, "max": 1.5, "note": "AUROC in a vacuum; workflow 'on your side of the fence'."},
+      "D6": {"min": 1, "max": 1.5, "note": "Legal-will-tell-us; column-dropping fairness fallacy."},
+      "D7": {"min": 1, "max": 1.5, "note": "Recommits to production-in-30 after pushback — DQ4."},
+      "D8": {"min": 1, "max": 2.5, "note": "Fluent delivery, zero updates. Judge must not convert fluency to score."}
+    },
+    "response_type_assertion": "No fired reactive/belief trigger may be classified 'update'.",
+    "red_flags_must_contain_any": ["DQ1", "DQ2", "rushed_to_solution"]
+  }
+}

@@ -1016,11 +1016,12 @@
   /* ── login overlay (split layout) ── */
   #auth-overlay {
     position: fixed; inset: 0; z-index: 9999;
-    display: flex; align-items: stretch; justify-content: center;
+    display: none; align-items: stretch; justify-content: center;
     background: var(--bg);
     overflow: hidden;
     transition: opacity 0.35s ease;
   }
+  #auth-overlay.show { display: flex; }
   /* subtle drifting aurora behind everything */
   #auth-overlay::before {
     content: '';
@@ -1260,7 +1261,7 @@
   <button class="btn btn-ghost" style="margin-left: 8px;" onclick="startMockLoop()" title="Chain a SQL/Python, design, and tradeoff question into one continuous mock interview">🔁 Mock interview</button>
   <a href="/dashboard" style="color: var(--text-dim); text-decoration: none; font-size: 13px;">Diagnose</a>
   <a href="/taxonomy" style="color: var(--text-dim); text-decoration: none; font-size: 13px; margin-left: 10px;">Taxonomy</a>
-  <a href="#" onclick="event.preventDefault(); localStorage.removeItem('loop_token'); document.getElementById('auth-overlay').classList.remove('hidden'); document.getElementById('auth-overlay').style.display=''; document.getElementById('auth-email').focus();" style="color: var(--text-dim); text-decoration: none; font-size: 12px; margin-left: 10px; opacity:0.6;" title="Log out">Logout</a>
+  <a href="#" onclick="event.preventDefault(); localStorage.removeItem('loop_token'); showAuthOverlay();" style="color: var(--text-dim); text-decoration: none; font-size: 12px; margin-left: 10px; opacity:0.6;" title="Log out">Logout</a>
 </div>
 <div id="mock-loop-bar" style="display:none; align-items:center; gap:10px; padding:8px 24px; background:var(--panel); border-bottom:1px solid var(--border); font-size:13px;">
   <span id="mock-loop-label"></span>
@@ -1359,9 +1360,9 @@
               <button class="btn btn-ghost" id="more-drills-btn" onclick="toggleDrillsMenu()" title="Pressure & interview drills"><svg class="icon" viewBox="0 0 24 24"><use href="#i-more"/></svg>More drills</button>
               <div class="drills-menu" id="drills-menu">
                 <div class="dm-group">Pressure drills</div>
-                <button class="dm-item" onclick="startSpotBug()"><svg class="icon" viewBox="0 0 24 24"><use href="#i-bug"/></svg>Spot the bug</button>
+                <button class="dm-item" id="spotbug-menu" onclick="startSpotBug()"><svg class="icon" viewBox="0 0 24 24"><use href="#i-bug"/></svg>Spot the bug</button>
                 <button class="dm-item" id="clarify-menu" onclick="toggleSqlClarify()"><svg class="icon" viewBox="0 0 24 24"><use href="#i-target"/></svg>Clarify first</button>
-                <button class="dm-item" onclick="startCurveball()"><svg class="icon" viewBox="0 0 24 24"><use href="#i-zap"/></svg>Curveball</button>
+                <button class="dm-item" id="curveball-menu" onclick="startCurveball()"><svg class="icon" viewBox="0 0 24 24"><use href="#i-zap"/></svg>Curveball</button>
                 <button class="dm-item" id="twist-menu" onclick="askTwist()" disabled><svg class="icon" viewBox="0 0 24 24"><use href="#i-repeat"/></svg>Twist</button>
                 <button class="dm-item" id="dryrun-menu" onclick="askDryRun()" disabled><svg class="icon" viewBox="0 0 24 24"><use href="#i-shoe"/></svg>Dry run</button>
                 <button class="dm-item" id="reverse-menu" onclick="startReverse()" disabled><svg class="icon" viewBox="0 0 24 24"><use href="#i-mask"/></svg>Be the interviewer</button>
@@ -2785,6 +2786,7 @@ async function loadList() {
     {lang: 'python', label: 'Python'},
     {lang: 'design', label: 'System Design'},
     {lang: 'tradeoff', label: 'Tradeoff Drills'},
+    {lang: 'decomposition', label: 'FDE Decomposition'},
   ];
 
   groups.forEach(({lang, label}) => {
@@ -2811,7 +2813,7 @@ async function loadList() {
 
       const badge = document.createElement('span');
       badge.className = 'q-lang-badge ' + q.lang;
-      badge.textContent = {sql: 'SQL', python: 'PY', design: 'SYS', tradeoff: 'T/O'}[q.lang];
+      badge.textContent = {sql: 'SQL', python: 'PY', design: 'SYS', tradeoff: 'T/O', decomposition: 'FDE'}[q.lang];
 
       const title = document.createElement('span');
       title.className = 'q-title';
@@ -2845,7 +2847,7 @@ async function loadList() {
   // hint to browse all when everything's collapsed away
   const browseHint = document.createElement('div');
   browseHint.className = 'q-browse-hint';
-  browseHint.innerHTML = 'Sections collapse as you clear them — use the filter above to browse all 202.';
+  browseHint.innerHTML = 'Sections collapse as you clear them — use the filter above to browse all 201.';
   sb.appendChild(browseHint);
 
   updateProgress();
@@ -2891,7 +2893,7 @@ function selectQuestion(el, id) {
   document.querySelectorAll('.q-item.active').forEach(x => x.classList.remove('active'));
   el.classList.add('active');
   loadQuestion(id);
-  if (current && current.lang === 'design' && !micOn) setMicOn(true);
+  if (current && (current.lang === 'design' || current.lang === 'decomposition') && !micOn) setMicOn(true);
 }
 
 async function startPractice(lane) {
@@ -2907,7 +2909,7 @@ async function startPractice(lane) {
     if (el) { selectQuestion(el, res.id); }
     else { await loadQuestion(res.id); }
     const q = QUESTIONS[res.id] || current;
-    if (q && q.lang === 'design' && !micOn) setMicOn(true);
+    if (q && (q.lang === 'design' || q.lang === 'decomposition') && !micOn) setMicOn(true);
   } catch (e) {
     showToast('Could not start practice: ' + e.message);
   } finally {
@@ -3058,23 +3060,25 @@ async function loadQuestion(id) {
   renderQuestionContext(q.context);
   const langBadge = document.getElementById('lang-badge');
   langBadge.className = 'badge ' + q.lang;
-  langBadge.textContent = {sql: 'SQL', python: 'PYTHON', design: 'SYSTEM DESIGN', tradeoff: 'TRADEOFF'}[q.lang];
+  langBadge.textContent = {sql: 'SQL', python: 'PYTHON', design: 'SYSTEM DESIGN', tradeoff: 'TRADEOFF', decomposition: 'FDE DECOMPOSITION'}[q.lang];
 
   const isDesign = q.lang === 'design';
+  const isDecomposition = q.lang === 'decomposition';
   const isTradeoff = q.lang === 'tradeoff';
-  document.getElementById('editor-card').style.display = (isDesign || isTradeoff) ? 'none' : '';
-  document.getElementById('concept-box').style.display = (isDesign || isTradeoff) ? 'none' : '';
-  if (isDesign || isTradeoff) document.getElementById('concept-mapper').style.display = 'none';
-  if (isDesign || isTradeoff) document.getElementById('sample').style.display = 'none';
-  document.getElementById('results').style.display = (isDesign || isTradeoff) ? 'none' : '';
-  document.getElementById('design-canvas-card').style.display = isDesign ? 'flex' : 'none';
-  document.getElementById('wrapup-btn').style.display = isDesign ? '' : 'none';
+  const isDrill = isDesign || isDecomposition;
+  document.getElementById('editor-card').style.display = (isDrill || isTradeoff) ? 'none' : '';
+  document.getElementById('concept-box').style.display = (isDrill || isTradeoff) ? 'none' : '';
+  if (isDrill || isTradeoff) document.getElementById('concept-mapper').style.display = 'none';
+  if (isDrill || isTradeoff) document.getElementById('sample').style.display = 'none';
+  document.getElementById('results').style.display = (isDrill || isTradeoff) ? 'none' : '';
+  document.getElementById('design-canvas-card').style.display = isDrill ? 'flex' : 'none';
+  document.getElementById('wrapup-btn').style.display = isDrill ? '' : 'none';
   document.getElementById('clarify-btn').style.display = isDesign ? '' : 'none';
   document.getElementById('adversarial-btn').style.display = isDesign ? '' : 'none';
   document.getElementById('incident-btn').style.display = isDesign ? '' : 'none';
   document.getElementById('scaling-btn').style.display = isDesign ? '' : 'none';
   document.getElementById('framework-btn').style.display = isDesign ? '' : 'none';
-  document.getElementById('replay-btn').style.display = isDesign ? '' : 'none';
+  document.getElementById('replay-btn').style.display = isDrill ? '' : 'none';
   document.getElementById('end-drill-btn').style.display = 'none';
   document.getElementById('selfrate-panel').style.display = 'none';
   document.getElementById('refdesign-btn').style.display = 'none';
@@ -3117,6 +3121,18 @@ async function loadQuestion(id) {
       scalingMode = false;
       chatlog.innerHTML = '';
       renderPersonaPicker('Pick an interviewer temperament to start:', PERSONA_OPTIONS, () => startInterview(id));
+    }
+    resetIdleTimer();
+    return;
+  }
+
+  if (isDecomposition) {
+    document.getElementById('trace-box').style.display = 'none';
+    document.getElementById('debrief-row').style.display = 'none';
+    startTimerFor(id);
+    const cached = stateCache[id];
+    if (cached) {
+      document.getElementById('chatlog').innerHTML = cached.chatHTML;
     }
     resetIdleTimer();
     return;
@@ -3982,7 +3998,8 @@ async function requestInterview(body) {
       method: 'POST', headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({...body, diagram: clarifyMode ? '' : serializeCanvasForLLM(), persona: selectedPersona,
                              adversarial: adversarialMode, flaws: adversarialFlaws, scaling: scalingMode || undefined,
-                             incident: incidentMode, incident_scenario: incidentScenario || undefined})
+                             incident: incidentMode, incident_scenario: incidentScenario || undefined,
+                             decomposition: current && current.lang === 'decomposition' || undefined})
     });
     const res = await r.json();
     if (!r.ok || res.error) {
@@ -4000,7 +4017,106 @@ async function requestInterview(body) {
           <div class="checklist-row">${res.communication_ok ? '✅' : '❌'} Communication: ${res.communication_ok ? 'kept stakeholders informed' : 'did not communicate effectively'}</div>`;
         textEl.appendChild(incidentEl);
       }
-      if (res.wrap_up && res.concept_taxonomy) {
+      if (res.wrap_up && res.decomposition) {
+        const j = res.judge;
+        if (j) {
+          // Red flags
+          if (j.red_flags && j.red_flags.length) {
+            j.red_flags.forEach(f => {
+              const el = document.createElement('div');
+              el.style.cssText = 'background:#fef2f2; border:1px solid #fca5a5; border-radius:6px; padding:8px 10px; margin-bottom:8px; color:#991b1b; font-size:13px; font-weight:600;';
+              const label = f.flag === 'rushed_to_solution' ? 'Rushed to solution' : f.flag;
+              el.textContent = '🚩 ' + label + (f.detail ? ': ' + f.detail : '');
+              textEl.appendChild(el);
+            });
+          }
+          // Band
+          const BAND_LABELS = {strong_hire: 'Strong Hire', hire: 'Hire', borderline: 'Borderline', no_hire: 'No Hire', strong_no_hire: 'Strong No Hire'};
+          const BAND_COLORS = {strong_hire: '#16a34a', hire: '#ca8a04', borderline: '#ea580c', no_hire: '#dc2626', strong_no_hire: '#991b1b'};
+          if (j.band) {
+            const bandEl = document.createElement('div');
+            bandEl.className = 'checklist-row';
+            bandEl.style.cssText = 'margin-top:6px; font-weight:700; font-size:15px; color:' + (BAND_COLORS[j.band] || '#333') + ';';
+            let capNote = j.band_capped_by_disqualifier ? ' (capped by disqualifier)' : '';
+            bandEl.textContent = (BAND_LABELS[j.band] || j.band) + capNote + ' — ' + (j.normalized_score ? j.normalized_score.toFixed(2) : '?') + '/5.0';
+            textEl.appendChild(bandEl);
+            if (j.low_coverage) {
+              const wEl = document.createElement('div');
+              wEl.style.cssText = 'color:#888; font-size:12px; margin-top:2px;';
+              wEl.textContent = '⚠ Low coverage — fewer than 5 dimensions were scorable. Score is advisory.';
+              textEl.appendChild(wEl);
+            }
+          }
+          // Dimensions
+          if (j.dimensions && j.dimensions.length) {
+            const dimWrap = document.createElement('div');
+            dimWrap.className = 'debrief-checklist';
+            dimWrap.innerHTML = '<div style="font-weight:600; margin-bottom:4px;">Judge Rubric</div>';
+            j.dimensions.forEach(d => {
+              const sc = d.score != null ? d.score + '/5' : 'N/A';
+              const wt = ' (×' + d.weight + ')';
+              const rt = d.response_type ? ' [' + d.response_type + ']' : '';
+              const bg = d.opportunity_present ? '' : 'background:#f5f5f5;';
+              const row = document.createElement('div');
+              row.className = 'checklist-row';
+              row.style.cssText = bg + 'margin:2px 0;';
+              row.innerHTML = '<span><strong>' + d.id + '</strong> ' + d.name + wt + ': ' + sc + rt + '</span>';
+              // Evidence toggle
+              if (d.evidence && d.evidence.length) {
+                const evBtn = document.createElement('span');
+                evBtn.style.cssText = 'color:#666; cursor:pointer; font-size:11px; margin-left:6px;';
+                evBtn.textContent = '📋';
+                evBtn.onclick = () => {
+                  const evDiv = row.querySelector('.ev-detail');
+                  if (evDiv) { evDiv.style.display = evDiv.style.display === 'none' ? '' : 'none'; return; }
+                  const ed = document.createElement('div');
+                  ed.className = 'ev-detail';
+                  ed.style.cssText = 'font-size:11px; color:#555; margin:4px 0 0 12px; padding:4px 8px; background:#f9f9f9; border-radius:4px;';
+                  ed.innerHTML = d.evidence.map(e => '<div style="margin:2px 0"><em>[t' + e.turn + ' ' + e.type + ']</em> "' + e.quote + '"</div>').join('');
+                  row.appendChild(ed);
+                };
+                row.appendChild(evBtn);
+              }
+              dimWrap.appendChild(row);
+            });
+            textEl.appendChild(dimWrap);
+          }
+          // Coaching
+          if (j.coaching) {
+            const coachWrap = document.createElement('div');
+            coachWrap.style.cssText = 'margin-top:10px; padding:8px 10px; background:#f0f7ff; border:1px solid #bfdbfe; border-radius:6px;';
+            coachWrap.innerHTML = '<div style="font-weight:600; margin-bottom:4px;">📝 Coaching</div>';
+            if (j.coaching.summary) {
+              const sum = document.createElement('div');
+              sum.style.cssText = 'font-size:13px; margin-bottom:6px;';
+              sum.textContent = j.coaching.summary;
+              coachWrap.appendChild(sum);
+            }
+            if (j.coaching.per_dimension && j.coaching.per_dimension.length) {
+              j.coaching.per_dimension.forEach(pd => {
+                const row = document.createElement('div');
+                row.style.cssText = 'font-size:12px; margin:2px 0;';
+                row.innerHTML = '<strong>' + pd.dimension_id + ':</strong> ' + pd.note;
+                coachWrap.appendChild(row);
+              });
+            }
+            if (j.coaching.strongest_moment) {
+              const s = document.createElement('div');
+              s.style.cssText = 'font-size:12px; margin-top:4px; color:#166534;';
+              s.innerHTML = '⭐ <strong>Strongest:</strong> turn ' + j.coaching.strongest_moment.turn + ' — ' + j.coaching.strongest_moment.note;
+              coachWrap.appendChild(s);
+            }
+            if (j.coaching.costliest_moment) {
+              const c = document.createElement('div');
+              c.style.cssText = 'font-size:12px; margin-top:2px; color:#991b1b;';
+              c.innerHTML = '💸 <strong>Costliest:</strong> turn ' + j.coaching.costliest_moment.turn + ' — ' + j.coaching.costliest_moment.note;
+              coachWrap.appendChild(c);
+            }
+            textEl.appendChild(coachWrap);
+          }
+        }
+      }
+      if (res.wrap_up && res.concept_taxonomy && !res.decomposition) {
         renderDebriefChecklist(textEl, res.missed_concepts || [], res.concept_taxonomy, res.self_rated || []);
         renderCommunicationScore(textEl, res.communication_score, res.communication_note);
         renderVerdict(textEl, res.verdict);
@@ -4072,6 +4188,14 @@ function wrapUpInterview() {
   clearPacingNudge();
   stopFrameworkMode();
   const panel = document.getElementById('selfrate-panel');
+  if (current && current.lang === 'decomposition') {
+    panel.style.display = 'none';
+    document.getElementById('wrapup-btn').style.display = 'none';
+    addMsg('system', 'Decomposition wrap-up requested');
+    requestInterview({question_id: current.id, wrap_up: true, decomposition: true});
+    resetIdleTimer();
+    return;
+  }
   const opts = document.getElementById('selfrate-options');
   opts.innerHTML = '';
   const taxonomy = CONCEPT_TAXONOMIES[(current && current.track) || 'data'];
@@ -4361,14 +4485,15 @@ function endClarifyDrill() {
 // ponytail: reuses parseDiagramLines (already built for reference-design + adversarial-mode)
 // to redraw each snapshot — no new diagram rendering code needed.
 async function startReplay() {
-  const r = await fetch(`/api/interview-history?question_id=${encodeURIComponent(current.id)}&adversarial=${adversarialMode ? '1' : '0'}&requirements_only=${clarifyMode ? '1' : '0'}&incident=${incidentMode ? '1' : '0'}`);
+  const isDecomp = current && current.lang === 'decomposition';
+  const r = await fetch(`/api/interview-history?question_id=${encodeURIComponent(current.id)}&adversarial=${adversarialMode ? '1' : '0'}&requirements_only=${clarifyMode ? '1' : '0'}&incident=${incidentMode ? '1' : '0'}&decomposition=${isDecomp ? '1' : '0'}`);
   const res = await r.json();
   replayTurns = res.turns || [];
   if (!replayTurns.length) {
     addMsg('tutor', 'Nothing to replay yet — have a few exchanges first.');
     return;
   }
-  const cr = await fetch(`/api/replay-comments?question_id=${encodeURIComponent(current.id)}&adversarial=${adversarialMode ? '1' : '0'}&requirements_only=${clarifyMode ? '1' : '0'}&incident=${incidentMode ? '1' : '0'}`);
+  const cr = await fetch(`/api/replay-comments?question_id=${encodeURIComponent(current.id)}&adversarial=${adversarialMode ? '1' : '0'}&requirements_only=${clarifyMode ? '1' : '0'}&incident=${incidentMode ? '1' : '0'}&decomposition=${isDecomp ? '1' : '0'}`);
   replayComments = (await cr.json()).comments || [];
   window.speechSynthesis && window.speechSynthesis.cancel();
   clearPacingNudge();
@@ -4820,8 +4945,7 @@ async function authSubmit() {
     if (data.access_token) {
       localStorage.setItem('loop_token', data.access_token);
     }
-    authOverlay.classList.add('hidden');
-    authOverlay.style.display = 'none';
+    hideAuthOverlay();
   } catch (e) {
     authShowError('Network error — try again.');
   } finally {
@@ -4837,8 +4961,7 @@ async function testLogin(fresh) {
     const data = await r.json();
     if (!r.ok || data.error) { authShowError(data.error || 'Test login failed.'); authSubmitBtn.disabled = false; return; }
     if (data.access_token) localStorage.setItem('loop_token', data.access_token);
-    authOverlay.classList.add('hidden');
-    authOverlay.style.display = 'none';
+    hideAuthOverlay();
     if (data.fresh) setTimeout(() => location.reload(), 500);
   } catch (e) { authShowError('Network error — try again.'); authSubmitBtn.disabled = false; }
 }
@@ -4847,31 +4970,40 @@ async function testLogin(fresh) {
 document.getElementById('auth-password').addEventListener('keydown', e => { if (e.key === 'Enter') authSubmit(); });
 document.getElementById('auth-email').addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('auth-password').focus(); });
 
-// On load: check existing token → skip login if valid; skip overlay entirely in legacy mode
+// Overlay is hidden by default (CSS). Only SHOW it when auth is genuinely required —
+// this prevents the login screen from flashing on every page load.
+function showAuthOverlay() {
+  authOverlay.classList.remove('hidden');
+  authOverlay.classList.add('show');
+  authOverlay.style.display = 'flex';
+  authEmail.focus();
+}
+
+function hideAuthOverlay() {
+  authOverlay.classList.remove('show');
+  authOverlay.classList.add('hidden');
+  authOverlay.style.display = 'none';
+}
+
 (async function checkAuth() {
   try {
     const r = await fetch('/api/me');
     const data = await r.json();
-    if (data.mode === 'legacy') {
-      authOverlay.classList.add('hidden');
-      authOverlay.style.display = 'none';
-      return;
-    }
-  } catch { /* Supabase may be unreachable — still show overlay */ }
+    if (data.mode === 'legacy') return; // legacy: never show overlay
+  } catch { /* Supabase unreachable — fall through to token check */ }
 
   const token = localStorage.getItem('loop_token');
-  if (!token) { authEmail.focus(); return; }
+  if (!token) { showAuthOverlay(); return; }
   try {
     const r2 = await fetch('/api/me', { headers: {'Authorization': 'Bearer ' + token} });
     const data2 = await r2.json();
     if (data2.user_id) {
-      authOverlay.classList.add('hidden');
-      authOverlay.style.display = 'none';
+      // valid session — keep overlay hidden
     } else {
       localStorage.removeItem('loop_token');
-      authEmail.focus();
+      showAuthOverlay();
     }
-  } catch { authEmail.focus(); }
+  } catch { showAuthOverlay(); }
 })();
 
 async function loadDeadline() {

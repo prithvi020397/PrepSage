@@ -8,6 +8,7 @@ import sqlite3
 import subprocess
 import tempfile
 import time
+import yaml
 from datetime import datetime, timedelta
 from io import BytesIO
 
@@ -497,6 +498,25 @@ WAR_STORIES_AI = {
     "agent_loop_termination": "a multi-step agent had no max-iteration or progress check, so when one tool call kept returning an error it hadn't seen before, it retried the same failing action in a loop until the session timed out",
 }
 
+# ponytail: FDE (Forward Deployed Engineer) taxonomy — concepts tested in decomposition /
+# open-ended case-study rounds. Selected via q["track"] == "fde".
+CONCEPT_TAXONOMY_FDE = [
+    "ambiguous_problem_scoping", "stakeholder_mapping_alignment",
+    "production_deployment_strategy", "legacy_enterprise_integration",
+    "failure_mode_risk_analysis", "iterative_delivery_mvp",
+    "data_integration_quality",
+]
+
+WAR_STORIES_FDE = {
+    "ambiguous_problem_scoping": "a team spent two months building a 'real-time fraud dashboard' before asking the stakeholder what decision it was meant to drive — turns out they needed a daily batch CSV emailed to a compliance officer, not a streaming viz",
+    "stakeholder_mapping_alignment": "an FDE got sign-off from the VP of Engineering but nobody told the IT security team, who blocked the VPC deployment on day one because they'd never been looped in on the compliance review",
+    "production_deployment_strategy": "a canary rollout pushed to 5% of users hit an undocumented rate limit on the customer's legacy ERP and took down order processing for that segment — the rollback plan existed but nobody had tested it",
+    "legacy_enterprise_integration": "a customer claimed their system had a 'REST API' — which turned out to be a SOAP endpoint wrapped in a custom HTTP adapter that dropped every fifth request with no error code",
+    "failure_mode_risk_analysis": "the deployment assumed the customer's Snowflake warehouse had <1s query latency, but the actual BI workload meant analytics queries queued for 45 seconds during business hours, breaking the real-time dashboard assumption",
+    "iterative_delivery_mvp": "a team spent six weeks building the 'perfect' data pipeline with exactly-once semantics and automatic failover, while the customer was manually emailing CSVs because they needed something — anything — working by week two",
+    "data_integration_quality": "a customer insisted their 12 data sources were 'clean and consistent' — the first integration pass found three different date formats, two different customer ID schemas, and one source that hadn't updated in 14 months",
+}
+
 BASELINE_RUBRIC_AI = [
     "Grounding: answers are grounded in retrieved/cited sources, with a defined behavior when there isn't enough context (say unsure/refuse vs hallucinate)",
     "Evals: there's a concrete offline eval set or regression harness that catches quality regressions before a prompt or model change ships",
@@ -504,21 +524,42 @@ BASELINE_RUBRIC_AI = [
     "Observability: production quality is monitored on an ongoing basis (e.g. logging retrieved context, tracking hallucination/refusal rates) rather than tested once offline",
 ]
 
+BASELINE_RUBRIC_FDE = [
+    "Scoping: asks clarifying questions about the actual goal, stakeholders, constraints, and success criteria before proposing anything",
+    "Decomposition: breaks the vague problem into concrete, separable workstreams sequenced by risk and value",
+    "Stakeholder awareness: identifies who needs to be involved, whose buy-in is needed, and how to navigate competing priorities",
+    "Iteration: proposes a thin walking-skeleton MVP before optimizing — ships fast, then hardens",
+    "Failure modes: names what could go wrong unprompted, proposes mitigations or fallback plans",
+    "Communication: narrates thinking continuously, structured walkthrough, doesn't go silent or jump between topics",
+]
+
 
 def taxonomy_for(q):
-    return CONCEPT_TAXONOMY_AI if q.get("track") == "ai" else CONCEPT_TAXONOMY
+    t = q.get("track")
+    if t == "ai": return CONCEPT_TAXONOMY_AI
+    if t == "fde": return CONCEPT_TAXONOMY_FDE
+    return CONCEPT_TAXONOMY
 
 
 def war_stories_for(q):
-    return WAR_STORIES_AI if q.get("track") == "ai" else WAR_STORIES
+    t = q.get("track")
+    if t == "ai": return WAR_STORIES_AI
+    if t == "fde": return WAR_STORIES_FDE
+    return WAR_STORIES
 
 
 def baseline_rubric_for(q):
-    return BASELINE_RUBRIC_AI if q.get("track") == "ai" else BASELINE_RUBRIC
+    t = q.get("track")
+    if t == "ai": return BASELINE_RUBRIC_AI
+    if t == "fde": return BASELINE_RUBRIC_FDE
+    return BASELINE_RUBRIC
 
 
 def persona_for(q):
-    return "senior AI/ML engineering interviewer" if q.get("track") == "ai" else "senior data engineering interviewer"
+    t = q.get("track")
+    if t == "ai": return "senior AI/ML engineering interviewer"
+    if t == "fde": return "senior forward deployed engineer interviewer"
+    return "senior data engineering interviewer"
 
 
 def pattern_for(q):
@@ -1263,7 +1304,7 @@ def practice():
     else:
         jd_context = ""
     return render_template("index.html",
-                           concept_taxonomies={"data": CONCEPT_TAXONOMY, "ai": CONCEPT_TAXONOMY_AI},
+                           concept_taxonomies={"data": CONCEPT_TAXONOMY, "ai": CONCEPT_TAXONOMY_AI, "fde": CONCEPT_TAXONOMY_FDE},
                            jd_context=jd_context,
                            jd_loaded=bool(jd))
 
@@ -2881,11 +2922,10 @@ def get_question(qid):
     q = QUESTIONS.get(qid)
     if not q:
         return jsonify({"error": "not found"}), 404
-    if q["lang"] in ("design", "tradeoff"):
-        # ponytail: no test_cases/starter_code for design/tradeoff questions, and the
-        # rubric/key_points/answer range are graded server-side only — never sent to the client
+    if q["lang"] in ("design", "tradeoff", "decomposition"):
+        # ponytail: no test_cases/starter_code for design/tradeoff/decomposition questions
         resp = {"id": q["id"], "lang": q["lang"], "title": q["title"], "prompt": q["prompt"]}
-        if q["lang"] == "design":
+        if q["lang"] in ("design", "decomposition"):
             resp["track"] = q.get("track", "data")
         if q["lang"] == "tradeoff":
             roll = TRADEOFF_ROLLS.get(q["id"])
@@ -3724,6 +3764,9 @@ def gen_trace():
         save_progress()
         return jsonify({"trace": pre["trace"], "pattern": pre["pattern"], "skeleton": pre["skeleton"], "solved": is_solved(q["id"])})
 
+    if q["lang"] in ("design", "tradeoff", "decomposition"):
+        return jsonify({"trace": [], "pattern": "", "skeleton": "", "solved": False})
+
     pattern_info = pattern_for(q)
     tc = q["test_cases"][0]
     sample_data = tc.get("harness", "") if q["lang"] == "python" else tc.get("schema_sql", "")
@@ -4109,7 +4152,135 @@ Rules:
    "incident_score": 1-5 (overall response quality),
    "triage_ok": true/false (did they check blast radius / logs first),
    "fix_choice_ok": true/false (did they choose the right fix or try to rebuild),
-   "communication_ok": true/false (did they communicate to stakeholders)."""
+    "communication_ok": true/false (did they communicate to stakeholders)."""
+
+DECOMPOSITION_RULES_FILE = os.path.join(os.path.dirname(__file__), "prompts", "decomposition.yaml")
+if os.path.exists(DECOMPOSITION_RULES_FILE):
+    with open(DECOMPOSITION_RULES_FILE) as f:
+        DECOMPOSITION_RULES = yaml.safe_load(f)["client_rules"]
+else:
+    DECOMPOSITION_RULES = ""
+
+# ---------------------------------------------------------------------------
+# Judge — post-hoc scoring model for decomposition sessions.
+# ---------------------------------------------------------------------------
+JUDGE_SYSTEM_PROMPT_FILE = os.path.join(os.path.dirname(__file__), "judge_system_prompt.md")
+JUDGE_OUTPUT_SCHEMA_FILE = os.path.join(os.path.dirname(__file__), "judge_output_schema.json")
+V2_SCENARIOS_FILE = os.path.join(os.path.dirname(__file__), "questions_hospital_scenario.json")
+
+JUDGE_SYSTEM_PROMPT = open(JUDGE_SYSTEM_PROMPT_FILE).read() if os.path.exists(JUDGE_SYSTEM_PROMPT_FILE) else ""
+JUDGE_OUTPUT_SCHEMA = json.load(open(JUDGE_OUTPUT_SCHEMA_FILE)) if os.path.exists(JUDGE_OUTPUT_SCHEMA_FILE) else {}
+V2_SCENARIOS = json.load(open(V2_SCENARIOS_FILE)) if os.path.exists(V2_SCENARIOS_FILE) else {}
+# Merge v2 scenarios into QUESTIONS so they're available through the same lookup
+QUESTIONS.update({k: v for k, v in V2_SCENARIOS.items() if v.get("lang") == "decomposition"})
+
+def run_judge(scenario_json, transcript_turns, session_id, scenario_id):
+    """Call the judge model (separate from the client simulation) to score a
+    completed decomposition session.
+
+    Parameters
+    ----------
+    scenario_json : dict
+        The full questions.json entry (persona + triggers + rubric for v2,
+        or just id/title/prompt for v1).
+    transcript_turns : list[dict]
+        Ordered turns with 'role' and 'text' keys.
+    session_id : str
+    scenario_id : str
+
+    Returns
+    -------
+    dict
+        Judge output conforming to judge_output_schema.json.
+    """
+    if not JUDGE_SYSTEM_PROMPT or not JUDGE_OUTPUT_SCHEMA:
+        return {"session_id": session_id, "scenario_id": scenario_id,
+                "insufficient_session": True, "band": None,
+                "normalized_score": None, "weighted_total": None,
+                "weights_used": None, "low_coverage": True,
+                "trigger_log": [], "dimensions": [], "disqualifiers": [],
+                "band_capped_by_disqualifier": False, "red_flags": [],
+                "coaching": {"summary": "Judge not configured.", "per_dimension": [],
+                             "strongest_moment": {"turn": 0, "note": ""},
+                             "costliest_moment": {"turn": 0, "note": ""}}}
+
+    # Build transcript JSON for the judge (only user/assistant turns that have text)
+    judge_transcript = []
+    for t in transcript_turns:
+        role = "candidate" if t["role"] == "user" else "client"
+        judge_transcript.append({"turn": t.get("turn", len(judge_transcript)),
+                                  "role": role, "text": t["content"][:2000]})
+
+    system = (JUDGE_SYSTEM_PROMPT
+              .replace("{scenario_json}", json.dumps(scenario_json, indent=2))
+              .replace("{transcript_json}", json.dumps(judge_transcript, indent=2))
+              .replace("{output_schema}", json.dumps(JUDGE_OUTPUT_SCHEMA, indent=2)))
+
+    try:
+        resp = client.chat.completions.create(
+            model=MODEL,
+            messages=[{"role": "system", "content": system},
+                      {"role": "user", "content": "Score this session. Output JSON only."}],
+            max_tokens=1500,
+            temperature=0,
+            extra_body={"reasoning": {"enabled": False}},
+        )
+        raw = resp.choices[0].message.content.strip()
+        # Strip markdown fences if present
+        if raw.startswith("```"):
+            raw = raw.split("\n", 1)[1] if "\n" in raw else raw[3:]
+            if raw.rstrip().endswith("```"):
+                raw = raw.rstrip()[:-3].strip()
+        result = json.loads(raw)
+    except Exception as e:
+        return {"session_id": session_id, "scenario_id": scenario_id,
+                "insufficient_session": True, "band": None,
+                "normalized_score": None, "weighted_total": None,
+                "weights_used": None, "low_coverage": True,
+                "trigger_log": [], "dimensions": [], "disqualifiers": [],
+                "band_capped_by_disqualifier": False, "red_flags": [],
+                "_judge_error": str(e),
+                "coaching": {"summary": f"Judge error: {e}", "per_dimension": [],
+                             "strongest_moment": {"turn": 0, "note": ""},
+                             "costliest_moment": {"turn": 0, "note": ""}}}
+
+    result.setdefault("session_id", session_id)
+    result.setdefault("scenario_id", scenario_id)
+    result.setdefault("insufficient_session", False)
+    result.setdefault("trigger_log", [])
+    result.setdefault("dimensions", [])
+    result.setdefault("disqualifiers", [])
+    result.setdefault("weighted_total", None)
+    result.setdefault("weights_used", None)
+    result.setdefault("normalized_score", None)
+    result.setdefault("band", None)
+    result.setdefault("band_capped_by_disqualifier", False)
+    result.setdefault("low_coverage", False)
+    result.setdefault("red_flags", [])
+    result.setdefault("coaching", {"summary": "", "per_dimension": [],
+                                    "strongest_moment": {"turn": 0, "note": ""},
+                                    "costliest_moment": {"turn": 0, "note": ""}})
+    return result
+
+
+# Standard judge rubric used for v1 questions (no per-scenario rubric).
+# Judge will score only `always_scorable` dimensions when triggers are empty.
+JUDGE_RUBRIC = {
+    "dimensions": [
+        {"id": "D1", "name": "Constraint discovery & clarification", "weight": 1.5, "always_scorable": True},
+        {"id": "D2", "name": "Architecture under hard constraints", "weight": 1.5, "always_scorable": True},
+        {"id": "D3", "name": "Stakeholder & trust management", "weight": 1.5, "always_scorable": False},
+        {"id": "D4", "name": "ML problem formulation", "weight": 1.5, "always_scorable": True},
+        {"id": "D5", "name": "Metrics tied to operations", "weight": 1.0, "always_scorable": False},
+        {"id": "D6", "name": "Regulatory & safety depth", "weight": 1.0, "always_scorable": True},
+        {"id": "D7", "name": "Scope realism & 30-day sequencing", "weight": 1.0, "always_scorable": False},
+        {"id": "D8", "name": "Communication & recovery", "weight": 1.0, "always_scorable": True},
+    ],
+    "disqualifiers": [
+        {"id": "DQ_generic", "description": "Candidate behavior that fundamentally violated the engagement constraints."}
+    ],
+    "bands": {"strong_hire": 4.20, "hire": 3.40, "borderline": 2.70, "no_hire": 1.80, "strong_no_hire": 0}
+}
 
 # ponytail: conversation messages for the incident drill are stored under a ":incident" suffix
 # so they can't leak into the standard-design replay chat for the same question.
@@ -4119,14 +4290,15 @@ Rules:
 def interview():
     data = request.json
     q = QUESTIONS.get(data["question_id"])
-    if not q or q["lang"] != "design":
+    if not q or q["lang"] not in ("design", "decomposition"):
         return jsonify({"error": "not found"}), 404
 
     requirements_only = bool(data.get("requirements_only"))
     adversarial = bool(data.get("adversarial"))
     scaling = bool(data.get("scaling"))
     incident = bool(data.get("incident"))
-    chat_key = data["question_id"] + (":clarify" if requirements_only else (":adversarial" if adversarial else (":scaling" if scaling else (":incident" if incident else ""))))
+    decomposition = bool(data.get("decomposition"))
+    chat_key = data["question_id"] + (":decomposition" if decomposition else (":clarify" if requirements_only else (":adversarial" if adversarial else (":scaling" if scaling else (":incident" if incident else "")))))
 
     if requirements_only:
         system_prompt = f"""You are a {persona_for(q)} running a requirements-gathering drill. Stay in character.
@@ -4188,6 +4360,40 @@ The current incident (this is the real failure the candidate must respond to):
 {incident_scenario}
 
 {INCIDENT_RULES}"""
+    elif decomposition:
+        if q.get("format_version") == 2:
+            # v2 — build client prompt from persona + triggers (no scoring content)
+            p = q.get("persona", {})
+            triggers = q.get("triggers", [])
+            # Filter judge_note out of trigger blocks that go to the client
+            clean_triggers = []
+            for tr in triggers:
+                ct = {k: v for k, v in tr.items() if k != "judge_note"}
+                clean_triggers.append(ct)
+            system_prompt = f"""You are roleplaying as a client stakeholder. The candidate is an FDE assigned to your account. Stay in character as a real client — you have a problem, you need help solving it, but you don't have all the answers yourself.
+
+Your name: {p.get('name', 'Client')}
+Your role: {p.get('role', 'Stakeholder')}
+Your voice: {p.get('voice', 'Professional')}
+
+{json.dumps(p.get('hidden_facts', {}), indent=2)}
+(The above is your PRIVATE internal knowledge. Never volunteer it unprompted.)
+
+{json.dumps(clean_triggers, indent=2)}
+(The above are internal notes on how to react when certain topics arise. Do NOT reveal this structure to the candidate.)
+
+{p.get('knowledge_boundaries', '')}"""
+        else:
+            # v1 — use the existing rules, stripped of any scoring content
+            system_prompt = f"""You are roleplaying as a client stakeholder at the company described below. The candidate is an FDE assigned to your account. Stay in character as a real client — you have a problem, you need help solving it, but you don't have all the answers yourself.
+
+Your internal situation (this is your PRIVATE context — the candidate does NOT know this and you must NOT volunteer it):
+Title: {q['title']}
+What's happening: {q['prompt']}
+
+**CRITICAL: The above "What's happening" is your private knowledge. Your opening statement MUST be vague — describe the problem in 1 sentence without mentioning specific constraints, technologies, compliance requirements, or internal teams. Anyone reading your opening should not be able to tell if this is a small startup or a Fortune 500. Let the candidate discover the details by asking good questions.**
+
+{DECOMPOSITION_RULES}"""
     else:
         rubric_lines = "\n".join(f"- {r}" for r in baseline_rubric_for(q) + q.get("rubric", []))
         war_stories_block = "\n".join(f"- {concept}: {story}" for concept, story in war_stories_for(q).items())
@@ -4245,6 +4451,12 @@ Rules:
                          "End with a JSON block:\n"
                          "```json\n{\"incident_score\": <1-5>, \"triage_ok\": <true/false>, "
                          "\"fix_choice_ok\": <true/false>, \"communication_ok\": <true/false>}\n```)")
+        elif decomposition:
+            user_turn = ("(The engagement is ending. Write a 3-5 sentence debrief from the CLIENT's perspective — "
+                         "not as an interviewer grading a candidate, but as a real stakeholder reflecting on how "
+                         "the FDE handled the engagement. Mention what they did well and where they fell short. "
+                         "Use natural client language, not rubric language. "
+                         "Do NOT include any JSON block or structured rubric — just natural prose.)")
         else:
             concept_list = ", ".join(taxonomy_for(q))
             rubric_block = (
@@ -4300,35 +4512,67 @@ Rules:
             user_turn = ("(The incident-response drill is starting. Open with a brief, urgent description of "
                          "the failure scenario — what broke, what alerts fired, who's affected. "
                          "Ask the candidate how they'd start troubleshooting. 2-3 sentences, calm but urgent tone.)")
+        elif decomposition:
+            v2_question = q.get("format_version") == 2 and q.get("persona", {}).get("opening_line")
+            if v2_question:
+                user_turn = f"(The engagement is starting. Roleplay as the client. Your opening line is below — say it exactly as written, then wait for the candidate to respond.)\n\n{q['persona']['opening_line']}"
+            else:
+                user_turn = ("(The engagement is starting. Roleplay as the client stakeholder introducing the problem. "
+                             "Give ONLY 2 sentences: one describing the data situation vaguely, one stating the goal. "
+                             "Do NOT mention HIPAA, EU borders, IT politics, budget, timelines, compliance, or any specific constraint. "
+                             "Do NOT say 'we have challenges' or 'there are hurdles' — that implies constraints. "
+                             "Just describe the raw situation: what data exists and what you want to achieve. "
+                             "End with 'So — what questions do you have for me?' "
+                             "Do NOT say 'the candidate' or 'the interview' — you are a client talking to an FDE.)")
         else:
             user_turn = ("(The interview is starting. Give a brief one-sentence opening inviting the candidate to "
                          "ask clarifying questions before they begin designing. Don't restate the scenario.)")
     else:
         user_turn = data.get("message") or "I'm ready to start."
 
+    is_meta = data.get("start") or data.get("wrap_up") or data.get("end_drill")
     diagram = (data.get("diagram") or "").strip()
-    if diagram:
+    if diagram and not is_meta:
         user_turn = f"[Candidate's current whiteboard]\n{diagram}\n\n[Candidate says]\n{user_turn}"
 
-    history = CHATS.setdefault(chat_key, [])
-    history.append({"role": "user", "content": user_turn})
+    history = CHATS.get(chat_key, [])
+    if is_meta:
+        # Meta instructions (start/wrap_up/end_drill) go to the LLM
+        # but are NOT persisted in chat history — prevents confusion
+        # between meta-prompts and actual candidate utterances.
+        llm_messages = [{"role": "system", "content": system_prompt}] + history + [{"role": "user", "content": user_turn}]
+    else:
+        history.append({"role": "user", "content": user_turn})
+        CHATS[chat_key] = history
+        llm_messages = [{"role": "system", "content": system_prompt}] + history
 
-    # ponytail: wrap-up replies need room for prose debrief + trailing json tail
     reply_max_tokens = 700 if (data.get("wrap_up") or data.get("end_drill")) else 400
     try:
         resp = client.chat.completions.create(
-            model=MODEL, messages=[{"role": "system", "content": system_prompt}] + history,
+            model=MODEL, messages=llm_messages,
             max_tokens=reply_max_tokens, extra_body={"reasoning": {"enabled": False}},
         )
     except Exception as e:
-        history.pop()
+        if not is_meta:
+            history.pop()
+            CHATS[chat_key] = history
         return jsonify({"error": str(e)}), 502
     reply = resp.choices[0].message.content
     if not reply:
-        history.pop()
+        if not is_meta:
+            history.pop()
+            CHATS[chat_key] = history
         return jsonify({"error": "model returned an empty response — try again"}), 502
-    history.append({"role": "assistant", "content": reply})
-    save_chats()
+
+    if not is_meta:
+        history.append({"role": "assistant", "content": reply})
+        CHATS[chat_key] = history
+        save_chats()
+    elif data.get("start"):
+        # Persist the opening statement so it survives page reloads
+        history.append({"role": "assistant", "content": reply})
+        CHATS[chat_key] = history
+        save_chats()
 
     prose_reply = reply
     if data.get("wrap_up"):
@@ -4350,6 +4594,31 @@ Rules:
             return jsonify({"reply": prose_reply, "wrap_up": True, "incident": True,
                             "incident_score": incident_score, "triage_ok": triage_ok,
                             "fix_choice_ok": fix_choice_ok, "communication_ok": communication_ok})
+        elif decomposition:
+            # Separate judge call — client model never sees the rubric
+            transcript_turns = history  # list of {role, content} from the session
+            # Get the scenario JSON for the judge
+            qid = data["question_id"]
+            judge_scenario = V2_SCENARIOS.get(qid)
+            if judge_scenario:
+                scenario_for_judge = judge_scenario
+            else:
+                # v1 — construct minimal scenario JSON for judge
+                scenario_for_judge = {
+                    "id": qid, "title": q.get("title", ""), "prompt": q.get("prompt", ""),
+                    "format_version": 1, "triggers": [], "rubric": JUDGE_RUBRIC,
+                }
+            judge_result = run_judge(
+                scenario_for_judge, transcript_turns,
+                session_id=f"{qid}@{int(time.time())}",
+                scenario_id=qid,
+            )
+            log_history({"event": "fde_debrief", "qid": qid,
+                         "judge_verdict": judge_result.get("band"),
+                         "normalized_score": judge_result.get("normalized_score")})
+            return jsonify({"reply": prose_reply, "wrap_up": True,
+                             "decomposition": True,
+                             "judge": judge_result})
         prose_reply, missed_concepts, rushed_to_design, communication_score, communication_note, rubric_scores = split_wrap_up_reply(reply, taxonomy_for(q))
         self_rated = [c for c in (data.get("self_rated") or []) if c in taxonomy_for(q)]
         verdict = hire_verdict(missed_concepts, rushed_to_design, communication_score, rubric_scores)
@@ -4388,7 +4657,8 @@ def interview_history():
     requirements_only = request.args.get("requirements_only") == "1"
     scaling = request.args.get("scaling") == "1"
     incident = request.args.get("incident") == "1"
-    chat_key = qid + (":clarify" if requirements_only else (":adversarial" if adversarial else (":scaling" if scaling else (":incident" if incident else ""))))
+    decomposition = request.args.get("decomposition") == "1"
+    chat_key = qid + (":clarify" if requirements_only else (":adversarial" if adversarial else (":scaling" if scaling else (":incident" if incident else (":decomposition" if decomposition else "")))))
 
     turns = []
     diagram = ""
@@ -4412,7 +4682,8 @@ def _replay_chat_key(args):
     requirements_only = args.get("requirements_only") == "1"
     scaling = args.get("scaling") == "1"
     incident = args.get("incident") == "1"
-    return qid + (":clarify" if requirements_only else (":adversarial" if adversarial else (":scaling" if scaling else (":incident" if incident else ""))))
+    decomposition = args.get("decomposition") == "1"
+    return qid + (":clarify" if requirements_only else (":adversarial" if adversarial else (":scaling" if scaling else (":incident" if incident else (":decomposition" if decomposition else "")))))
 
 
 @app.route("/api/replay-comments")
