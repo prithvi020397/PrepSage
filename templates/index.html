@@ -4162,6 +4162,26 @@ async function requestInterview(body) {
           body: JSON.stringify({question_id: current.id, missed_concepts: res.missed_concepts || [], rubric_scores: res.rubric_scores || {}})
         }).then(r => r.json()).then(t => renderTakeaways(t.takeaways)).catch(() => {});
       }
+      // Download report button for any wrap_up
+      if (res.wrap_up) {
+        const dlBtn = document.createElement('button');
+        dlBtn.className = 'btn btn-ghost';
+        dlBtn.textContent = '📥 Download Report';
+        dlBtn.style.cssText = 'font-size:13px; margin-top:10px; padding:6px 14px; border-radius:6px;';
+        dlBtn.onclick = () => {
+          const body = {question_id: current.id};
+          if (res.decomposition) body.decomposition = true;
+          fetch('/api/export', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)})
+            .then(r => r.ok ? r.text() : Promise.reject())
+            .then(md => {
+              const blob = new Blob([md], {type: 'text/markdown'});
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a'); a.href = url; a.download = (current.id || 'report') + '.md'; a.click();
+              URL.revokeObjectURL(url);
+            }).catch(() => alert('Export failed — session may have expired.'));
+        };
+        textEl.appendChild(dlBtn);
+      }
       speakTutor(res.reply);
       extractChips(res.reply);
       if (res.wrap_up) clearPacingNudge(); else armPacingNudge();

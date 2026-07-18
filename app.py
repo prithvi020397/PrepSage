@@ -150,6 +150,11 @@ REPLAY_COMMENTS_FILE = "replay_comments.json"
 # CHATS, so a shared replay link's comments survive a restart too.
 REPLAY_COMMENTS = json.load(open(REPLAY_COMMENTS_FILE)) if os.path.exists(REPLAY_COMMENTS_FILE) else {}
 
+JUDGES_FILE = "judges.json"
+# chat_key -> judge_result dict — persisted so /api/export can reconstruct reports
+# after the session ends, without re-running the judge model.
+JUDGES = json.load(open(JUDGES_FILE)) if os.path.exists(JUDGES_FILE) else {}
+
 PRECOMPUTED_TRACES = json.load(open("traces.json")) if os.path.exists("traces.json") else {}
 PRECOMPUTED_CONCEPTS = json.load(open("concept_maps.json")) if os.path.exists("concept_maps.json") else {}
 PRECOMPUTED_SOLUTIONS = json.load(open("solutions.json")) if os.path.exists("solutions.json") else {}
@@ -796,7 +801,7 @@ def start_over():
     # with no streaks, due reviews, saved code, chat history, or replay comments. Distinct
     # from /api/reset-category which only clears working state and keeps solved credit.
     import glob
-    for f in (PROGRESS_FILE, HISTORY_FILE, CHATS_FILE, REPLAY_COMMENTS_FILE):
+    for f in (PROGRESS_FILE, HISTORY_FILE, CHATS_FILE, REPLAY_COMMENTS_FILE, JUDGES_FILE):
         if os.path.exists(f):
             os.remove(f)
     return jsonify({"ok": True})
@@ -810,6 +815,10 @@ def log_history(entry):
 
 def save_chats():
     _atomic_json(CHATS_FILE, CHATS)
+
+
+def save_judges():
+    _atomic_json(JUDGES_FILE, JUDGES)
 
 
 def save_replay_comments():
@@ -4633,6 +4642,8 @@ Rules:
             log_history({"event": "fde_debrief", "qid": qid,
                          "judge_verdict": judge_result.get("band"),
                          "normalized_score": judge_result.get("normalized_score")})
+            JUDGES[chat_key] = judge_result
+            save_judges()
             return jsonify({"reply": prose_reply, "wrap_up": True,
                              "decomposition": True,
                              "judge": judge_result})
@@ -4659,6 +4670,140 @@ Rules:
                          "max_tier_reached": max_tier})
 
     return jsonify({"reply": prose_reply, "wrap_up": bool(data.get("wrap_up"))})
+
+
+def _generate_report(qid, q, turns, judge_result):
+    is_decomposition = bool(judge_result)
+    lines = []
+    title = q.get("title", qid) if q else qid
+    lines.append(f"# Interview Report: {title}")
+    lines.append("")
+    lines.append(f"**Question ID:** {qid}")
+    lines.append(f"**Track:** {q.get('track', q.get('lang', 'FDE'))}")
+    lines.append(f"**Total Turns:** {len([t for t in turns if t.get('role') in ('user', 'assistant')])}")
+    lines.append("")
+
+    if is_decomposition:
+        lines.append("## Scores")
+        lines.append("")
+        lines.append("| Dimension | Score | Weight | Evidence |")
+        lines.append("|-----------|-------|--------|----------|")
+        for dim in judge_result.get("dimensions", []):
+            w = dim.get("weight", 1.0)
+            w_label = f"{w:.1f}×" if w != 1.0 else "1.0×"
+            ev = dim.get("evidence", [])
+            ev_str = "; ".join([f"Turn {e.get('turn','?')}: {e.get('quote','')[:80]}" for e in ev]) if ev else "—"
+            lines.append(f"| {dim.get('id', '?')}: {dim.get('name', '')} | {dim.get('score', '-')}/5 | {w_label} | {ev_str} |")
+        lines.append("")
+
+        ns = judge_result.get("normalized_score")
+        if ns is not None:
+            band_labels = {
+                "strong_hire": "Strong Hire (SH)", "hire": "Hire (H)",
+                "borderline": "Borderline (BL)", "no_hire": "No Hire (NH)",
+                "strong_no_hire": "Strong No Hire (SNH)",
+            }
+            band = judge_result.get("band", "")
+            bl = band_labels.get(band, band)
+            lines.append(f"**Weighted Average:** {ns:.2f}")
+            lines.append(f"**Band:** {bl}")
+            lines.append("")
+
+        dqs = judge_result.get("disqualifiers", [])
+        triggered_dqs = [d for d in dqs if d.get("triggered")]
+        if triggered_dqs:
+            lines.append("### Disqualifiers Triggered")
+            for d in triggered_dqs:
+                lines.append(f"- **{d.get('id', '?')}:** {d.get('note', '')}")
+            lines.append("")
+
+        coaching = judge_result.get("coaching", {})
+        if coaching:
+            lines.append("## Coaching Notes")
+            lines.append("")
+            summary = coaching.get("summary", "")
+            if summary:
+                lines.append(f"_{summary}_")
+                lines.append("")
+            for dn in coaching.get("per_dimension", []):
+                did = dn.get("dimension_id", "")
+                note = dn.get("note", "")
+                if note:
+                    lines.append(f"- **{did}:** {note}")
+            sm = coaching.get("strongest_moment", {})
+            if sm.get("note"):
+                lines.append("")
+                lines.append(f"**Strongest Moment** (Turn {sm.get('turn', '?')}): {sm['note']}")
+            cm = coaching.get("costliest_moment", {})
+            if cm.get("note"):
+                lines.append("")
+                lines.append(f"**Costliest Moment** (Turn {cm.get('turn', '?')}): {cm['note']}")
+            lines.append("")
+
+    else:
+        lines.append("## Assessment")
+        lines.append("")
+        last_turn = turns[-1] if turns else None
+        if last_turn:
+            content = last_turn.get("content", "")
+            if "```json" in content:
+                try:
+                    raw = content.split("```json")[1].split("```")[0]
+                    meta = json.loads(raw)
+                    missed = meta.get("missed_concepts", [])
+                    comm = meta.get("communication_score")
+                    rushed = meta.get("rushed_to_design", False)
+                    rubric_scores = meta.get("rubric_scores", {})
+                    lines.append(f"- **Communication:** {comm}/5" if comm else "")
+                    lines.append(f"- **Rushed to design:** {'Yes' if rushed else 'No'}")
+                    if rubric_scores:
+                        total = sum(rubric_scores.values())
+                        max_total = len(rubric_scores) * 5
+                        lines.append(f"- **Rubric Score:** {total}/{max_total}")
+                    if missed:
+                        lines.append(f"- **Missed concepts ({len(missed)}):** {', '.join(missed)}")
+                    lines.append("")
+                except Exception:
+                    pass
+
+    lines.append("## Transcript")
+    lines.append("")
+    for turn in turns:
+        role = turn.get("role", "")
+        content = turn.get("content", "").strip()
+        if not content:
+            continue
+        if "```json" in content:
+            content = content.split("```json")[0].strip()
+        if role == "user":
+            wm = WHITEBOARD_WRAP_RE.match(content)
+            if wm:
+                text = wm.group(2).strip()
+                lines.append(f"**You:** {text}")
+            else:
+                lines.append(f"**You:** {content}")
+        elif role == "assistant":
+            lines.append(f"**Client:** {content}")
+        lines.append("")
+
+    return "\n".join(lines) + "\n"
+
+
+@app.route("/api/export", methods=["POST"])
+def export_session():
+    data = request.json
+    qid = data.get("question_id", "")
+    if not qid:
+        return jsonify({"error": "question_id required"}), 400
+    decomposition = bool(data.get("decomposition"))
+    chat_key = qid + (":decomposition" if decomposition else "")
+    turns = CHATS.get(chat_key, [])
+    if not turns:
+        return jsonify({"error": f"Session not found for {chat_key}"}), 404
+    q = QUESTIONS.get(qid) or V2_SCENARIOS.get(qid) or {}
+    judge_result = JUDGES.get(chat_key) if decomposition else None
+    md = _generate_report(qid, q, turns, judge_result)
+    return md, 200, {"Content-Type": "text/markdown; charset=utf-8"}
 
 
 WHITEBOARD_WRAP_RE = re.compile(r"^\[Candidate's current whiteboard\]\n(.*?)\n\n\[Candidate says\]\n(.*)$", re.S)
