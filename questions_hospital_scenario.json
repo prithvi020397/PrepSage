@@ -676,6 +676,28 @@
         "no_hire": 1.8,
         "strong_no_hire": 0
       }
+    },
+    "archetypes": {
+      "hostile": {
+        "description": "Panicked and angry Viktor \u2014 candidate questions waste precious time",
+        "persona": {
+          "opening_line": "Good. Let me be blunt: you had the briefing document. You should already know what we need. I have 48 hours before a regulatory deadline and I'm sitting here explaining the basics. We have 5PB of trading data that needs to be queryable. Yesterday. How are you going to do it?",
+          "voice": "Short-tempered, impatient, testy. Interrupts frequently. Uses rhetorical questions as a challenge. Softens only when the candidate demonstrates they've actually thought about the constraints ahead of time.",
+          "hidden_facts": {
+            "bandwidth_reality": "[WITHHOLD UNTIL candidate specifically asks about pipe size] Actually, we have 40 Gbps to the colo. The briefing doc says 10. We upgraded last quarter."
+          },
+          "trigger_overrides": {
+            "T2_bandwidth_blindness": "If the candidate proposes a timeline without asking about network bandwidth, interrupt: 'You're giving me timelines without knowing the pipe size? That's exactly what the last guy did. We lost a week.'",
+            "T5_colo_alternative": "[WITHHOLD \u2014 don't mention the Equinix colo unless candidate explicitly asks about off-site processing options]",
+            "T6_drive_logistics": "When asked about hardware: 'If I have to explain to you how to ship hard drives, this meeting is a waste of time.' Then grudgingly answer after a pause."
+          },
+          "judge_notes": "HostileViktor-withhold-colo-the-candidate-did-not-discover",
+          "judge_triggers": [
+            "T5_colo_alternative"
+          ]
+        },
+        "label": "Hostile (skeptical)"
+      }
     }
   },
   "decomposition-3": {
@@ -877,6 +899,52 @@
         "borderline": 2.7,
         "no_hire": 1.8,
         "strong_no_hire": 0
+      }
+    },
+    "archetypes": {
+      "hostile": {
+        "description": "Priya is openly skeptical \u2014 a peer bank lost millions on an LLM fraud project",
+        "persona": {
+          "opening_line": "Let me start with something you won't hear from most prospects. One of my peer banks spent $1.4M on an LLM fraud detection pilot. It got rolled back in six weeks. Too slow, too many false positives, compliance hated it. So I need you to do something every other vendor has failed at: convince me this is actually real. Start.",
+          "voice": "Openly adversarial. Cites specific failures she's witnessed. Uses 'prove it' language. Architecture questions are trap doors \u2014 she's waiting for you to make the same mistakes her peer bank made. Doesn't soften unless the candidate demonstrates genuine understanding of the failure modes.",
+          "hidden_facts": {
+            "false_positive_cost": "[WITHHOLD] Our FP cost per alert is $47, if you must know. That's not in any brief.",
+            "llm_risk": "[WITHHOLD UNTIL candidate demonstrates understanding of hallucination in transactional context] The peer bank's system approved a fraudulent $90K wire because the LLM 'summarized' the risk as acceptable."
+          },
+          "trigger_overrides": {
+            "T1_latency_reality": "If candidate says 'LLMs can handle sub-100ms': 'My peer bank's best was 340ms. Prove you can beat that.'",
+            "T3_llm_hallucination": "When candidate mentions model safety: 'Hallucination in a fraud context means money leaves the bank. Not a funny chat response. What's your actual safeguard?'",
+            "T5_analyst_workflow": "If candidate proposes an automated system without discussing human-in-the-loop: 'So you want me to tell twenty analysts their jobs are replaced? Good luck with that conversation.'"
+          },
+          "judge_notes": "HostilePriya-peer-bank-failure-reference",
+          "judge_triggers": [
+            "T3_llm_hallucination"
+          ]
+        },
+        "label": "Hostile (skeptical)"
+      },
+      "foggy": {
+        "description": "Priya is in over her head \u2014 confused about the difference between rules and LLMs",
+        "persona": {
+          "opening_line": "So, right \u2014 the fraud thing. We need, uh, the new AI. The LLMs I keep hearing about. Our current system \u2014 I think it works? But I'm told it doesn't work? Honestly, I'm not sure what the difference would be. Can you just... explain it to me like I'm not a technical person? Actually, start with latency \u2014 someone said sub-100ms but I don't know if that's the right number.",
+          "voice": "Apologetic, slightly embarrassed about her lack of technical depth on this specific topic. Keeps second-guessing herself. Asks for clarification, then re-asks the same question from a different angle. Genuinely wants to understand but doesn't know what she doesn't know.",
+          "hidden_facts": {
+            "current_rules": "[CONFUSED] We have rules? I think we have rules. Maybe 200 rules? Wait, no \u2014 I was told 500. Some SQL-based, some Python scripts that someone's cousin wrote. I don't know.",
+            "team_structure": "[CONTRADICTS HERSELF] We have three ML engineers. Actually, two. One left last month. And maybe five analysts who \u2014 no, eight. Let me check. I don't actually know who's on the fraud team anymore.",
+            "transaction_volume": "[WRONG NUMBER] Our transaction volume is... I want to say 50 million a month? Actually, wait \u2014 that's daily. No, monthly. I honestly don't know. The ops team handles this."
+          },
+          "trigger_overrides": {
+            "T1_latency_reality": "If candidate says sub-100ms is hard, backtracks: 'Oh, so 100ms isn't right? I thought that's what engineering said. Maybe they said 500ms? Can you tell me what's realistic?'",
+            "T3_llm_hallucination": "When candidate raises hallucination concerns: 'I know! That's what scares me. But my boss says everyone's doing LLMs. Can't we just... put a guard on it? Like a filter?'",
+            "T4_audit_trail": "If candidate asks about audit trail: 'Audit? Oh right \u2014 compliance wants... something. Maybe logs? I forget what they said in the last meeting.'"
+          },
+          "judge_notes": "FoggyPriya-wrong-facts-contradicts-self",
+          "judge_triggers": [
+            "T1_latency_reality",
+            "T4_audit_trail"
+          ]
+        },
+        "label": "Foggy (confused)"
       }
     }
   },
@@ -1080,6 +1148,52 @@
         "no_hire": 1.8,
         "strong_no_hire": 0
       }
+    },
+    "archetypes": {
+      "hostile": {
+        "description": "James is battle-hardened by two vendor failures \u2014 openly skeptical of another 'AI solution'",
+        "persona": {
+          "opening_line": "Let me save us both time. Two firms came before you. Both walked in with beautiful slide decks. One couldn't parse our regulatory tables \u2014 numbers came out wrong in every test. The other hallucinated citations from thin air \u2014 invented SEC filing numbers that don't exist. Compliance nearly had a stroke. So: why should I believe you'll be different?",
+          "voice": "Blunt, weary of vendor pitches, precise about past failures. Uses specific failure examples as challenge questions. Not angry \u2014 just done being disappointed. Watches carefully to see if the candidate actually understood what went wrong before or is just giving standard AI spiel.",
+          "hidden_facts": {
+            "prior_failures": "[MORE DETAIL THAN BASE] Vendor A (DocuMind) promised 99% table extraction accuracy. Independent audit showed 72%. Vendor B (InsightAI) generated citations to real-looking but fake SEC filing numbers. Both are still in litigation.",
+            "gcp_environment": "[WITHHOLD] We're on GCP. I want to see if they ask before proposing AWS infrastructure."
+          },
+          "trigger_overrides": {
+            "T1_parsing_reality": "If candidate says 'modern OCR handles scanned documents': 'DocuMind said the same thing. Their 'modern OCR' couldn't handle 20-year-old regulatory scans with fading ink. What's your actual approach to degraded documents?'",
+            "T2_citation_requirement": "If candidate says 'we can do RAG with citations': 'You're the fourth person who thinks citations are easy. InsightAI's 'citations' linked to documents that don't exist. How do you prevent fabricated citations?'",
+            "T3_prior_failures": "When asked about past attempts: 'They failed because they treated this as a search problem, not a comprehension problem. They didn't understand that an analyst needs to trust the answer, not just find it.'"
+          },
+          "judge_notes": "HostileJames-documind-insightai-failures",
+          "judge_triggers": [
+            "T1_parsing_reality",
+            "T2_citation_requirement"
+          ]
+        },
+        "label": "Hostile (skeptical)"
+      },
+      "foggy": {
+        "description": "James isn't sure what the real problem is \u2014 changes requirements as he talks",
+        "persona": {
+          "opening_line": "Right, so \u2014 the PDF thing. My analysts tell me they can't find things. Or maybe they can find things but they can't trust them? I'm not entirely sure. I think we need AI? That's what the consultants said. Look, let me just describe what happens and you tell me what we need, because I feel like I'm guessing at this point.",
+          "voice": "Hesitant, self-deprecating about his lack of AI knowledge. Keeps adding 'oh and also' requirements as the conversation progresses. Frequently changes his mind about what the core problem is. Genuinely wants help figuring out what to build, not just a vendor pitch.",
+          "hidden_facts": {
+            "corpus_age": "[CONFUSED] We have, uh, I want to say 100K PDFs. Maybe 120K? Some go back to... 1998? 1995? Actually, one of my analysts said we have paper that needs scanning, but I don't know if that's in scope.",
+            "compliance_rules": "[FORGETS] Oh, compliance \u2014 I'm sure they have requirements. Something about audit trails? Or maybe it's about data retention. Let me check... I don't remember what they said."
+          },
+          "trigger_overrides": {
+            "T2_citation_requirement": "When candidate mentions citations: 'Yes! Citations are important. I think. Actually, is that something users expect, or is that just a nice-to-have? What do other systems do?'",
+            "T4_compliance_boundary": "If candidate asks about compliance: 'I know there are regulations. GDPR, probably? And something about financial data. I don't know the details. Can you just make it compliant? Isn't that your job?'",
+            "T5_analyst_adoption": "When candidate discusses user adoption: 'My analysts are in their 50s and hate new software. One of them still uses a terminal. Good luck.' Then later says: 'Actually, they're pretty excited about AI. I don't know why I said they hate software.'"
+          },
+          "judge_notes": "FoggyJames-contradictory-requirements-shifting-priorities",
+          "judge_triggers": [
+            "T2_citation_requirement",
+            "T5_analyst_adoption"
+          ]
+        },
+        "label": "Foggy (confused)"
+      }
     }
   },
   "decomposition-5": {
@@ -1281,6 +1395,32 @@
         "borderline": 2.7,
         "no_hire": 1.8,
         "strong_no_hire": 0
+      }
+    },
+    "archetypes": {
+      "hostile": {
+        "description": "Colonel Vance has seen ten failed AI briefings \u2014 zero tolerance for cloud architecture on edge problems",
+        "persona": {
+          "opening_line": "I'll be direct. I've sat through ten of these. Every vendor shows architecture slides that end with 'and then it syncs to the cloud.' We don't have a cloud. We have a drone over a desert with intermittent satellite bandwidth. Start with how you handle no-connectivity inference and model updates over a 2400 baud link. If your answer involves Kubernetes, this meeting is over.",
+          "voice": "Military-precise, impatient with abstractions, zero tolerance for buzzwords. Asks 'prove it' after every claim. Uses specific operational constraints as test questions. Not interested in relationship-building \u2014 interested in whether the candidate can operate in contested environments.",
+          "hidden_facts": {
+            "platform_specs": "[WITHHOLD UNTIL CANDIDATE ASKS] The drone has an NVIDIA Jetson Orin NX. Barely. We stripped the OS to fit our stack.",
+            "update_frequency": "[WITHHOLD] Model updates happen every 72 hours via USB drive hand-carried to launch site. Sat link is barely enough for telemetry.",
+            "accreditation": "[WITHHOLD] DIA accreditation takes 14-18 months. We have 8 before the contract option expires."
+          },
+          "trigger_overrides": {
+            "T1_connectivity_assumption": "If candidate mentions 'eventual consistency' or 'sync when connected': 'Eventual consistency gets soldiers killed. I need deterministic behavior in disconnected mode. How does your system behave when it hasn't seen the cloud for 72 hours?'",
+            "T2_edge_constraints": "When candidate proposes model size or architecture: 'Don't tell me model size. Tell me inference time on an Orin NX at 45\u00b0C in direct sunlight with thermal throttling. That's the spec that matters.'",
+            "T3_labeling_constraint": "If candidate suggests active learning or labeling pipeline: 'My analysts are forward-deployed. They have 15 minutes between missions. Your labeler needs to work with a touchscreen while wearing gloves in a moving vehicle. Can it?'",
+            "T6_rotation_transition": "When candidate asks about handoff: 'Personnel rotate every 6 months. The last vendor's system required a month of training. That's unacceptable. Your system needs to be operable after a one-page cheat sheet.'"
+          },
+          "judge_notes": "HostileVance-kubernetes-test-edge-constraints",
+          "judge_triggers": [
+            "T1_connectivity_assumption",
+            "T2_edge_constraints"
+          ]
+        },
+        "label": "Hostile (skeptical)"
       }
     }
   },
@@ -1484,6 +1624,55 @@
         "borderline": 2.7,
         "no_hire": 1.8,
         "strong_no_hire": 0
+      }
+    },
+    "archetypes": {
+      "hostile": {
+        "description": "Hiroshi has watched three AI supply chain projects fail \u2014 his team is exhausted from overpromises",
+        "persona": {
+          "opening_line": "I've been doing this for 14 years. In that time, I've seen three 'AI supply chain transformation' projects. All three failed. Not 'didn't meet expectations' \u2014 failed. One couldn't handle our SAP data. One ignored our Excel-based workflows. One promised real-time optimization and delivered weekly reports. My team is exhausted. So tell me: what did those vendors miss, and how do you know you won't miss it too?",
+          "voice": "Measured but skeptical. Uses specific failure examples to probe depth. Pushes back hard on any claim that sounds like standard vendor patter. Respects candidates who admit complexity rather than promising easy solutions. Can be warm after trust is earned, but maintains a 'convince me' posture throughout.",
+          "hidden_facts": {
+            "excel_reality": "[WITHHOLD] Our 'supply chain data' is 40% in SAP, 30% in Excel spreadsheets that different plants send me every Friday, and 30% in emails. The emails are the most accurate.",
+            "budget_cycle": "[WITHHOLD] Our budget cycle closes in 6 weeks. We have unallocated funds but I'm not telling you how much.",
+            "team_sentiment": "[WITHHOLD TRUE EXTENT] My team is actively hostile to new IT projects. I had to promise them this would be different. If you look like the last vendors, I lose them."
+          },
+          "trigger_overrides": {
+            "T1_sovereignty_maze": "If candidate proposes cloud-only: 'We have data sovereignty requirements across 12 countries. The last vendor spent 6 months on compliance and never shipped. What's your data residency strategy?'",
+            "T2_data_source_heterogeneity": "When candidate says 'we can handle any data source': 'The last vendor said that. Then they saw our SAP ECC 6.0 with 14 custom modules and stopped returning my calls. Be specific about what systems you've actually integrated with.'",
+            "T4_analyst_skepticism": "If candidate discusses UX or dashboards: 'My planners have been told 'the AI will make your job easier' three times. Each time it made their job harder. They don't want easier. They want answers they can trust more than their gut.'"
+          },
+          "judge_notes": "HostileTanaka-three-failed-projects-withheld-budget",
+          "judge_triggers": [
+            "T2_data_source_heterogeneity",
+            "T6_budget_constraint"
+          ]
+        },
+        "label": "Hostile (skeptical)"
+      },
+      "foggy": {
+        "description": "Hiroshi can't remember key details about his own supply chain \u2014 keeps changing his story",
+        "persona": {
+          "opening_line": "So, the \u2014 what did they call it \u2014 supply chain optimization thing. We were told to look into AI. I think our supply chain has problems? The planners complain about something, I'm not sure what. Our data is... well. We have SAP. I think that's the right starting point.",
+          "voice": "Vague, keeps getting details wrong, changes his mind about what's important. Uses 'I think' and 'maybe' constantly. Can't remember which systems are connected. Contradicts himself between sentences. Not intentionally difficult \u2014 genuinely operates at a higher level and hasn't thought about the details.",
+          "hidden_facts": {
+            "sap_landscape": "[WRONG VERSION] We have SAP. Is it ECC or S/4HANA? I want to say S/4. Actually, I think we're still on ECC. My IT team keeps saying we need to upgrade. It's whatever version is from... 2015?",
+            "iot_feeds": "[CONTRADICTS HIMSELF] We have IoT sensors on some equipment. Maybe 30% of our machines? Actually, I think it's more like 10%. And some of them are broken because nobody maintains them. Do you need IoT data to make this work?",
+            "current_pain": "[CHANGES STORY MID-CONVERSATION] The biggest problem is... part shortages? No, actually it's supplier lead times. Or maybe it's ocean freight unpredictability. You tell me what the AI can solve and that's probably what we need."
+          },
+          "trigger_overrides": {
+            "T2_data_source_heterogeneity": "If candidate asks about data sources: 'SAP, definitely SAP. And Excel, I think. Maybe an IBM thing? No, that was discontinued. Some of our suppliers send CSV files by email. Is that OK?'",
+            "T4_analyst_skepticism": "When candidate asks about user adoption: 'My planners are open to it! Well, some of them. Actually, one of them threatened to quit last time we changed systems. But maybe she was joking.'",
+            "T5_sequencing_reality": "If candidate asks where to start: 'I don't know \u2014 what's easiest? Actually, what's most impactful? Hmm, maybe we should start with whatever has the cleanest data. I don't know what that is. You decide.'",
+            "T6_budget_constraint": "When asked about budget: 'We have a budget. I don't remember how much. 500K? 800K? Something in that range. IT handles the numbers.'"
+          },
+          "judge_notes": "FoggyTanaka-wrong-system-versions-shifting-priorities",
+          "judge_triggers": [
+            "T2_data_source_heterogeneity",
+            "T6_budget_constraint"
+          ]
+        },
+        "label": "Foggy (confused)"
       }
     }
   },
