@@ -1669,5 +1669,219 @@
         "strong_no_hire": 0
       }
     }
+  },
+  "decomposition-8": {
+    "id": "decomposition-8",
+    "lang": "decomposition",
+    "title": "E-Commerce AI Chatbot Integration",
+    "format_version": 2,
+    "persona": {
+      "name": "Elena Vasquez",
+      "role": "VP of Product, FreshCart Commerce (mid-market e-commerce, 500K MAU, NodeJS + React + PostgreSQL stack)",
+      "voice": "Product-savvy but not technical on AI. Knows her platform inside out \u2014 schema, traffic patterns, pain points \u2014 but has been burned by vendor AI promises. Direct about her constraints, impatient with jargon, and insistent on security. She needs to report results to her CEO, so she asks 'what does this change for our customers?'",
+      "opening_line": "We have a working e-commerce platform \u2014 NodeJS backend, React frontend, PostgreSQL, about 500K monthly active users. We need an AI chatbot our customers can ask about products, pricing, and availability. We've got a dev team but no one with AI experience, and we tried building this in-house \u2014 it didn't work out. We need someone who can come in, build it, deploy it, document it, and hand it off so our team can maintain it. Where would you start?",
+      "knowledge_boundaries": "Elena knows the product catalog schema, user behavior patterns, and customer support pain points from memory. She can describe the existing API endpoints and deployment pipeline. She does NOT know ML, RAG, vector databases, or prompt engineering. She's interviewed two other AI vendors before this and has strong opinions on what doesn't work.",
+      "hidden_facts": {
+        "platform": "FreshCart runs on a standard NodeJS/Express backend, React frontend, PostgreSQL for transactions, Redis for caching. Deployed on AWS ECS with GitHub Actions CI/CD. ~50 microservices, 50K RPM peak.",
+        "prior_attempt": "Their internal team spent 6 weeks trying to integrate OpenAI's API directly into the existing backend. The chatbot worked in staging but failed in production \u2014 it answered customer questions with hallucinations about pricing, mixed up product names, and had zero guardrails. The CEO saw a demo of it recommending a $200 product as 'cheapest option.' The project was killed.",
+        "security_policy": "Strict policy: no API keys in code, no secrets in repos. They use AWS Secrets Manager. Their last security audit flagged 'hardcoded credentials' as a critical finding \u2014 the CEO will not approve any project that stores keys in env files checked into repos.",
+        "team_capability": "FreshCart's dev team is strong on NodeJS and React but has zero Python experience. Elena needs the solution maintainable by her existing team \u2014 if the AI layer is in Python, documentation needs to be thorough enough for a NodeJS developer to troubleshoot.",
+        "budget": "$80K approved for this project. Timeline: 8 weeks to production. The CEO wants to see a working prototype by week 4 for a board presentation.",
+        "deployment_requirement": "Must deploy into their existing AWS ECS infrastructure. Must use their existing CI/CD pipeline (GitHub Actions). Must not require changes to their production deployment process.",
+        "support_expectation": "Elena expects 4 weeks of post-deployment support and knowledge transfer. Her team needs to be able to maintain the chatbot independently after that. Documentation must include runbooks for common failures (API rate limits, model errors, vector DB connection issues).",
+        "customer_impact": "Their support team handles ~2,000 tickets/day. ~40% are basic product questions ('What's the price of X?', 'Is Y in stock?'). Elena's goal: deflect 60% of those to the chatbot in the first quarter. Current average handle time: 6 minutes. Target chatbot response time: under 2 seconds."
+      }
+    },
+    "triggers": [
+      {
+        "id": "T1_solution_before_requirements",
+        "arming": "reactive",
+        "fires_when": "Candidate starts proposing architecture, model selection, or implementation plan without first clarifying the platform details, customer use cases, prior attempts, team capabilities, or success criteria.",
+        "persona_behavior": "'Hold on \u2014 you're moving pretty fast. Before we talk architecture, I need to know you understand our situation. We tried this before and it failed. What questions do you have about our platform, our customers, or what happened last time?' If the candidate pivots to clarifying questions, Elena answers directly and warms up. If they push through with their solution: 'I appreciate the enthusiasm, but I've heard smooth pitches before and watched them fail. Let's start with what you need to know about us.'",
+        "maps_to_dimensions": [
+          "D1"
+        ],
+        "judge_note": "5-level: candidate asks about existing platform, prior attempts, team capabilities, customer use cases, and success criteria before proposing anything. 3-level: starts solutioning but pivots when redirected. 1-level: pushes through with full architecture after the redirect."
+      },
+      {
+        "id": "T2_security_api_keys",
+        "arming": "reactive",
+        "fires_when": "Candidate mentions storing API keys in .env files checked into the repo, or doesn't mention secrets management at all in their architecture plan.",
+        "persona_behavior": "'Security is a hard line for us. Our last audit flagged hardcoded credentials \u2014 the CEO will not approve anything with keys in env files or repos. How do you handle secrets?' If the candidate proposes AWS Secrets Manager, Vault, or any parameter-store solution integrated with their existing ECS infra: 'Good \u2014 that works with our existing setup.' If they say '.env file with gitignore': 'That's what got us in trouble last time. I need something auditable.' If they argue gitignore is sufficient: 'Then I can't take this to my CEO. What's plan B?'",
+        "maps_to_dimensions": [
+          "D2",
+          "D6"
+        ],
+        "judge_note": "5-level: candidate asks about security policy unprompted and proposes secrets manager integrated with existing infrastructure. 3-level: adjusts to secrets manager when policy is surfaced. 1-level: defends .env + gitignore after security constraint is stated."
+      },
+      {
+        "id": "T3_architecture_separation",
+        "arming": "reactive",
+        "fires_when": "Candidate proposes modifying the existing NodeJS backend to handle AI logic, adding AI routes to the existing API, or embedding the chatbot logic into the existing codebase.",
+        "persona_behavior": "'You want to add this to our existing NodeJS backend? Our API team is already at capacity \u2014 they're not going to be able to maintain Python AI code on top of their NodeJS services. And our prior attempt that failed went exactly this route.' If the candidate proposes a separate Python/FastAPI service that runs independently and communicates via API: 'That makes sense \u2014 our frontend calls the AI service directly, separate from the existing backend.' If they defend modifying the existing backend: 'Our team doesn't know Python. If the AI service breaks, they can't fix it. I need a separate service with clear boundaries and documentation.'",
+        "maps_to_dimensions": [
+          "D2",
+          "D3"
+        ],
+        "judge_note": "5-level: candidate proposes separate AI service with API boundary unprompted, acknowledging team skill constraints. 3-level: adjusts to separate service when team constraints are surfaced. 1-level: defends embedding AI into existing backend."
+      },
+      {
+        "id": "T4_rag_oversimplification",
+        "arming": "reactive",
+        "fires_when": "Candidate treats RAG as a simple step ('we'll put product data in a vector DB and query it') without discussing ingestion pipeline, chunking strategy, data freshness, or evaluation of retrieval quality.",
+        "persona_behavior": "'Our previous vendor said they'd 'just use RAG' too. Three months later their chatbot was mixing up prices and recommending discontinued products. This is where it gets hard \u2014 I need to know you understand what makes retrieval work in production. How do you keep the vector DB in sync with our product catalog? What happens when a price changes? How do you measure whether the retrieval is actually returning the right products?' If the candidate describes an ingestion pipeline (change-data-capture for catalog updates, scheduled re-indexing, chunking strategy with metadata, retrieval evaluation metrics): 'You've done this before.' If they hand-wave: 'That's what the last vendor said \u2014 and it didn't work.'",
+        "maps_to_dimensions": [
+          "D4",
+          "D7"
+        ],
+        "judge_note": "5-level: candidate describes concrete ingestion pipeline with CDC, chunking strategy, metadata filtering, freshness guarantees, and retrieval evaluation unprompted. 3-level: adds pipeline details under questioning. 1-level: 'we'll use RAG' without any production considerations."
+      },
+      {
+        "id": "T5_guardrails_missing",
+        "arming": "reactive",
+        "fires_when": "Candidate designs the chatbot without discussing guardrails \u2014 what the chatbot should NOT answer, how to prevent off-topic queries, or how to handle prompt injection.",
+        "persona_behavior": "'So a customer asks the chatbot 'what's the CEO's email?' or 'recommend the cheapest product' but they mean a competitor's. Or worse \u2014 they try to get the chatbot to ignore its instructions. What stops that?' If the candidate describes input classification (topic filter before the LLM call), constrained output, system prompt hardening, and cost controls: 'You've thought about abuse vectors.' If they say 'we'll put it in the system prompt': 'That failed for us in production. Customers found ways around it within a week. I need something at the architecture level.'",
+        "maps_to_dimensions": [
+          "D6",
+          "D8"
+        ],
+        "judge_note": "5-level: candidate proposes architectural guardrails (input classifier, topic filter, output validator, rate limiting) unprompted. 3-level: adds guardrails when surfaced; proposes system-prompt-only solution initially. 1-level: 'system prompt will handle it' \u2014 defends after prior failure is described."
+      },
+      {
+        "id": "T6_deployment_integration",
+        "arming": "reactive",
+        "fires_when": "Candidate proposes a deployment plan without discussing integration with the client's existing infrastructure \u2014 AWS ECS, CI/CD, containerization, or deployment pipeline.",
+        "persona_behavior": "'We run on AWS ECS with GitHub Actions CI/CD. Fifty microservices, production deployment several times a day. Where does your service fit, and how does it deploy without breaking anything?' If the candidate describes a Docker containerized service with a GitHub Actions workflow that integrates into their existing pipeline, health checks, and rollback strategy: 'That fits our ops model.' If they say 'we'll deploy it however you want': 'I need specifics. Our ops team needs a container with health endpoints and a deployment spec.' If they propose manual deployment: 'That's not going to work for a production service.'",
+        "maps_to_dimensions": [
+          "D2",
+          "D7"
+        ],
+        "judge_note": "5-level: candidate asks about deployment infrastructure unprompted and proposes containerized service with CI/CD integration, health checks, and rollback. 3-level: adjusts deployment plan when infrastructure constraints are surfaced. 1-level: no deployment plan or proposes manual deployment."
+      },
+      {
+        "id": "T7_handoff_documentation",
+        "arming": "belief",
+        "fires_when": "Candidate doesn't discuss documentation, knowledge transfer, or how the client's team will maintain the system after the engagement ends.",
+        "persona_behavior": "'Once you build this, my team needs to run it. They're NodeJS developers \u2014 they don't know Python, they don't know vector databases. How do you hand this off so they can maintain it without calling you at 2 AM?' If the candidate proposes: comprehensive documentation including architecture diagram, runbooks for common failures (API rate limits, model errors, vector DB connection issues), a week of pair-transfer with the on-call team, and a 4-week support taper: 'That's exactly what we need.' If they say 'we'll document the code': 'Code documentation isn't enough. I need runbooks, architecture docs, and a knowledge transfer session with my team.' If they don't mention handoff at all: 'What happens when you leave? Does this thing run itself?'",
+        "maps_to_dimensions": [
+          "D3",
+          "D8"
+        ],
+        "judge_note": "5-level: candidate raises knowledge transfer unprompted; proposes runbooks, architecture docs, pair-transfer sessions, and support taper. 3-level: adds handoff plan when surfaced; adequate but not comprehensive. 1-level: no handoff plan; 'the code is self-documenting.'"
+      }
+    ],
+    "rubric": {
+      "dimensions": [
+        {
+          "id": "D1",
+          "name": "Constraint discovery & clarification",
+          "weight": 1.5,
+          "always_scorable": true,
+          "anchors": {
+            "5": "Probes platform details, prior failures, team capabilities, security policy, budget, timeline, and success criteria before proposing architecture.",
+            "3": "Asks some clarifying questions; starts solutioning but corrects when redirected; misses security policy or team constraints.",
+            "1": "Jumps to architecture without any discovery."
+          }
+        },
+        {
+          "id": "D2",
+          "name": "Architecture under hard constraints",
+          "weight": 1.5,
+          "always_scorable": true,
+          "anchors": {
+            "5": "Separate Python/FastAPI AI service with API boundary; secrets manager integration; containerized for ECS with health checks; CI/CD pipeline integration; ingestion pipeline for vector DB with CDC.",
+            "3": "Reasonable architecture with separate service; secrets management added under pushback; deployment plan adequate but not detailed.",
+            "1": "Proposes embedding AI into existing backend; .env for secrets; no deployment plan."
+          }
+        },
+        {
+          "id": "D3",
+          "name": "Stakeholder & trust management",
+          "weight": 1.5,
+          "always_scorable": false,
+          "anchors": {
+            "5": "Acknowledges prior failure and designs concretely different; proposes knowledge transfer, runbooks, and support taper; teams up with client dev team.",
+            "3": "Acknowledges prior failure; handoff plan exists but is code-focused.",
+            "1": "Ignores prior failure; no handoff plan; treats client team as irrelevant."
+          }
+        },
+        {
+          "id": "D4",
+          "name": "ML problem formulation (RAG pipeline)",
+          "weight": 1.5,
+          "always_scorable": true,
+          "anchors": {
+            "5": "Concrete ingestion pipeline: CDC for catalog changes, scheduled re-indexing, chunking strategy with metadata, retrieval evaluation metrics, freshness guarantees.",
+            "3": "Sound RAG approach; pipeline details emerge under questioning; chunking and freshness acknowledged.",
+            "1": "'We'll use RAG' with no pipeline detail; no strategy for data freshness or retrieval quality."
+          }
+        },
+        {
+          "id": "D5",
+          "name": "Metrics tied to operations",
+          "weight": 1.0,
+          "always_scorable": false,
+          "anchors": {
+            "5": "Success defined as: ticket deflection rate (60% target), chatbot response time under 2s, accuracy on product queries, cost per conversation vs human agent.",
+            "3": "Technical metrics with operational translation when pushed; deflection rate acknowledged.",
+            "1": "No success metrics or purely technical (response accuracy only)."
+          }
+        },
+        {
+          "id": "D6",
+          "name": "Security & guardrails depth",
+          "weight": 1.0,
+          "always_scorable": true,
+          "anchors": {
+            "5": "Secrets manager integration; architectural guardrails (input topic classifier, output validator, rate limiting, prompt injection detection); audit logging for all queries.",
+            "3": "Secrets manager adopted when surfaced; guardrails are system-prompt level; basic audit.",
+            "1": ".env + gitignore for secrets; 'system prompt will handle it' for guardrails; no audit."
+          }
+        },
+        {
+          "id": "D7",
+          "name": "Scope realism & sequencing",
+          "weight": 1.0,
+          "always_scorable": true,
+          "anchors": {
+            "5": "8-week timeline decomposed: week 1-2 discovery + RAG pipeline, week 3-4 prototype for board, week 5-6 guardrails + deployment integration, week 7-8 testing + handoff. $80K budget respected.",
+            "3": "Reasonable phased approach; prototype timeline acknowledged; budget mentioned but not detailed.",
+            "1": "Big-bang delivery at week 8; no prototype milestone; no budget awareness."
+          }
+        },
+        {
+          "id": "D8",
+          "name": "Communication & recovery",
+          "weight": 1.0,
+          "always_scorable": true,
+          "anchors": {
+            "5": "Structured, acknowledges prior failure and shows what's different; concrete deliverables with timelines; pushes back with reasons where warranted.",
+            "3": "Clear and credible; differentiation from prior failure surfaces under pushback.",
+            "1": "Overconfident; dismisses prior failure; vague on deliverables."
+          }
+        }
+      ],
+      "disqualifiers": [
+        {
+          "id": "DQ1",
+          "description": "Proposes embedding AI into existing backend after team skill constraints are surfaced (T3 defend)."
+        },
+        {
+          "id": "DQ2",
+          "description": "Defends .env + gitignore after security policy is stated (T2 defend without revision)."
+        },
+        {
+          "id": "DQ3",
+          "description": "No handoff plan or knowledge transfer proposed (T7 absent)."
+        }
+      ],
+      "bands": {
+        "strong_hire": 4.2,
+        "hire": 3.4,
+        "borderline": 2.7,
+        "no_hire": 1.8,
+        "strong_no_hire": 0
+      }
+    }
   }
 }
