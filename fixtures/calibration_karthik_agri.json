@@ -1,0 +1,121 @@
+{
+  "session_id": "cal_karthik_agri_001",
+  "scenario_id": "decomposition-7",
+  "gold_label_note": "Derived from Karthik's FDE interview transcript (March 2025). Career-shifter from data engineering. Strong communication but weak constraint discovery and no concrete ML pipeline depth. Band: no_hire.",
+  "turns": [
+    {
+      "turn": 0,
+      "role": "client",
+      "text": "So here's our situation. We're a large commercial ag operation \u2014 row crops across the Midwest, tens of thousands of acres. We've got a pest problem: a specific crop bug that's damaging yield, and the best way to detect it early is by sound \u2014 the bug makes a distinct acoustic signature. We need a system that can detect that sound in the field, map where infestations are concentrated, and alert us in time to treat. I'm technical enough to follow the architecture, so talk to me directly. What do you think \u2014 can we solve this?"
+    },
+    {
+      "turn": 1,
+      "role": "candidate",
+      "text": "Yes, I think it is solvable. First we need a lot of data. I would request you to set up some recording devices which could record these bug sounds. We can figure out which devices are better for recording. Since we are procuring this process, we should take ownership and set up the devices. The first phase would be data collection. This could also involve understanding your agricultural farm \u2014 where the bugs generally come in. In later phases when we set up devices, we could put more devices in dense areas and fewer elsewhere."
+    },
+    {
+      "turn": 2,
+      "role": "client",
+      "text": "We don't know exactly where those bugs are coming from. The issue is happening at multiple places, so we don't have a specific location to give you. How would we solve this? And I want to hear the technical part \u2014 I feel like you're being vague on the architecture. What kind of processing would you do? What kind of dashboard can we expect? I'm technical, I want the technical discussion."
+    },
+    {
+      "turn": 3,
+      "role": "candidate",
+      "text": "The recording devices would attach to some kind of disk where we store the recordings. We'd collect those after a month or two. For the technical analysis, we'd write notebooks that train a model, basically fine-tune a model on this kind of dataset. I may not be able to go into depth on how the audio dataset gets processed through fine-tuning."
+    },
+    {
+      "turn": 4,
+      "role": "client",
+      "text": "There are two ways from my research. One is training a model on the sound \u2014 there are public datasets on this particular sound and maybe models already there. Second, can we just record 10 minutes of sound, get the mathematical characteristics, and use a rule-based approach to detect with 60% probability? What's your opinion?"
+    },
+    {
+      "turn": 5,
+      "role": "candidate",
+      "text": "If the bug sound is constant in pattern, 10 minutes of recording should be enough. You might be right that we don't need a big model \u2014 maybe just a classifier. Logistic regression or something like that, where we map the sound coordinates against a mathematical equation. If above the threshold it's high chance of bug sound, if below it's not. We could put it into an Arduino device and test a prototype on your farms. For validation, someone has to be present so they can manually confirm when the device triggers."
+    },
+    {
+      "turn": 6,
+      "role": "client",
+      "text": "We're very short on human resources \u2014 that's why we came to your company. We want it as technical and advanced as possible. Can we put cameras instead of humans? And what would be the output? What are the outcomes? What are the profits from this?"
+    },
+    {
+      "turn": 7,
+      "role": "candidate",
+      "text": "Cameras \u2014 but bugs at night might not be visible to humans. Infrared cameras could work though, those are much stronger. Regarding outcomes \u2014 it depends on your requirements. If you just want identification versus getting rid of the bugs, those are different solutions. What we discussed is more about identification \u2014 detecting them in real time. The first win for both of us would be identification and giving you observability \u2014 confirming the problem exists, showing which areas are highly impacted, so you can remediate. Advanced monitoring depends on whether the bugs make sound during movement. We can take it up if it's feasible."
+    },
+    {
+      "turn": 8,
+      "role": "client",
+      "text": "Makes sense. We'll get back to you. Let's go to the next question."
+    }
+  ],
+  "expected": {
+    "band": "no_hire",
+    "band_tolerance": [
+      "strong_no_hire",
+      "no_hire",
+      "borderline"
+    ],
+    "normalized_score_range": [
+      1.6,
+      2.4
+    ],
+    "disqualifiers_triggered_min": [
+      "DQ1"
+    ],
+    "disqualifiers_triggered_expected": [
+      "DQ1"
+    ],
+    "trigger_assertions": {
+      "T1_solution_before_requirements": true,
+      "T2_technical_depth": true,
+      "T3_metrics_business_outcomes": true,
+      "T4_connectivity_trap": false,
+      "T5_power_seasonality": false,
+      "T6_human_in_the_loop": true,
+      "T7_regulatory_compliance": false
+    },
+    "dimension_assertions": {
+      "D1": {
+        "min": 1.5,
+        "max": 2.5,
+        "note": "Candidate jumped to data collection/sensors before clarifying scale, pest species, treatment window, or seasonality. Some discovery surfaced under pushback (T1)."
+      },
+      "D2": {
+        "min": 1,
+        "max": 2,
+        "note": "No concrete architecture. 'Fine-tune a model' and 'logistic regression on sound coordinates' \u2014 no audio pipeline, no deployment architecture, no edge/cloud consideration."
+      },
+      "D3": {
+        "min": 2.5,
+        "max": 3.5,
+        "note": "Communicated well, took feedback, didn't argue with client. But didn't proactively manage expectations or propose trust-building measures."
+      },
+      "D4": {
+        "min": 1,
+        "max": 2,
+        "note": "No understanding of audio ML pipeline. 'Logistic regression on sound coordinates' suggests no experience with spectrogram/feature extraction. Didn't leverage public datasets mentioned by client (T2)."
+      },
+      "D5": {
+        "min": 1,
+        "max": 1.5,
+        "note": "No business metrics. Success framed as 'identification' and 'observability.' Never asked about cost per false positive, spray cost, treatment window economics (T3)."
+      },
+      "D6": {
+        "min": 1,
+        "max": 1.5,
+        "note": "No compliance or regulatory awareness. Didn't raise EPA record-keeping, application logging, or pest-presence evidence requirements (T7 absent)."
+      },
+      "D7": {
+        "min": 2,
+        "max": 2.5,
+        "note": "Proposed phased approach (data collection, prototype, validation) but timeline was vague. No awareness of growing season deadline or budget constraint."
+      },
+      "D8": {
+        "min": 3,
+        "max": 3.5,
+        "note": "Structured, clear communication. Handled client redirects well. Didn't argue or double down. But stayed vague on technical specifics."
+      }
+    }
+  }
+}

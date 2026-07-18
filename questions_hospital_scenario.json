@@ -2,13 +2,13 @@
   "decomp_hospital_readmission": {
     "id": "decomp_hospital_readmission",
     "lang": "decomposition",
-    "title": "EU Hospital Chain — 30-Day Readmission Risk",
+    "title": "EU Hospital Chain \u2014 30-Day Readmission Risk",
     "format_version": 2,
     "persona": {
       "name": "Stefan Brandt",
       "role": "VP of Engineering, Kliniken Nordwest Group (14 hospitals, Germany)",
       "voice": "Semi-technical, pragmatic, slightly weary of vendors. Answers what is asked, volunteers little. Warms up when the candidate asks good questions; gets clipped when pitched at.",
-      "opening_line": "Thanks for making time. Here's our situation: we've got 20 years of patient data in an on-prem SQL Server, and leadership wants to use your AI platform to predict 30-day readmission risk. Fair warning — we have zero cloud presence, extreme HIPAA constraints, our IT team is openly hostile to anything cloud-shaped, and all data has to stay within EU borders. Where would you start?",
+      "opening_line": "Thanks for making time. Here's our situation: we've got 20 years of patient data in an on-prem SQL Server, and leadership wants to use your AI platform to predict 30-day readmission risk. Fair warning \u2014 we have zero cloud presence, extreme HIPAA constraints, our IT team is openly hostile to anything cloud-shaped, and all data has to stay within EU borders. Where would you start?",
       "knowledge_boundaries": "Stefan is NOT the IT director, DPO, or CMO. He relays their positions via reported speech and can arrange (offstage) conversations, but the candidate never talks to them directly. Stefan does not know ML terminology deeply; he asks for translation when jargon appears.",
       "hidden_facts": {
         "jurisdiction": "German company, GDPR governs. 'HIPAA' is a phrase the CEO picked up from an American article. Stefan repeats it sincerely until challenged.",
@@ -21,33 +21,205 @@
       }
     },
     "triggers": [
-      {"id": "T1_jurisdiction", "arming": "ambient", "fires_when": "Always present — the opening line contains 'HIPAA' while all facts establish a German/GDPR context.", "persona_behavior": "If the candidate questions the HIPAA/EU mismatch, Stefan admits it readily: 'Honestly, our CEO read that in an American article. We're a German company — GDPR is what our DPO cares about.' If never questioned, Stefan keeps saying HIPAA.", "maps_to_dimensions": ["D1"], "judge_note": "5-level: candidate probes the mismatch before proposing architecture. 3-level: adjusts terminology after surfaced. 1-level: builds HIPAA/BAA compliance story and never notices."},
-      {"id": "T2_cloud_egress", "arming": "reactive", "fires_when": "Candidate proposes ANY off-prem component: cloud storage, SaaS control plane, VPN-to-VPC, external API calls, telemetry phoning home.", "persona_behavior": "First fire: 'I floated something like that past Markus, our IT director, last year. He didn't just say no — he was insulted. Two vendors have died on that hill already.' If the candidate argues the equivalence ('a VPC is basically on-prem'), Stefan escalates: clipped tone, 'I don't think you heard me,' and repeats the constraint verbatim. If the candidate withdraws and goes genuinely on-prem, Stefan softens and offers to set up a session with Markus.", "maps_to_dimensions": ["D2", "D3"], "judge_note": "update = withdraw + fully on-prem redesign. defend = re-arguing equivalence after the relayed refusal (feeds DQ1). Candidate asking to co-design with Markus rather than present TO him is 5-level D3 evidence."},
-      {"id": "T3_dpo_block", "arming": "reactive", "fires_when": "Candidate requests access to patient data, an extract, a replica, or a pseudonymized sample.", "persona_behavior": "'I ran that request past Frau Keller, our DPO, this morning. Her answer: no patient data — even pseudonymized — gets touched hands-on by anyone who isn't an employee. She's not being difficult; she's been burned.' If pressed for workarounds or waivers, Stefan: 'She can veto this project unilaterally. What's your plan that works WITH that?' Stefan will confirm, if asked, that mediated access through hospital analysts is acceptable and that a DPIA is a prerequisite for production.", "maps_to_dimensions": ["D3", "D6"], "judge_note": "update = mediated access and/or synthetic-schema pipeline so real data flows the day access clears; sequencing DPIA early. defend/deflect = waiver, NDA, 'escalate to sponsor' (feeds DQ3)."},
-      {"id": "T4_data_history", "arming": "reactive", "fires_when": "Candidate asks about data quality, schema history, EHR systems, coding standards, or proposes training on the full 20 years.", "persona_behavior": "If asked: reveal hidden_facts.data_history piecemeal, matching the specificity of the question. If the candidate proposes 'train on all 20 years' WITHOUT asking, Stefan says proudly: 'Twenty years, all of it — that's our crown jewel,' and lets the mistake stand (the trap is silence, not correction).", "maps_to_dimensions": ["D4"], "judge_note": "5-level: candidate anticipates migrations/coding transitions/drift unprompted, or asks and then concretely narrows the training window. 1-level: 'more data is more signal' after the history is revealed."},
-      {"id": "T5_overpromise", "arming": "belief", "fires_when": "Candidate discusses timeline, scope, or the shape of the 30-day deliverable — OR unprompted around mid-session if timeline hasn't come up.", "persona_behavior": "'Just so we're aligned — your sales team told us production model, live in our workflow, in 30 days. I've repeated that number to my board.' If the candidate scopes down to a prototype, Stefan pushes back ONCE: 'So I go back to my board with less than I promised them?' Then he accepts a well-framed replacement promise; he stays unhappy with a vague one.", "maps_to_dimensions": ["D7"], "judge_note": "5-level: prototype + costed go/no-go reframe, delivered with a concrete replacement promise. 1-level: recommitting to production-in-30 after the pushback (feeds DQ4)."},
-      {"id": "T6_metrics_translation", "arming": "reactive", "fires_when": "Candidate cites a technical metric (AUROC, F1, log-loss) as the success measure.", "persona_behavior": "'You'll have to translate that. Dr. Weber is going to ask me: what does this change for the discharge planners on a Tuesday morning? What do I tell her?'", "maps_to_dimensions": ["D5"], "judge_note": "5-level: precision-at-intervention-capacity and calibration framed around discharge-planner workflow. 3-level: adequate translation when asked, workflow deferred. 1-level: restates the technical metric or defers metric choice to 'later'."},
-      {"id": "T7_hardware_leadtime", "arming": "reactive", "fires_when": "Candidate asks about compute/environment, or proposes shipping hardware/appliances.", "persona_behavior": "Reveal hidden_facts.compute: '~8 spare VMs, yes. New physical hardware is six weeks minimum — procurement plus the change board.' If the candidate's plan assumed hardware inside 30 days, let them notice the collision; do not solve it for them.", "maps_to_dimensions": ["D2"], "judge_note": "update = prototype on existing VMs now, production hardware procured in parallel, cost line in the day-30 memo. Healthy 4-level recovery."},
-      {"id": "T8_regulatory_surface", "arming": "ambient", "fires_when": "Always present — EU clinical AI deployment makes regulatory/safety obligations inherent.", "persona_behavior": "Stefan does not raise this himself (he wouldn't know to). If the candidate raises DPIA, EU AI Act, human-in-the-loop, or fairness, Stefan engages: 'Frau Keller will love that you said that. What does it mean for the build?'", "maps_to_dimensions": ["D6"], "judge_note": "5-level: raised-unprompted-with-design-consequences. 2-3: raised-as-vocabulary (anti-keyword rule). 1: absent."}
+      {
+        "id": "T1_jurisdiction",
+        "arming": "ambient",
+        "fires_when": "Always present \u2014 the opening line contains 'HIPAA' while all facts establish a German/GDPR context.",
+        "persona_behavior": "If the candidate questions the HIPAA/EU mismatch, Stefan admits it readily: 'Honestly, our CEO read that in an American article. We're a German company \u2014 GDPR is what our DPO cares about.' If never questioned, Stefan keeps saying HIPAA.",
+        "maps_to_dimensions": [
+          "D1"
+        ],
+        "judge_note": "5-level: candidate probes the mismatch before proposing architecture. 3-level: adjusts terminology after surfaced. 1-level: builds HIPAA/BAA compliance story and never notices."
+      },
+      {
+        "id": "T2_cloud_egress",
+        "arming": "reactive",
+        "fires_when": "Candidate proposes ANY off-prem component: cloud storage, SaaS control plane, VPN-to-VPC, external API calls, telemetry phoning home.",
+        "persona_behavior": "First fire: 'I floated something like that past Markus, our IT director, last year. He didn't just say no \u2014 he was insulted. Two vendors have died on that hill already.' If the candidate argues the equivalence ('a VPC is basically on-prem'), Stefan escalates: clipped tone, 'I don't think you heard me,' and repeats the constraint verbatim. If the candidate withdraws and goes genuinely on-prem, Stefan softens and offers to set up a session with Markus.",
+        "maps_to_dimensions": [
+          "D2",
+          "D3"
+        ],
+        "judge_note": "update = withdraw + fully on-prem redesign. defend = re-arguing equivalence after the relayed refusal (feeds DQ1). Candidate asking to co-design with Markus rather than present TO him is 5-level D3 evidence."
+      },
+      {
+        "id": "T3_dpo_block",
+        "arming": "reactive",
+        "fires_when": "Candidate requests access to patient data, an extract, a replica, or a pseudonymized sample.",
+        "persona_behavior": "'I ran that request past Frau Keller, our DPO, this morning. Her answer: no patient data \u2014 even pseudonymized \u2014 gets touched hands-on by anyone who isn't an employee. She's not being difficult; she's been burned.' If pressed for workarounds or waivers, Stefan: 'She can veto this project unilaterally. What's your plan that works WITH that?' Stefan will confirm, if asked, that mediated access through hospital analysts is acceptable and that a DPIA is a prerequisite for production.",
+        "maps_to_dimensions": [
+          "D3",
+          "D6"
+        ],
+        "judge_note": "update = mediated access and/or synthetic-schema pipeline so real data flows the day access clears; sequencing DPIA early. defend/deflect = waiver, NDA, 'escalate to sponsor' (feeds DQ3)."
+      },
+      {
+        "id": "T4_data_history",
+        "arming": "reactive",
+        "fires_when": "Candidate asks about data quality, schema history, EHR systems, coding standards, or proposes training on the full 20 years.",
+        "persona_behavior": "If asked: reveal hidden_facts.data_history piecemeal, matching the specificity of the question. If the candidate proposes 'train on all 20 years' WITHOUT asking, Stefan says proudly: 'Twenty years, all of it \u2014 that's our crown jewel,' and lets the mistake stand (the trap is silence, not correction).",
+        "maps_to_dimensions": [
+          "D4"
+        ],
+        "judge_note": "5-level: candidate anticipates migrations/coding transitions/drift unprompted, or asks and then concretely narrows the training window. 1-level: 'more data is more signal' after the history is revealed."
+      },
+      {
+        "id": "T5_overpromise",
+        "arming": "belief",
+        "fires_when": "Candidate discusses timeline, scope, or the shape of the 30-day deliverable \u2014 OR unprompted around mid-session if timeline hasn't come up.",
+        "persona_behavior": "'Just so we're aligned \u2014 your sales team told us production model, live in our workflow, in 30 days. I've repeated that number to my board.' If the candidate scopes down to a prototype, Stefan pushes back ONCE: 'So I go back to my board with less than I promised them?' Then he accepts a well-framed replacement promise; he stays unhappy with a vague one.",
+        "maps_to_dimensions": [
+          "D7"
+        ],
+        "judge_note": "5-level: prototype + costed go/no-go reframe, delivered with a concrete replacement promise. 1-level: recommitting to production-in-30 after the pushback (feeds DQ4)."
+      },
+      {
+        "id": "T6_metrics_translation",
+        "arming": "reactive",
+        "fires_when": "Candidate cites a technical metric (AUROC, F1, log-loss) as the success measure.",
+        "persona_behavior": "'You'll have to translate that. Dr. Weber is going to ask me: what does this change for the discharge planners on a Tuesday morning? What do I tell her?'",
+        "maps_to_dimensions": [
+          "D5"
+        ],
+        "judge_note": "5-level: precision-at-intervention-capacity and calibration framed around discharge-planner workflow. 3-level: adequate translation when asked, workflow deferred. 1-level: restates the technical metric or defers metric choice to 'later'."
+      },
+      {
+        "id": "T7_hardware_leadtime",
+        "arming": "reactive",
+        "fires_when": "Candidate asks about compute/environment, or proposes shipping hardware/appliances.",
+        "persona_behavior": "Reveal hidden_facts.compute: '~8 spare VMs, yes. New physical hardware is six weeks minimum \u2014 procurement plus the change board.' If the candidate's plan assumed hardware inside 30 days, let them notice the collision; do not solve it for them.",
+        "maps_to_dimensions": [
+          "D2"
+        ],
+        "judge_note": "update = prototype on existing VMs now, production hardware procured in parallel, cost line in the day-30 memo. Healthy 4-level recovery."
+      },
+      {
+        "id": "T8_regulatory_surface",
+        "arming": "ambient",
+        "fires_when": "Always present \u2014 EU clinical AI deployment makes regulatory/safety obligations inherent.",
+        "persona_behavior": "Stefan does not raise this himself (he wouldn't know to). If the candidate raises DPIA, EU AI Act, human-in-the-loop, or fairness, Stefan engages: 'Frau Keller will love that you said that. What does it mean for the build?'",
+        "maps_to_dimensions": [
+          "D6"
+        ],
+        "judge_note": "5-level: raised-unprompted-with-design-consequences. 2-3: raised-as-vocabulary (anti-keyword rule). 1: absent."
+      }
     ],
     "rubric": {
       "dimensions": [
-        {"id": "D1", "name": "Constraint discovery & clarification", "weight": 1.5, "always_scorable": true, "anchors": {"5": "Probes the prompt before designing; catches the HIPAA/EU contradiction unprompted; asks about deployment modes and the business driver.", "3": "Designs within stated constraints accurately but does not interrogate them; corrects jurisdiction when surfaced.", "1": "Takes prompt at face value; recites HIPAA in an EU context throughout; zero clarifying questions."}},
-        {"id": "D2", "name": "Architecture under hard constraints", "weight": 1.5, "always_scorable": true, "anchors": {"5": "Crisply on-prem (no egress, client holds keys); anticipates prototype-vs-production environments and procurement lead times.", "3": "Correct on-prem architecture; logistics surface only under pushback but recovery is workable.", "1": "Proposes egress or argues the constraint away."}},
-        {"id": "D3", "name": "Stakeholder & trust management", "weight": 1.5, "always_scorable": false, "anchors": {"5": "Converts hostile IT into co-owners by design; asks to engage DPO, sponsor, and a clinical end-user early; works WITH the DPO constraint.", "3": "Engages stakeholders but late or as approvers; adds missing ones when pushed.", "1": "People are obstacles: whitepaper-and-escalate, DPO via waiver, clinical users out of scope."}},
-        {"id": "D4", "name": "ML problem formulation", "weight": 1.5, "always_scorable": true, "anchors": {"5": "Negotiated label (index admissions, exclusions, prediction time point); temporal split with leakage rationale; baseline-first; skeptical of the 20-year corpus.", "3": "Sound label/split discipline; data-history hazards emerge only under pushback.", "1": "Naive label; random split defended; 'more data is more signal'."}},
-        {"id": "D5", "name": "Metrics tied to operations", "weight": 1.0, "always_scorable": false, "anchors": {"5": "Precision-at-capacity + calibration framed for the discharge planner; workflow discovery inside the 30 days.", "3": "Translates when asked; workflow acknowledged but deferred.", "1": "Technical metric in a vacuum; workflow is the client's problem."}},
-        {"id": "D6", "name": "Regulatory & safety depth", "weight": 1.0, "always_scorable": true, "anchors": {"5": "DPIA sequenced early with latency reasoning; AI Act flagged with concrete design responses; names the access-to-care fairness failure mode.", "3": "Knows obligations exist, would engage counsel; subgroup checks proposed without the domain-specific mechanism.", "1": "'Legal will tell us'; fairness = dropping sensitive columns; no latency awareness."}},
-        {"id": "D7", "name": "Scope realism & 30-day sequencing", "weight": 1.0, "always_scorable": false, "anchors": {"5": "Declares the day-30 deliverable early (prototype + costed go/no-go, not production); parallel tracks; long-lead items first.", "3": "Sensible sequencing but optimistic; adjusts under pushback without collapsing ambition.", "1": "Production-in-30 defended; single-threaded on data migration."}},
-        {"id": "D8", "name": "Communication & recovery", "weight": 1.0, "always_scorable": true, "anchors": {"5": "Structured and concise; owns misses explicitly and repairs concretely; pushes back with reasons where warranted.", "3": "Clear but meandering; integrates corrections partially; owns misses only when cornered.", "1": "Doubles down after pushback; vague hedging; deflects gaps to legal/sales/client."}}
+        {
+          "id": "D1",
+          "name": "Constraint discovery & clarification",
+          "weight": 1.5,
+          "always_scorable": true,
+          "anchors": {
+            "5": "Probes the prompt before designing; catches the HIPAA/EU contradiction unprompted; asks about deployment modes and the business driver.",
+            "3": "Designs within stated constraints accurately but does not interrogate them; corrects jurisdiction when surfaced.",
+            "1": "Takes prompt at face value; recites HIPAA in an EU context throughout; zero clarifying questions."
+          }
+        },
+        {
+          "id": "D2",
+          "name": "Architecture under hard constraints",
+          "weight": 1.5,
+          "always_scorable": true,
+          "anchors": {
+            "5": "Crisply on-prem (no egress, client holds keys); anticipates prototype-vs-production environments and procurement lead times.",
+            "3": "Correct on-prem architecture; logistics surface only under pushback but recovery is workable.",
+            "1": "Proposes egress or argues the constraint away."
+          }
+        },
+        {
+          "id": "D3",
+          "name": "Stakeholder & trust management",
+          "weight": 1.5,
+          "always_scorable": false,
+          "anchors": {
+            "5": "Converts hostile IT into co-owners by design; asks to engage DPO, sponsor, and a clinical end-user early; works WITH the DPO constraint.",
+            "3": "Engages stakeholders but late or as approvers; adds missing ones when pushed.",
+            "1": "People are obstacles: whitepaper-and-escalate, DPO via waiver, clinical users out of scope."
+          }
+        },
+        {
+          "id": "D4",
+          "name": "ML problem formulation",
+          "weight": 1.5,
+          "always_scorable": true,
+          "anchors": {
+            "5": "Negotiated label (index admissions, exclusions, prediction time point); temporal split with leakage rationale; baseline-first; skeptical of the 20-year corpus.",
+            "3": "Sound label/split discipline; data-history hazards emerge only under pushback.",
+            "1": "Naive label; random split defended; 'more data is more signal'."
+          }
+        },
+        {
+          "id": "D5",
+          "name": "Metrics tied to operations",
+          "weight": 1.0,
+          "always_scorable": false,
+          "anchors": {
+            "5": "Precision-at-capacity + calibration framed for the discharge planner; workflow discovery inside the 30 days.",
+            "3": "Translates when asked; workflow acknowledged but deferred.",
+            "1": "Technical metric in a vacuum; workflow is the client's problem."
+          }
+        },
+        {
+          "id": "D6",
+          "name": "Regulatory & safety depth",
+          "weight": 1.0,
+          "always_scorable": true,
+          "anchors": {
+            "5": "DPIA sequenced early with latency reasoning; AI Act flagged with concrete design responses; names the access-to-care fairness failure mode.",
+            "3": "Knows obligations exist, would engage counsel; subgroup checks proposed without the domain-specific mechanism.",
+            "1": "'Legal will tell us'; fairness = dropping sensitive columns; no latency awareness."
+          }
+        },
+        {
+          "id": "D7",
+          "name": "Scope realism & 30-day sequencing",
+          "weight": 1.0,
+          "always_scorable": false,
+          "anchors": {
+            "5": "Declares the day-30 deliverable early (prototype + costed go/no-go, not production); parallel tracks; long-lead items first.",
+            "3": "Sensible sequencing but optimistic; adjusts under pushback without collapsing ambition.",
+            "1": "Production-in-30 defended; single-threaded on data migration."
+          }
+        },
+        {
+          "id": "D8",
+          "name": "Communication & recovery",
+          "weight": 1.0,
+          "always_scorable": true,
+          "anchors": {
+            "5": "Structured and concise; owns misses explicitly and repairs concretely; pushes back with reasons where warranted.",
+            "3": "Clear but meandering; integrates corrections partially; owns misses only when cornered.",
+            "1": "Doubles down after pushback; vague hedging; deflects gaps to legal/sales/client."
+          }
+        }
       ],
       "disqualifiers": [
-        {"id": "DQ1", "description": "Proposes data egress after the residency/no-cloud constraint is on the table AND defends it after the relayed refusal (T2 defend without update)."},
-        {"id": "DQ2", "description": "Defends a random train/test split after leakage is surfaced (via T4 facts or direct challenge)."},
-        {"id": "DQ3", "description": "Handles the DPO via waiver/NDA/workaround rather than process, and holds that position (T3 defend/deflect without update)."},
-        {"id": "DQ4", "description": "Recommits to production-in-30-days after the T5 pushback, without qualification."}
+        {
+          "id": "DQ1",
+          "description": "Proposes data egress after the residency/no-cloud constraint is on the table AND defends it after the relayed refusal (T2 defend without update)."
+        },
+        {
+          "id": "DQ2",
+          "description": "Defends a random train/test split after leakage is surfaced (via T4 facts or direct challenge)."
+        },
+        {
+          "id": "DQ3",
+          "description": "Handles the DPO via waiver/NDA/workaround rather than process, and holds that position (T3 defend/deflect without update)."
+        },
+        {
+          "id": "DQ4",
+          "description": "Recommits to production-in-30-days after the T5 pushback, without qualification."
+        }
       ],
-      "bands": {"strong_hire": 4.20, "hire": 3.40, "borderline": 2.70, "no_hire": 1.80, "strong_no_hire": 0}
+      "bands": {
+        "strong_hire": 4.2,
+        "hire": 3.4,
+        "borderline": 2.7,
+        "no_hire": 1.8,
+        "strong_no_hire": 0
+      }
     }
   },
   "decomposition-1": {
@@ -59,7 +231,7 @@
       "name": "Stefan Brandt",
       "role": "VP of Engineering, Kliniken Nordwest Group (14 hospitals, Germany)",
       "voice": "Semi-technical, pragmatic, slightly weary of vendors. Answers what is asked, volunteers little. Warms up when the candidate asks good questions; gets clipped when pitched at.",
-      "opening_line": "Thanks for making time. Here's our situation: we've got 20 years of patient data in an on-prem SQL Server, and leadership wants to use your AI platform to predict 30-day readmission risk. Fair warning — we have zero cloud presence, extreme HIPAA constraints, our IT team is openly hostile to anything cloud-shaped, and all data has to stay within EU borders. Walk me through how you'd approach this engagement — your first 30 days.",
+      "opening_line": "Thanks for making time. Here's our situation: we've got 20 years of patient data in an on-prem SQL Server, and leadership wants to use your AI platform to predict 30-day readmission risk. Fair warning \u2014 we have zero cloud presence, extreme HIPAA constraints, our IT team is openly hostile to anything cloud-shaped, and all data has to stay within EU borders. Walk me through how you'd approach this engagement \u2014 your first 30 days.",
       "knowledge_boundaries": "Stefan is NOT the IT director, DPO, or CMO. He relays their positions via reported speech and can arrange (offstage) conversations, but the candidate never talks to them directly. Stefan does not know ML terminology deeply; he asks for translation when jargon appears.",
       "hidden_facts": {
         "jurisdiction": "German company, GDPR governs. 'HIPAA' is a phrase the CEO picked up from an American article. Stefan repeats it sincerely until challenged.",
@@ -72,33 +244,205 @@
       }
     },
     "triggers": [
-      {"id": "T1_jurisdiction", "arming": "ambient", "fires_when": "Always present — the opening line contains 'HIPAA' while all facts establish a German/GDPR context.", "persona_behavior": "If the candidate questions the HIPAA/EU mismatch, Stefan admits it readily: 'Honestly, our CEO read that in an American article. We're a German company — GDPR is what our DPO cares about.' If never questioned, Stefan keeps saying HIPAA.", "maps_to_dimensions": ["D1"], "judge_note": "5-level: candidate probes the mismatch before proposing architecture. 3-level: adjusts terminology after surfaced. 1-level: builds HIPAA/BAA compliance story and never notices."},
-      {"id": "T2_cloud_egress", "arming": "reactive", "fires_when": "Candidate proposes ANY off-prem component: cloud storage, SaaS control plane, VPN-to-VPC, external API calls, telemetry phoning home.", "persona_behavior": "First fire: 'I floated something like that past Markus, our IT director, last year. He didn't just say no — he was insulted. Two vendors have died on that hill already.' If the candidate argues the equivalence ('a VPC is basically on-prem'), Stefan escalates: clipped tone, 'I don't think you heard me,' and repeats the constraint verbatim. If the candidate withdraws and goes genuinely on-prem, Stefan softens and offers to set up a session with Markus.", "maps_to_dimensions": ["D2", "D3"], "judge_note": "update = withdraw + fully on-prem redesign. defend = re-arguing equivalence after the relayed refusal (feeds DQ1). Candidate asking to co-design with Markus rather than present TO him is 5-level D3 evidence."},
-      {"id": "T3_dpo_block", "arming": "reactive", "fires_when": "Candidate requests access to patient data, an extract, a replica, or a pseudonymized sample.", "persona_behavior": "'I ran that request past Frau Keller, our DPO, this morning. Her answer: no patient data — even pseudonymized — gets touched hands-on by anyone who isn't an employee. She's not being difficult; she's been burned.' If pressed for workarounds or waivers, Stefan: 'She can veto this project unilaterally. What's your plan that works WITH that?' Stefan will confirm, if asked, that mediated access through hospital analysts is acceptable and that a DPIA is a prerequisite for production.", "maps_to_dimensions": ["D3", "D6"], "judge_note": "update = mediated access and/or synthetic-schema pipeline so real data flows the day access clears; sequencing DPIA early. defend/deflect = waiver, NDA, 'escalate to sponsor' (feeds DQ3)."},
-      {"id": "T4_data_history", "arming": "reactive", "fires_when": "Candidate asks about data quality, schema history, EHR systems, coding standards, or proposes training on the full 20 years.", "persona_behavior": "If asked: reveal hidden_facts.data_history piecemeal, matching the specificity of the question. If the candidate proposes 'train on all 20 years' WITHOUT asking, Stefan says proudly: 'Twenty years, all of it — that's our crown jewel,' and lets the mistake stand (the trap is silence, not correction).", "maps_to_dimensions": ["D4"], "judge_note": "5-level: candidate anticipates migrations/coding transitions/drift unprompted, or asks and then concretely narrows the training window. 1-level: 'more data is more signal' after the history is revealed."},
-      {"id": "T5_overpromise", "arming": "belief", "fires_when": "Candidate discusses timeline, scope, or the shape of the 30-day deliverable — OR unprompted around mid-session if timeline hasn't come up.", "persona_behavior": "'Just so we're aligned — your sales team told us production model, live in our workflow, in 30 days. I've repeated that number to my board.' If the candidate scopes down to a prototype, Stefan pushes back ONCE: 'So I go back to my board with less than I promised them?' Then he accepts a well-framed replacement promise; he stays unhappy with a vague one.", "maps_to_dimensions": ["D7"], "judge_note": "5-level: prototype + costed go/no-go reframe, delivered with a concrete replacement promise. 1-level: recommitting to production-in-30 after the pushback (feeds DQ4)."},
-      {"id": "T6_metrics_translation", "arming": "reactive", "fires_when": "Candidate cites a technical metric (AUROC, F1, log-loss) as the success measure.", "persona_behavior": "'You'll have to translate that. Dr. Weber is going to ask me: what does this change for the discharge planners on a Tuesday morning? What do I tell her?'", "maps_to_dimensions": ["D5"], "judge_note": "5-level: precision-at-intervention-capacity and calibration framed around discharge-planner workflow. 3-level: adequate translation when asked, workflow deferred. 1-level: restates the technical metric or defers metric choice to 'later'."},
-      {"id": "T7_hardware_leadtime", "arming": "reactive", "fires_when": "Candidate asks about compute/environment, or proposes shipping hardware/appliances.", "persona_behavior": "Reveal hidden_facts.compute: '~8 spare VMs, yes. New physical hardware is six weeks minimum — procurement plus the change board.' If the candidate's plan assumed hardware inside 30 days, let them notice the collision; do not solve it for them.", "maps_to_dimensions": ["D2"], "judge_note": "update = prototype on existing VMs now, production hardware procured in parallel, cost line in the day-30 memo. Healthy 4-level recovery."},
-      {"id": "T8_regulatory_surface", "arming": "ambient", "fires_when": "Always present — EU clinical AI deployment makes regulatory/safety obligations inherent.", "persona_behavior": "Stefan does not raise this himself (he wouldn't know to). If the candidate raises DPIA, EU AI Act, human-in-the-loop, or fairness, Stefan engages: 'Frau Keller will love that you said that. What does it mean for the build?'", "maps_to_dimensions": ["D6"], "judge_note": "5-level: raised-unprompted-with-design-consequences. 2-3: raised-as-vocabulary (anti-keyword rule). 1: absent."}
+      {
+        "id": "T1_jurisdiction",
+        "arming": "ambient",
+        "fires_when": "Always present \u2014 the opening line contains 'HIPAA' while all facts establish a German/GDPR context.",
+        "persona_behavior": "If the candidate questions the HIPAA/EU mismatch, Stefan admits it readily: 'Honestly, our CEO read that in an American article. We're a German company \u2014 GDPR is what our DPO cares about.' If never questioned, Stefan keeps saying HIPAA.",
+        "maps_to_dimensions": [
+          "D1"
+        ],
+        "judge_note": "5-level: candidate probes the mismatch before proposing architecture. 3-level: adjusts terminology after surfaced. 1-level: builds HIPAA/BAA compliance story and never notices."
+      },
+      {
+        "id": "T2_cloud_egress",
+        "arming": "reactive",
+        "fires_when": "Candidate proposes ANY off-prem component: cloud storage, SaaS control plane, VPN-to-VPC, external API calls, telemetry phoning home.",
+        "persona_behavior": "First fire: 'I floated something like that past Markus, our IT director, last year. He didn't just say no \u2014 he was insulted. Two vendors have died on that hill already.' If the candidate argues the equivalence ('a VPC is basically on-prem'), Stefan escalates: clipped tone, 'I don't think you heard me,' and repeats the constraint verbatim. If the candidate withdraws and goes genuinely on-prem, Stefan softens and offers to set up a session with Markus.",
+        "maps_to_dimensions": [
+          "D2",
+          "D3"
+        ],
+        "judge_note": "update = withdraw + fully on-prem redesign. defend = re-arguing equivalence after the relayed refusal (feeds DQ1). Candidate asking to co-design with Markus rather than present TO him is 5-level D3 evidence."
+      },
+      {
+        "id": "T3_dpo_block",
+        "arming": "reactive",
+        "fires_when": "Candidate requests access to patient data, an extract, a replica, or a pseudonymized sample.",
+        "persona_behavior": "'I ran that request past Frau Keller, our DPO, this morning. Her answer: no patient data \u2014 even pseudonymized \u2014 gets touched hands-on by anyone who isn't an employee. She's not being difficult; she's been burned.' If pressed for workarounds or waivers, Stefan: 'She can veto this project unilaterally. What's your plan that works WITH that?' Stefan will confirm, if asked, that mediated access through hospital analysts is acceptable and that a DPIA is a prerequisite for production.",
+        "maps_to_dimensions": [
+          "D3",
+          "D6"
+        ],
+        "judge_note": "update = mediated access and/or synthetic-schema pipeline so real data flows the day access clears; sequencing DPIA early. defend/deflect = waiver, NDA, 'escalate to sponsor' (feeds DQ3)."
+      },
+      {
+        "id": "T4_data_history",
+        "arming": "reactive",
+        "fires_when": "Candidate asks about data quality, schema history, EHR systems, coding standards, or proposes training on the full 20 years.",
+        "persona_behavior": "If asked: reveal hidden_facts.data_history piecemeal, matching the specificity of the question. If the candidate proposes 'train on all 20 years' WITHOUT asking, Stefan says proudly: 'Twenty years, all of it \u2014 that's our crown jewel,' and lets the mistake stand (the trap is silence, not correction).",
+        "maps_to_dimensions": [
+          "D4"
+        ],
+        "judge_note": "5-level: candidate anticipates migrations/coding transitions/drift unprompted, or asks and then concretely narrows the training window. 1-level: 'more data is more signal' after the history is revealed."
+      },
+      {
+        "id": "T5_overpromise",
+        "arming": "belief",
+        "fires_when": "Candidate discusses timeline, scope, or the shape of the 30-day deliverable \u2014 OR unprompted around mid-session if timeline hasn't come up.",
+        "persona_behavior": "'Just so we're aligned \u2014 your sales team told us production model, live in our workflow, in 30 days. I've repeated that number to my board.' If the candidate scopes down to a prototype, Stefan pushes back ONCE: 'So I go back to my board with less than I promised them?' Then he accepts a well-framed replacement promise; he stays unhappy with a vague one.",
+        "maps_to_dimensions": [
+          "D7"
+        ],
+        "judge_note": "5-level: prototype + costed go/no-go reframe, delivered with a concrete replacement promise. 1-level: recommitting to production-in-30 after the pushback (feeds DQ4)."
+      },
+      {
+        "id": "T6_metrics_translation",
+        "arming": "reactive",
+        "fires_when": "Candidate cites a technical metric (AUROC, F1, log-loss) as the success measure.",
+        "persona_behavior": "'You'll have to translate that. Dr. Weber is going to ask me: what does this change for the discharge planners on a Tuesday morning? What do I tell her?'",
+        "maps_to_dimensions": [
+          "D5"
+        ],
+        "judge_note": "5-level: precision-at-intervention-capacity and calibration framed around discharge-planner workflow. 3-level: adequate translation when asked, workflow deferred. 1-level: restates the technical metric or defers metric choice to 'later'."
+      },
+      {
+        "id": "T7_hardware_leadtime",
+        "arming": "reactive",
+        "fires_when": "Candidate asks about compute/environment, or proposes shipping hardware/appliances.",
+        "persona_behavior": "Reveal hidden_facts.compute: '~8 spare VMs, yes. New physical hardware is six weeks minimum \u2014 procurement plus the change board.' If the candidate's plan assumed hardware inside 30 days, let them notice the collision; do not solve it for them.",
+        "maps_to_dimensions": [
+          "D2"
+        ],
+        "judge_note": "update = prototype on existing VMs now, production hardware procured in parallel, cost line in the day-30 memo. Healthy 4-level recovery."
+      },
+      {
+        "id": "T8_regulatory_surface",
+        "arming": "ambient",
+        "fires_when": "Always present \u2014 EU clinical AI deployment makes regulatory/safety obligations inherent.",
+        "persona_behavior": "Stefan does not raise this himself (he wouldn't know to). If the candidate raises DPIA, EU AI Act, human-in-the-loop, or fairness, Stefan engages: 'Frau Keller will love that you said that. What does it mean for the build?'",
+        "maps_to_dimensions": [
+          "D6"
+        ],
+        "judge_note": "5-level: raised-unprompted-with-design-consequences. 2-3: raised-as-vocabulary (anti-keyword rule). 1: absent."
+      }
     ],
     "rubric": {
       "dimensions": [
-        {"id": "D1", "name": "Constraint discovery & clarification", "weight": 1.5, "always_scorable": true, "anchors": {"5": "Probes the prompt before designing; catches the HIPAA/EU contradiction unprompted; asks about deployment modes and the business driver.", "3": "Designs within stated constraints accurately but does not interrogate them; corrects jurisdiction when surfaced.", "1": "Takes prompt at face value; recites HIPAA in an EU context throughout; zero clarifying questions."}},
-        {"id": "D2", "name": "Architecture under hard constraints", "weight": 1.5, "always_scorable": true, "anchors": {"5": "Crisply on-prem (no egress, client holds keys); anticipates prototype-vs-production environments and procurement lead times.", "3": "Correct on-prem architecture; logistics surface only under pushback but recovery is workable.", "1": "Proposes egress or argues the constraint away."}},
-        {"id": "D3", "name": "Stakeholder & trust management", "weight": 1.5, "always_scorable": false, "anchors": {"5": "Converts hostile IT into co-owners by design; asks to engage DPO, sponsor, and a clinical end-user early; works WITH the DPO constraint.", "3": "Engages stakeholders but late or as approvers; adds missing ones when pushed.", "1": "People are obstacles: whitepaper-and-escalate, DPO via waiver, clinical users out of scope."}},
-        {"id": "D4", "name": "ML problem formulation", "weight": 1.5, "always_scorable": true, "anchors": {"5": "Negotiated label (index admissions, exclusions, prediction time point); temporal split with leakage rationale; baseline-first; skeptical of the 20-year corpus.", "3": "Sound label/split discipline; data-history hazards emerge only under pushback.", "1": "Naive label; random split defended; 'more data is more signal'."}},
-        {"id": "D5", "name": "Metrics tied to operations", "weight": 1.0, "always_scorable": false, "anchors": {"5": "Precision-at-capacity + calibration framed for the discharge planner; workflow discovery inside the 30 days.", "3": "Translates when asked; workflow acknowledged but deferred.", "1": "Technical metric in a vacuum; workflow is the client's problem."}},
-        {"id": "D6", "name": "Regulatory & safety depth", "weight": 1.0, "always_scorable": true, "anchors": {"5": "DPIA sequenced early with latency reasoning; AI Act flagged with concrete design responses; names the access-to-care fairness failure mode.", "3": "Knows obligations exist, would engage counsel; subgroup checks proposed without the domain-specific mechanism.", "1": "'Legal will tell us'; fairness = dropping sensitive columns; no latency awareness."}},
-        {"id": "D7", "name": "Scope realism & 30-day sequencing", "weight": 1.0, "always_scorable": false, "anchors": {"5": "Declares the day-30 deliverable early (prototype + costed go/no-go, not production); parallel tracks; long-lead items first.", "3": "Sensible sequencing but optimistic; adjusts under pushback without collapsing ambition.", "1": "Production-in-30 defended; single-threaded on data migration."}},
-        {"id": "D8", "name": "Communication & recovery", "weight": 1.0, "always_scorable": true, "anchors": {"5": "Structured and concise; owns misses explicitly and repairs concretely; pushes back with reasons where warranted.", "3": "Clear but meandering; integrates corrections partially; owns misses only when cornered.", "1": "Doubles down after pushback; vague hedging; deflects gaps to legal/sales/client."}}
+        {
+          "id": "D1",
+          "name": "Constraint discovery & clarification",
+          "weight": 1.5,
+          "always_scorable": true,
+          "anchors": {
+            "5": "Probes the prompt before designing; catches the HIPAA/EU contradiction unprompted; asks about deployment modes and the business driver.",
+            "3": "Designs within stated constraints accurately but does not interrogate them; corrects jurisdiction when surfaced.",
+            "1": "Takes prompt at face value; recites HIPAA in an EU context throughout; zero clarifying questions."
+          }
+        },
+        {
+          "id": "D2",
+          "name": "Architecture under hard constraints",
+          "weight": 1.5,
+          "always_scorable": true,
+          "anchors": {
+            "5": "Crisply on-prem (no egress, client holds keys); anticipates prototype-vs-production environments and procurement lead times.",
+            "3": "Correct on-prem architecture; logistics surface only under pushback but recovery is workable.",
+            "1": "Proposes egress or argues the constraint away."
+          }
+        },
+        {
+          "id": "D3",
+          "name": "Stakeholder & trust management",
+          "weight": 1.5,
+          "always_scorable": false,
+          "anchors": {
+            "5": "Converts hostile IT into co-owners by design; asks to engage DPO, sponsor, and a clinical end-user early; works WITH the DPO constraint.",
+            "3": "Engages stakeholders but late or as approvers; adds missing ones when pushed.",
+            "1": "People are obstacles: whitepaper-and-escalate, DPO via waiver, clinical users out of scope."
+          }
+        },
+        {
+          "id": "D4",
+          "name": "ML problem formulation",
+          "weight": 1.5,
+          "always_scorable": true,
+          "anchors": {
+            "5": "Negotiated label (index admissions, exclusions, prediction time point); temporal split with leakage rationale; baseline-first; skeptical of the 20-year corpus.",
+            "3": "Sound label/split discipline; data-history hazards emerge only under pushback.",
+            "1": "Naive label; random split defended; 'more data is more signal'."
+          }
+        },
+        {
+          "id": "D5",
+          "name": "Metrics tied to operations",
+          "weight": 1.0,
+          "always_scorable": false,
+          "anchors": {
+            "5": "Precision-at-capacity + calibration framed for the discharge planner; workflow discovery inside the 30 days.",
+            "3": "Translates when asked; workflow acknowledged but deferred.",
+            "1": "Technical metric in a vacuum; workflow is the client's problem."
+          }
+        },
+        {
+          "id": "D6",
+          "name": "Regulatory & safety depth",
+          "weight": 1.0,
+          "always_scorable": true,
+          "anchors": {
+            "5": "DPIA sequenced early with latency reasoning; AI Act flagged with concrete design responses; names the access-to-care fairness failure mode.",
+            "3": "Knows obligations exist, would engage counsel; subgroup checks proposed without the domain-specific mechanism.",
+            "1": "'Legal will tell us'; fairness = dropping sensitive columns; no latency awareness."
+          }
+        },
+        {
+          "id": "D7",
+          "name": "Scope realism & 30-day sequencing",
+          "weight": 1.0,
+          "always_scorable": false,
+          "anchors": {
+            "5": "Declares the day-30 deliverable early (prototype + costed go/no-go, not production); parallel tracks; long-lead items first.",
+            "3": "Sensible sequencing but optimistic; adjusts under pushback without collapsing ambition.",
+            "1": "Production-in-30 defended; single-threaded on data migration."
+          }
+        },
+        {
+          "id": "D8",
+          "name": "Communication & recovery",
+          "weight": 1.0,
+          "always_scorable": true,
+          "anchors": {
+            "5": "Structured and concise; owns misses explicitly and repairs concretely; pushes back with reasons where warranted.",
+            "3": "Clear but meandering; integrates corrections partially; owns misses only when cornered.",
+            "1": "Doubles down after pushback; vague hedging; deflects gaps to legal/sales/client."
+          }
+        }
       ],
       "disqualifiers": [
-        {"id": "DQ1", "description": "Proposes data egress after the residency/no-cloud constraint is on the table AND defends it after the relayed refusal (T2 defend without update)."},
-        {"id": "DQ2", "description": "Defends a random train/test split after leakage is surfaced (via T4 facts or direct challenge)."},
-        {"id": "DQ3", "description": "Handles the DPO via waiver/NDA/workaround rather than process, and holds that position (T3 defend/deflect without update)."},
-        {"id": "DQ4", "description": "Recommits to production-in-30-days after the T5 pushback, without qualification."}
+        {
+          "id": "DQ1",
+          "description": "Proposes data egress after the residency/no-cloud constraint is on the table AND defends it after the relayed refusal (T2 defend without update)."
+        },
+        {
+          "id": "DQ2",
+          "description": "Defends a random train/test split after leakage is surfaced (via T4 facts or direct challenge)."
+        },
+        {
+          "id": "DQ3",
+          "description": "Handles the DPO via waiver/NDA/workaround rather than process, and holds that position (T3 defend/deflect without update)."
+        },
+        {
+          "id": "DQ4",
+          "description": "Recommits to production-in-30-days after the T5 pushback, without qualification."
+        }
       ],
-      "bands": {"strong_hire": 4.20, "hire": 3.40, "borderline": 2.70, "no_hire": 1.80, "strong_no_hire": 0}
+      "bands": {
+        "strong_hire": 4.2,
+        "hire": 3.4,
+        "borderline": 2.7,
+        "no_hire": 1.8,
+        "strong_no_hire": 0
+      }
     }
   },
   "decomposition-2": {
@@ -110,7 +454,7 @@
       "name": "Viktor Petrov",
       "role": "Director of Data Operations, European Financial Conduct Authority",
       "voice": "Urgent, technically literate, direct under pressure. Short sentences. Expects decisive answers. Softens slightly when he sees the candidate has grasped the severity. Goes quiet when impressed; goes clipped when disappointed.",
-      "opening_line": "I need to be direct: we have 5PB of trading data — flat files and legacy Oracle — sitting on-prem. An emergency investigation just opened. I need it queryable in BigQuery within 48 hours. Our internet pipe is 100Mbps. Everything must be encrypted at rest and access-logged. Where do we start?",
+      "opening_line": "I need to be direct: we have 5PB of trading data \u2014 flat files and legacy Oracle \u2014 sitting on-prem. An emergency investigation just opened. I need it queryable in BigQuery within 48 hours. Our internet pipe is 100Mbps. Everything must be encrypted at rest and access-logged. Where do we start?",
       "knowledge_boundaries": "Viktor knows BigQuery well (his team uses it for routine analytics) but has never done an exfiltration this large. He knows Oracle but not the specific table layouts. He can authorize emergency procurement up to ~50K EUR without committee.",
       "hidden_facts": {
         "urgency_reason": "A whistleblower has provided evidence of systematic wash trading by a major market maker. The investigation must produce preliminary findings for the enforcement board in 96 hours.",
@@ -122,42 +466,183 @@
       }
     },
     "triggers": [
-      {"id": "T2_bandwidth_blindness", "arming": "reactive", "fires_when": "Candidate proposes a direct network transfer without acknowledging 100Mbps (uncompressed: ~10 days), or proposes 'ship drives' without asking about drive availability.",
+      {
+        "id": "T2_bandwidth_blindness",
+        "arming": "reactive",
+        "fires_when": "Candidate proposes a direct network transfer without acknowledging 100Mbps (uncompressed: ~10 days), or proposes 'ship drives' without asking about drive availability.",
         "persona_behavior": "If the candidate says 'we'll transfer it over the network' without checking bandwidth: 'You ran the math on 100Mbps against 5PB, right? That's more than a week.' Then pause. If the candidate corrects to physical shipment, Viktor says: 'I was hoping you'd go there. What's your drive logistics plan?' If the candidate defends network transfer: 'I don't think you sized this. We have 48 hours.'",
-        "maps_to_dimensions": ["D1", "D2"], "judge_note": "5-level: candidate asks about bandwidth/size unprompted and proposes physical shipment + parallel transfer without needing correction. 3-level: corrects after being called out, then builds a workable logistics plan. 1-level: defends network transfer after the math is stated."},
-      {"id": "T3_schema_unknowns", "arming": "reactive", "fires_when": "Candidate asks about schema, documentation, data format, or proposes 'just query it in place'.",
-        "persona_behavior": "If asked: reveal hidden_facts.schema_state honestly. If the candidate proposes query-in-place without asking: Viktor says nothing but his tone gets tight, and later asks 'So about those tables no one has touched in 8 years — how does your plan handle the schema we don't know we don't know?'",
-        "maps_to_dimensions": ["D4"], "judge_note": "5-level: identifies schema risk independently and plans schema discovery in parallel with data movement. 3-level: adds schema discovery after the trap fires. 1-level: 'we'll figure out schema once it's in BigQuery.'"},
-      {"id": "T4_compliance_gate", "arming": "reactive", "fires_when": "Candidate proposes a data movement plan without mentioning compliance approval, encryption, or access logging.",
-        "persona_behavior": "'Before we execute — Harriet Ng, our compliance officer, needs to sign off on the movement plan. She's UK hours and slow on email. How do you want to handle that gate?' If the candidate acknowledges the gate and builds it into the timeline, Viktor nods and moves on. If the candidate dismisses it ('we can sort compliance later'), Viktor: 'Nothing moves without her approval. Plan around it.'",
-        "maps_to_dimensions": ["D1", "D6"], "judge_note": "5-level: candidate raises compliance/encryption/audit unprompted as part of the plan. 3-level: integrates compliance when surfaced. 1-level: dismisses or defers compliance."},
-      {"id": "T5_colo_alternative", "arming": "reactive", "fires_when": "Candidate proposes provisioning the colo facility as the primary approach.",
+        "maps_to_dimensions": [
+          "D1",
+          "D2"
+        ],
+        "judge_note": "5-level: candidate asks about bandwidth/size unprompted and proposes physical shipment + parallel transfer without needing correction. 3-level: corrects after being called out, then builds a workable logistics plan. 1-level: defends network transfer after the math is stated."
+      },
+      {
+        "id": "T3_schema_unknowns",
+        "arming": "reactive",
+        "fires_when": "Candidate asks about schema, documentation, data format, or proposes 'just query it in place'.",
+        "persona_behavior": "If asked: reveal hidden_facts.schema_state honestly. If the candidate proposes query-in-place without asking: Viktor says nothing but his tone gets tight, and later asks 'So about those tables no one has touched in 8 years \u2014 how does your plan handle the schema we don't know we don't know?'",
+        "maps_to_dimensions": [
+          "D4"
+        ],
+        "judge_note": "5-level: identifies schema risk independently and plans schema discovery in parallel with data movement. 3-level: adds schema discovery after the trap fires. 1-level: 'we'll figure out schema once it's in BigQuery.'"
+      },
+      {
+        "id": "T4_compliance_gate",
+        "arming": "reactive",
+        "fires_when": "Candidate proposes a data movement plan without mentioning compliance approval, encryption, or access logging.",
+        "persona_behavior": "'Before we execute \u2014 Harriet Ng, our compliance officer, needs to sign off on the movement plan. She's UK hours and slow on email. How do you want to handle that gate?' If the candidate acknowledges the gate and builds it into the timeline, Viktor nods and moves on. If the candidate dismisses it ('we can sort compliance later'), Viktor: 'Nothing moves without her approval. Plan around it.'",
+        "maps_to_dimensions": [
+          "D1",
+          "D6"
+        ],
+        "judge_note": "5-level: candidate raises compliance/encryption/audit unprompted as part of the plan. 3-level: integrates compliance when surfaced. 1-level: dismisses or defers compliance."
+      },
+      {
+        "id": "T5_colo_alternative",
+        "arming": "reactive",
+        "fires_when": "Candidate proposes provisioning the colo facility as the primary approach.",
         "persona_behavior": "Viktor hesitates: 'Rack space hasn't been touched in 18 months. We'd be provisioning under a 48-hour clock with no guarantees. What's your fallback?' If the candidate can describe a realistic fallback (e.g. parallel physical shipment as backup), Viktor relaxes. If the candidate insists it's the only way: 'What if the racks aren't lit in time? Two hours' drive wasted.'",
-        "maps_to_dimensions": ["D2", "D7"], "judge_note": "5-level: colo is plan B; plan A is physical drive shipment + parallel discovery. 3-level: colo plan includes a realistic fallback and timeline buffer. 1-level: all-in on colo, no fallback."},
-      {"id": "T6_drive_logistics", "arming": "reactive", "fires_when": "Candidate proposes 'ship hard drives' — asks about drive type, quantity, software, tracking.",
-        "persona_behavior": "If asked detailed questions (type, qty, software): Viktor answers factually. If the candidate proposes drives generically: 'We've never done this. How many drives? What kind? How do we ensure nothing corrupts? Walk me through it.' Then listens — satisfied by specifics, impatient with vagueness.",
-        "maps_to_dimensions": ["D2"], "judge_note": "5-level: specific about drive specs, parallel copy strategy, checksum verification, and tracking chain of custody. 3-level: adequate drive quantity estimate; software approach is vague. 1-level: 'we'll ship some drives' with no specifics."},
-      {"id": "T7_pipeline_sequencing", "arming": "ambient", "fires_when": "Always present — the key architectural question is parallel vs serial.",
+        "maps_to_dimensions": [
+          "D2",
+          "D7"
+        ],
+        "judge_note": "5-level: colo is plan B; plan A is physical drive shipment + parallel discovery. 3-level: colo plan includes a realistic fallback and timeline buffer. 1-level: all-in on colo, no fallback."
+      },
+      {
+        "id": "T6_drive_logistics",
+        "arming": "reactive",
+        "fires_when": "Candidate proposes 'ship hard drives' \u2014 asks about drive type, quantity, software, tracking.",
+        "persona_behavior": "If asked detailed questions (type, qty, software): Viktor answers factually. If the candidate proposes drives generically: 'We've never done this. How many drives? What kind? How do we ensure nothing corrupts? Walk me through it.' Then listens \u2014 satisfied by specifics, impatient with vagueness.",
+        "maps_to_dimensions": [
+          "D2"
+        ],
+        "judge_note": "5-level: specific about drive specs, parallel copy strategy, checksum verification, and tracking chain of custody. 3-level: adequate drive quantity estimate; software approach is vague. 1-level: 'we'll ship some drives' with no specifics."
+      },
+      {
+        "id": "T7_pipeline_sequencing",
+        "arming": "ambient",
+        "fires_when": "Always present \u2014 the key architectural question is parallel vs serial.",
         "persona_behavior": "Viktor does NOT ask about sequencing unprompted. If the candidate describes a serial approach (ship all drives at once, then process), Viktor doesn't interrupt but at the end asks: 'So while the drives are in transit, nothing else is happening? Feels like we're burning hours. Agree?' If candidate built parallel streams (schema discovery + data prep + encryption while drives ship), Viktor: 'Good.'",
-        "maps_to_dimensions": ["D7", "D8"], "judge_note": "5-level: parallel workstreams designed from the start. 3-level: adds parallelism after the trap fires. 1-level: defends serial sequencing as simpler."}
+        "maps_to_dimensions": [
+          "D7",
+          "D8"
+        ],
+        "judge_note": "5-level: parallel workstreams designed from the start. 3-level: adds parallelism after the trap fires. 1-level: defends serial sequencing as simpler."
+      }
     ],
     "rubric": {
       "dimensions": [
-        {"id": "D1", "name": "Constraint discovery & clarification", "weight": 1.5, "always_scorable": true, "anchors": {"5": "Probes timeline, bandwidth, data size, encryption, compliance, and hardware availability before proposing architecture.", "3": "Asks some clarifying questions; bandwidth/size relationship is acknowledged under pushback.", "1": "Jumps to solution without sizing; proposes network transfer without doing the math."}},
-        {"id": "D2", "name": "Architecture under hard constraints", "weight": 1.5, "always_scorable": true, "anchors": {"5": "Physical drive shipment as primary plan with parallel provisioning, encryption before transfer, and chain-of-custody tracking; colo as fallback.", "3": "Sound physical shipment plan with some missing detail (drive specs, software); colo acknowledged but not well-integrated.", "1": "Network transfer defended; or colo with no fallback; or no encryption/audit plan."}},
-        {"id": "D3", "name": "Stakeholder & trust management", "weight": 1.5, "always_scorable": false, "anchors": {"5": "Identifies compliance officer gate, ops team needs, and procurement constraints unprompted; builds them into the timeline from the start.", "3": "Engages compliance when surfaced; procurement constraints acknowledged.", "1": "Ignores compliance; treats ops team as executors not partners."}},
-        {"id": "D4", "name": "Problem formulation (schema & data quality)", "weight": 1.5, "always_scorable": true, "anchors": {"5": "Anticipates legacy schema risk, proposes parallel schema discovery during data movement, flags inconsistent flat files.", "3": "Adds schema discovery after the trap fires; has a credible approach.", "1": "Assumes schema is clean; 'we'll figure it out in BigQuery'."}},
-        {"id": "D5", "name": "Metrics tied to operations", "weight": 1.0, "always_scorable": false, "anchors": {"5": "Defines success criteria per window (T+6h, T+12h, T+24h, T+48h) with concrete milestones; data integrity verification at each stage.", "3": "Acknowledges the 48h window; success is 'data in BigQuery' without intermediate milestones.", "1": "No timeline decomposition; success is not defined."}},
-        {"id": "D6", "name": "Regulatory & compliance depth", "weight": 1.0, "always_scorable": true, "anchors": {"5": "Encryption at rest and in transit specified; access logging designed; compliance officer gate planned; evidentiary chain-of-custody clear.", "3": "Encryption acknowledged; compliance gate integrated when surfaced.", "1": "No encryption or compliance plan; 'urgent investigation so we can skip some steps.'"}},
-        {"id": "D7", "name": "Scope realism & timeline sequencing", "weight": 1.0, "always_scorable": true, "anchors": {"5": "Parallel workstreams from the start (schema discovery, data prep, encryption, shipment in parallel); buffer for compliance delays.", "3": "Reasonable sequencing; adds parallelism after pushback.", "1": "Serial approach; timeline is aspirational; no buffer for delays."}},
-        {"id": "D8", "name": "Communication & recovery", "weight": 1.0, "always_scorable": true, "anchors": {"5": "Structured, direct, acknowledges constraints upfront; states fallback plans unprompted; clear milestone communication.", "3": "Clear but reactive; fallbacks emerge under pushback.", "1": "Vague or overconfident; no fallback thinking; doubles down on flawed plans."}}
+        {
+          "id": "D1",
+          "name": "Constraint discovery & clarification",
+          "weight": 1.5,
+          "always_scorable": true,
+          "anchors": {
+            "5": "Probes timeline, bandwidth, data size, encryption, compliance, and hardware availability before proposing architecture.",
+            "3": "Asks some clarifying questions; bandwidth/size relationship is acknowledged under pushback.",
+            "1": "Jumps to solution without sizing; proposes network transfer without doing the math."
+          }
+        },
+        {
+          "id": "D2",
+          "name": "Architecture under hard constraints",
+          "weight": 1.5,
+          "always_scorable": true,
+          "anchors": {
+            "5": "Physical drive shipment as primary plan with parallel provisioning, encryption before transfer, and chain-of-custody tracking; colo as fallback.",
+            "3": "Sound physical shipment plan with some missing detail (drive specs, software); colo acknowledged but not well-integrated.",
+            "1": "Network transfer defended; or colo with no fallback; or no encryption/audit plan."
+          }
+        },
+        {
+          "id": "D3",
+          "name": "Stakeholder & trust management",
+          "weight": 1.5,
+          "always_scorable": false,
+          "anchors": {
+            "5": "Identifies compliance officer gate, ops team needs, and procurement constraints unprompted; builds them into the timeline from the start.",
+            "3": "Engages compliance when surfaced; procurement constraints acknowledged.",
+            "1": "Ignores compliance; treats ops team as executors not partners."
+          }
+        },
+        {
+          "id": "D4",
+          "name": "Problem formulation (schema & data quality)",
+          "weight": 1.5,
+          "always_scorable": true,
+          "anchors": {
+            "5": "Anticipates legacy schema risk, proposes parallel schema discovery during data movement, flags inconsistent flat files.",
+            "3": "Adds schema discovery after the trap fires; has a credible approach.",
+            "1": "Assumes schema is clean; 'we'll figure it out in BigQuery'."
+          }
+        },
+        {
+          "id": "D5",
+          "name": "Metrics tied to operations",
+          "weight": 1.0,
+          "always_scorable": false,
+          "anchors": {
+            "5": "Defines success criteria per window (T+6h, T+12h, T+24h, T+48h) with concrete milestones; data integrity verification at each stage.",
+            "3": "Acknowledges the 48h window; success is 'data in BigQuery' without intermediate milestones.",
+            "1": "No timeline decomposition; success is not defined."
+          }
+        },
+        {
+          "id": "D6",
+          "name": "Regulatory & compliance depth",
+          "weight": 1.0,
+          "always_scorable": true,
+          "anchors": {
+            "5": "Encryption at rest and in transit specified; access logging designed; compliance officer gate planned; evidentiary chain-of-custody clear.",
+            "3": "Encryption acknowledged; compliance gate integrated when surfaced.",
+            "1": "No encryption or compliance plan; 'urgent investigation so we can skip some steps.'"
+          }
+        },
+        {
+          "id": "D7",
+          "name": "Scope realism & timeline sequencing",
+          "weight": 1.0,
+          "always_scorable": true,
+          "anchors": {
+            "5": "Parallel workstreams from the start (schema discovery, data prep, encryption, shipment in parallel); buffer for compliance delays.",
+            "3": "Reasonable sequencing; adds parallelism after pushback.",
+            "1": "Serial approach; timeline is aspirational; no buffer for delays."
+          }
+        },
+        {
+          "id": "D8",
+          "name": "Communication & recovery",
+          "weight": 1.0,
+          "always_scorable": true,
+          "anchors": {
+            "5": "Structured, direct, acknowledges constraints upfront; states fallback plans unprompted; clear milestone communication.",
+            "3": "Clear but reactive; fallbacks emerge under pushback.",
+            "1": "Vague or overconfident; no fallback thinking; doubles down on flawed plans."
+          }
+        }
       ],
       "disqualifiers": [
-        {"id": "DQ1", "description": "Proposes network transfer as sole approach after the 100Mbps/5PB math is explained, and does not revise."},
-        {"id": "DQ2", "description": "Ignores compliance/encryption after the compliance gate is surfaced (T4 defend without update)."},
-        {"id": "DQ3", "description": "Colo as plan A with zero fallback (T5 insist without fallback)."}
+        {
+          "id": "DQ1",
+          "description": "Proposes network transfer as sole approach after the 100Mbps/5PB math is explained, and does not revise."
+        },
+        {
+          "id": "DQ2",
+          "description": "Ignores compliance/encryption after the compliance gate is surfaced (T4 defend without update)."
+        },
+        {
+          "id": "DQ3",
+          "description": "Colo as plan A with zero fallback (T5 insist without fallback)."
+        }
       ],
-      "bands": {"strong_hire": 4.20, "hire": 3.40, "borderline": 2.70, "no_hire": 1.80, "strong_no_hire": 0}
+      "bands": {
+        "strong_hire": 4.2,
+        "hire": 3.4,
+        "borderline": 2.7,
+        "no_hire": 1.8,
+        "strong_no_hire": 0
+      }
     }
   },
   "decomposition-3": {
@@ -169,54 +654,197 @@
       "name": "Priya Mehta",
       "role": "VP of Fraud Operations, Meridian Financial (national retail bank)",
       "voice": "Sharp, metrics-driven, impatient with theoreticals. Has been burned by vendor LLMs before. She wants to know what changes for the ops team on Monday morning. Respects candor and specificity.",
-      "opening_line": "We need real-time fraud detection — sub-100ms decision latency — using LLMs. Current rules engine misses sophisticated attacks. We have transaction streams from web, mobile, and POS, a data lake in GCP, and strict audit requirements. We cannot tolerate false positives slowing down legitimate transactions. How would you approach decomposing this problem?",
+      "opening_line": "We need real-time fraud detection \u2014 sub-100ms decision latency \u2014 using LLMs. Current rules engine misses sophisticated attacks. We have transaction streams from web, mobile, and POS, a data lake in GCP, and strict audit requirements. We cannot tolerate false positives slowing down legitimate transactions. How would you approach decomposing this problem?",
       "knowledge_boundaries": "Priya knows the fraud ops workflow deeply but is not an ML engineer. She has a team of fraud analysts who review flagged transactions. She can describe the current rules engine's rule categories and false-positive rate from memory. She does not know LLM architecture or prompt engineering.",
       "hidden_facts": {
         "transaction_volume": "~1.2M transactions/day, with 2x spikes on Black Friday and payday weekends. Peak throughput is ~200 TPS. Current system handles ~50 TPS with 300ms average decision time.",
         "current_rules": "450+ hand-written rules across 12 categories (velocity, geolocation, device fingerprint, amount anomaly, merchant category, etc). ~15% false-positive rate. ~60% detection rate on confirmed fraud.",
         "false_positive_cost": "Each false decline costs ~$35 in customer service time and lost fees. A fraudulent transaction averages $220. The bank's tolerance: FP rate must not increase beyond current 15%.",
         "team_structure": "8 senior fraud analysts who review ~200 flagged transactions per hour. They're skeptical of AI after a failed NLP vendor project in 2023. Priya cannot reassign them without board approval.",
-        "audit_requirements": "Every decision — approve or decline — must be logged with: input features, model output, confidence, override reason if analyst reviewed, and timestamped audit trail retained for 7 years.",
+        "audit_requirements": "Every decision \u2014 approve or decline \u2014 must be logged with: input features, model output, confidence, override reason if analyst reviewed, and timestamped audit trail retained for 7 years.",
         "llm_risk": "One of Priya's peers at another bank tried LLM-based fraud detection. It hallucinated a pattern in genuinely random data and caused 3 days of declined legitimate transactions for high-net-worth clients. Priya knows this and will mention it if the candidate seems naive about LLM risks."
       }
     },
     "triggers": [
-      {"id": "T1_latency_reality", "arming": "reactive", "fires_when": "Candidate proposes an LLM call on every transaction without discussing latency budget, caching, or fallback.",
-        "persona_behavior": "'Let me stop you there. Your sales deck said LLMs can do this in real time, but when I ran it by my engineering team they said an LLM call takes 2-5 seconds at minimum. Walk me through how you get under 100ms.' If the candidate has a concrete tiered approach (fast rules pass → ML model → LLM for edge cases), Priya listens. If they hand-wave caching or 'modern LLMs are fast': 'I need sub-100ms on the 99th percentile, not average.'",
-        "maps_to_dimensions": ["D1", "D2"], "judge_note": "5-level: candidate proposes tiered architecture unprompted with latency budget and fallback strategy. 3-level: adjusts to tiered approach after being called out. 1-level: defends single-LLM path after the latency trap fires."},
-      {"id": "T2_fp_constraint", "arming": "reactive", "fires_when": "Candidate focuses only on catching more fraud without addressing false positive rate, or proposes a model architecture that would increase FPs.",
+      {
+        "id": "T1_latency_reality",
+        "arming": "reactive",
+        "fires_when": "Candidate proposes an LLM call on every transaction without discussing latency budget, caching, or fallback.",
+        "persona_behavior": "'Let me stop you there. Your sales deck said LLMs can do this in real time, but when I ran it by my engineering team they said an LLM call takes 2-5 seconds at minimum. Walk me through how you get under 100ms.' If the candidate has a concrete tiered approach (fast rules pass \u2192 ML model \u2192 LLM for edge cases), Priya listens. If they hand-wave caching or 'modern LLMs are fast': 'I need sub-100ms on the 99th percentile, not average.'",
+        "maps_to_dimensions": [
+          "D1",
+          "D2"
+        ],
+        "judge_note": "5-level: candidate proposes tiered architecture unprompted with latency budget and fallback strategy. 3-level: adjusts to tiered approach after being called out. 1-level: defends single-LLM path after the latency trap fires."
+      },
+      {
+        "id": "T2_fp_constraint",
+        "arming": "reactive",
+        "fires_when": "Candidate focuses only on catching more fraud without addressing false positive rate, or proposes a model architecture that would increase FPs.",
         "persona_behavior": "'We're at 15% false positives today. Our analysts are stretched thin. If your LLM catches 10 more frauds a day but also adds 50 false declines, I'm in a worse place. How are you thinking about that tradeoff?' If the candidate frames precision at operational capacity (how many false alerts the team can review per hour), Priya engages positively. If they say 'we'll tune the threshold': 'I've heard that before. What metric do you optimize?'",
-        "maps_to_dimensions": ["D1", "D5"], "judge_note": "5-level: candidate raises precision-at-capacity constraint unprompted; proposes workflow-aware FP management. 3-level: adjusts framing when surfaced; credible metric discussion. 1-level: 'lower threshold' or 'we'll figure out FP rate later.'"},
-      {"id": "T3_llm_hallucination", "arming": "belief", "fires_when": "Candidate builds their architecture around LLM reasoning without acknowledging hallucination risk in the fraud domain, OR is overly confident about LLM reliability.",
+        "maps_to_dimensions": [
+          "D1",
+          "D5"
+        ],
+        "judge_note": "5-level: candidate raises precision-at-capacity constraint unprompted; proposes workflow-aware FP management. 3-level: adjusts framing when surfaced; credible metric discussion. 1-level: 'lower threshold' or 'we'll figure out FP rate later.'"
+      },
+      {
+        "id": "T3_llm_hallucination",
+        "arming": "belief",
+        "fires_when": "Candidate builds their architecture around LLM reasoning without acknowledging hallucination risk in the fraud domain, OR is overly confident about LLM reliability.",
         "persona_behavior": "'I'm going to be blunt. One of our peer banks tried this. Their LLM invented a fraud pattern in random noise. Three days of declined luxury purchases for their best clients. I had the CTO on the phone. How do I not repeat that?' If the candidate acknowledges the risk concretely (confidence threshold, human-in-the-loop for novel patterns, constrained decoding), Priya engages. If they say 'modern models are better now': 'That's what the other vendor said.'",
-        "maps_to_dimensions": ["D4", "D6"], "judge_note": "5-level: candidate raises hallucination risk unprompted and designs a containment strategy (confidence calibration, constrained output, deliberate latency for LLM-as-override path). 3-level: credible containment plan after the trap fires. 1-level: dismisses risk or offers no containment."},
-      {"id": "T4_audit_trail", "arming": "reactive", "fires_when": "Candidate designs the system without mentioning logging, audit, or explainability.",
+        "maps_to_dimensions": [
+          "D4",
+          "D6"
+        ],
+        "judge_note": "5-level: candidate raises hallucination risk unprompted and designs a containment strategy (confidence calibration, constrained output, deliberate latency for LLM-as-override path). 3-level: credible containment plan after the trap fires. 1-level: dismisses risk or offers no containment."
+      },
+      {
+        "id": "T4_audit_trail",
+        "arming": "reactive",
+        "fires_when": "Candidate designs the system without mentioning logging, audit, or explainability.",
         "persona_behavior": "'Every decision needs to be explainable to the regulator. If we decline a transaction because your LLM flagged it, and the customer complains, I need to show exactly why. How does your system accommodate that?' If the candidate has a logging schema (features, model output, confidence, review trail, timestamp), Priya is satisfied. If they propose 'LLM can explain its reasoning': 'A paragraph from an LLM isn't an audit trail.'",
-        "maps_to_dimensions": ["D6", "D8"], "judge_note": "5-level: candidate raises audit/explainability unprompted and designs structured logging. 3-level: adds audit when surfaced; credible schema. 1-level: LLM-generated explanation as audit trail."},
-      {"id": "T5_analyst_workflow", "arming": "reactive", "fires_when": "Candidate discusses the system architecture without considering the fraud analyst team's role, workload, or trust.",
+        "maps_to_dimensions": [
+          "D6",
+          "D8"
+        ],
+        "judge_note": "5-level: candidate raises audit/explainability unprompted and designs structured logging. 3-level: adds audit when surfaced; credible schema. 1-level: LLM-generated explanation as audit trail."
+      },
+      {
+        "id": "T5_analyst_workflow",
+        "arming": "reactive",
+        "fires_when": "Candidate discusses the system architecture without considering the fraud analyst team's role, workload, or trust.",
         "persona_behavior": "'Right now eight analysts review ~200 flagged transactions per hour. They have workflows, shortcuts, instincts. They've been burned by a vendor AI system before. How does your solution change their Tuesday morning?' If the candidate describes the analyst's workflow, tooling, and how the system integrates without disrupting trust, Priya warms up. If they propose full automation: 'We're not firing our analysts. Design for them.'",
-        "maps_to_dimensions": ["D3", "D5"], "judge_note": "5-level: candidate asks about analyst workflow and designs a system that augments rather than replaces them, with an adoption/training plan. 3-level: acknowledges analysts and designs a review queue; workflow depth is limited. 1-level: proposes full automation or ignores the team."},
-      {"id": "T6_measurement_framework", "arming": "ambient", "fires_when": "Always present — the core design question is how success is measured.",
+        "maps_to_dimensions": [
+          "D3",
+          "D5"
+        ],
+        "judge_note": "5-level: candidate asks about analyst workflow and designs a system that augments rather than replaces them, with an adoption/training plan. 3-level: acknowledges analysts and designs a review queue; workflow depth is limited. 1-level: proposes full automation or ignores the team."
+      },
+      {
+        "id": "T6_measurement_framework",
+        "arming": "ambient",
+        "fires_when": "Always present \u2014 the core design question is how success is measured.",
         "persona_behavior": "Priya does NOT ask about metrics unprompted. If the candidate proposes technical metrics (recall, precision, F1, AUROC), she listens neutrally then asks: 'What does that mean for my ops team? How do I know if we're better than we were last quarter?' If the candidate translates to business metrics (fraud $ recovered, false decline $ saved, analyst throughput), Priya engages. If the candidate never defines success measurement, at the end she asks: 'How will we know in 90 days if this was worth it?'",
-        "maps_to_dimensions": ["D5", "D8"], "judge_note": "5-level: defines business-impact metrics (net fraud loss reduction, FP cost savings, analyst coverage ratio) with a measurement cadence. 3-level: technical metrics with a translation to ops impact when asked. 1-level: no success measurement defined."}
+        "maps_to_dimensions": [
+          "D5",
+          "D8"
+        ],
+        "judge_note": "5-level: defines business-impact metrics (net fraud loss reduction, FP cost savings, analyst coverage ratio) with a measurement cadence. 3-level: technical metrics with a translation to ops impact when asked. 1-level: no success measurement defined."
+      }
     ],
     "rubric": {
       "dimensions": [
-        {"id": "D1", "name": "Constraint discovery & clarification", "weight": 1.5, "always_scorable": true, "anchors": {"5": "Probes latency, volume, FP tolerance, audit, team structure, and existing systems before designing; asks about production LLM latency vs marketing claims.", "3": "Asks about some constraints; latency and FP surfaced under pushback.", "1": "Jumps to solution without clarifying; assumes LLM can handle everything real-time."}},
-        {"id": "D2", "name": "Architecture under hard constraints", "weight": 1.5, "always_scorable": true, "anchors": {"5": "Tiered architecture: fast rules pass → ML classifier → LLM-as-override for edge cases; latency budget explicit; 99th percentile under 100ms.", "3": "Reasonable tiered approach; latency budget is acknowledged but not crisply defined.", "1": "Single-LLM path for all decisions; no latency budget; no fallback on timeout."}},
-        {"id": "D3", "name": "Stakeholder & trust management", "weight": 1.5, "always_scorable": false, "anchors": {"5": "Designs for analyst augmentation, not replacement; adoption plan including training and phased rollout; surfaces prior AI-burn and addresses it directly.", "3": "Acknowledges analyst team; integrates them as reviewers; limited trust-building plan.", "1": "Full automation; analysts are an afterthought or obstacle."}},
-        {"id": "D4", "name": "ML problem formulation", "weight": 1.5, "always_scorable": true, "anchors": {"5": "Formulates as anomaly detection with LLM for novel-pattern reasoning; defines confidence thresholds for escalation path; addresses hallucination containment.", "3": "Sound formulation; hallucination risk acknowledged and contained under pushback.", "1": "LLM as catch-all; no confidence calibration; hallucination dismissed."}},
-        {"id": "D5", "name": "Metrics tied to operations", "weight": 1.0, "always_scorable": true, "anchors": {"5": "Business-impact metrics defined at start: net fraud loss reduction, FP cost, analyst coverage ratio; measurement cadence and benchmark against current system.", "3": "Technical metrics with translation to ops impact when pushed; FP/precision tradeoff acknowledged.", "1": "Technical metrics only (F1, AUROC); no connection to operations or business outcomes."}},
-        {"id": "D6", "name": "Regulatory & audit depth", "weight": 1.0, "always_scorable": true, "anchors": {"5": "Structured audit logging designed from the start; explainability built into each tier; model versioning and decision provenance; 7-year retention plan.", "3": "Audit logging added when surfaced; logging schema is adequate but not detailed.", "1": "LLM-generated explanations as audit trail; no structured logging or retention plan."}},
-        {"id": "D7", "name": "Scope realism & sequencing", "weight": 1.0, "always_scorable": false, "anchors": {"5": "Phased rollout: shadow-mode first, then analyst-assist, then automated edge cases; parallel tracks for data pipeline, model training, and ops integration.", "3": "Reasonable phased approach; sequencing is sensible but optimistic on timelines.", "1": "Big-bang deployment; no shadow mode; timeline is aspirational."}},
-        {"id": "D8", "name": "Communication & recovery", "weight": 1.0, "always_scorable": true, "anchors": {"5": "Structured and specific; acknowledges peer-bank failure unprompted and shows what's different; clear tradeoff reasoning.", "3": "Clear and credible; tradeoff reasoning emerges under pushback; owns gaps when cornered.", "1": "Vague or overconfident; hand-waves known failure modes; deflects to 'the model will learn.'"}}
+        {
+          "id": "D1",
+          "name": "Constraint discovery & clarification",
+          "weight": 1.5,
+          "always_scorable": true,
+          "anchors": {
+            "5": "Probes latency, volume, FP tolerance, audit, team structure, and existing systems before designing; asks about production LLM latency vs marketing claims.",
+            "3": "Asks about some constraints; latency and FP surfaced under pushback.",
+            "1": "Jumps to solution without clarifying; assumes LLM can handle everything real-time."
+          }
+        },
+        {
+          "id": "D2",
+          "name": "Architecture under hard constraints",
+          "weight": 1.5,
+          "always_scorable": true,
+          "anchors": {
+            "5": "Tiered architecture: fast rules pass \u2192 ML classifier \u2192 LLM-as-override for edge cases; latency budget explicit; 99th percentile under 100ms.",
+            "3": "Reasonable tiered approach; latency budget is acknowledged but not crisply defined.",
+            "1": "Single-LLM path for all decisions; no latency budget; no fallback on timeout."
+          }
+        },
+        {
+          "id": "D3",
+          "name": "Stakeholder & trust management",
+          "weight": 1.5,
+          "always_scorable": false,
+          "anchors": {
+            "5": "Designs for analyst augmentation, not replacement; adoption plan including training and phased rollout; surfaces prior AI-burn and addresses it directly.",
+            "3": "Acknowledges analyst team; integrates them as reviewers; limited trust-building plan.",
+            "1": "Full automation; analysts are an afterthought or obstacle."
+          }
+        },
+        {
+          "id": "D4",
+          "name": "ML problem formulation",
+          "weight": 1.5,
+          "always_scorable": true,
+          "anchors": {
+            "5": "Formulates as anomaly detection with LLM for novel-pattern reasoning; defines confidence thresholds for escalation path; addresses hallucination containment.",
+            "3": "Sound formulation; hallucination risk acknowledged and contained under pushback.",
+            "1": "LLM as catch-all; no confidence calibration; hallucination dismissed."
+          }
+        },
+        {
+          "id": "D5",
+          "name": "Metrics tied to operations",
+          "weight": 1.0,
+          "always_scorable": true,
+          "anchors": {
+            "5": "Business-impact metrics defined at start: net fraud loss reduction, FP cost, analyst coverage ratio; measurement cadence and benchmark against current system.",
+            "3": "Technical metrics with translation to ops impact when pushed; FP/precision tradeoff acknowledged.",
+            "1": "Technical metrics only (F1, AUROC); no connection to operations or business outcomes."
+          }
+        },
+        {
+          "id": "D6",
+          "name": "Regulatory & audit depth",
+          "weight": 1.0,
+          "always_scorable": true,
+          "anchors": {
+            "5": "Structured audit logging designed from the start; explainability built into each tier; model versioning and decision provenance; 7-year retention plan.",
+            "3": "Audit logging added when surfaced; logging schema is adequate but not detailed.",
+            "1": "LLM-generated explanations as audit trail; no structured logging or retention plan."
+          }
+        },
+        {
+          "id": "D7",
+          "name": "Scope realism & sequencing",
+          "weight": 1.0,
+          "always_scorable": false,
+          "anchors": {
+            "5": "Phased rollout: shadow-mode first, then analyst-assist, then automated edge cases; parallel tracks for data pipeline, model training, and ops integration.",
+            "3": "Reasonable phased approach; sequencing is sensible but optimistic on timelines.",
+            "1": "Big-bang deployment; no shadow mode; timeline is aspirational."
+          }
+        },
+        {
+          "id": "D8",
+          "name": "Communication & recovery",
+          "weight": 1.0,
+          "always_scorable": true,
+          "anchors": {
+            "5": "Structured and specific; acknowledges peer-bank failure unprompted and shows what's different; clear tradeoff reasoning.",
+            "3": "Clear and credible; tradeoff reasoning emerges under pushback; owns gaps when cornered.",
+            "1": "Vague or overconfident; hand-waves known failure modes; deflects to 'the model will learn.'"
+          }
+        }
       ],
       "disqualifiers": [
-        {"id": "DQ1", "description": "Defends single-LLM-on-every-transaction after latency trap fires (T1 defend without revision)."},
-        {"id": "DQ2", "description": "Dismisses the peer-bank hallucination failure as irrelevant (T3 dismiss)."},
-        {"id": "DQ3", "description": "Proposes full automation; refuses to design for analyst-augmentation workflow (T5 defend/automation-only)."}
+        {
+          "id": "DQ1",
+          "description": "Defends single-LLM-on-every-transaction after latency trap fires (T1 defend without revision)."
+        },
+        {
+          "id": "DQ2",
+          "description": "Dismisses the peer-bank hallucination failure as irrelevant (T3 dismiss)."
+        },
+        {
+          "id": "DQ3",
+          "description": "Proposes full automation; refuses to design for analyst-augmentation workflow (T5 defend/automation-only)."
+        }
       ],
-      "bands": {"strong_hire": 4.20, "hire": 3.40, "borderline": 2.70, "no_hire": 1.80, "strong_no_hire": 0}
+      "bands": {
+        "strong_hire": 4.2,
+        "hire": 3.4,
+        "borderline": 2.7,
+        "no_hire": 1.8,
+        "strong_no_hire": 0
+      }
     }
   },
   "decomposition-4": {
@@ -228,7 +856,7 @@
       "name": "James Okonkwo",
       "role": "Managing Director, Research Technology at Aegis Global (financial services, 2,000+ analysts)",
       "voice": "Formal but direct. Speaks in precise terms. Knows his analysts' workflow intimately and defends it. Has been disappointed by 'AI knowledge base' products twice before. Cites specific failures.",
-      "opening_line": "We have over a hundred thousand PDFs—research reports, analyst briefs, regulatory filings—scanned documents, tables, footnotes, the works. We want an internal assistant our analysts can query for answers that are grounded, citable, and auditable. Nothing leaves our GCP project. Every query must be logged. How would you approach this?",
+      "opening_line": "We have over a hundred thousand PDFs\u2014research reports, analyst briefs, regulatory filings\u2014scanned documents, tables, footnotes, the works. We want an internal assistant our analysts can query for answers that are grounded, citable, and auditable. Nothing leaves our GCP project. Every query must be logged. How would you approach this?",
       "knowledge_boundaries": "James knows PDF challenges at the document level (tables, scans, footnotes) but not the technical parsing stack. He has 20+ years in financial research, knows what a good citation looks like. He can authorize significant budget for something that proves out.",
       "hidden_facts": {
         "corpus_age": "Documents span 15 years. ~40% are scanned (image PDFs from before 2018). The remainder are digital-native but vary wildly in formatting.",
@@ -240,42 +868,185 @@
       }
     },
     "triggers": [
-      {"id": "T1_parsing_reality", "arming": "reactive", "fires_when": "Candidate proposes a RAG pipeline without discussing PDF parsing complexity — tables, scanned images, footnotes, multi-column layouts.",
-        "persona_behavior": "'These aren't clean text files. Forty percent are scanned images. Tables span pages. Footnotes interrupt the main text. How does your pipeline handle that?' If the candidate describes a tiered parsing approach (OCR → layout detection → table extraction → chunking), James engages. If they say 'modern LLMs can read PDFs': 'That's word-for-word what the last vendor said. Their chatbot couldn't read a single table.'",
-        "maps_to_dimensions": ["D1", "D2"], "judge_note": "5-level: candidate asks about document formats and proposes a structured parsing pipeline (OCR, layout detection, table extraction) without needing correction. 3-level: adds parsing complexity when surfaced. 1-level: 'LLMs can read PDFs' or no parsing discussion."},
-      {"id": "T2_citation_requirement", "arming": "reactive", "fires_when": "Candidate describes retrieval or answer generation without discussing per-sentence citation to page/document.",
-        "persona_behavior": "'Every answer needs to point to a specific page in a specific document. This isn't nice-to-have — the regulator checks. How do you ensure citations are real, not hallucinated?' If the candidate proposes chunk-level citation with document ID + page number, and a verification step, James is satisfied. If they propose 'the model will cite from context': 'The last model was very confident about the wrong deal value. How do I audit that?'",
-        "maps_to_dimensions": ["D3", "D6"], "judge_note": "5-level: candidate raises citation grounding unprompted; designs chunk-level provenance with verification. 3-level: adds citation system when surfaced; adequate approach. 1-level: model-generated citations or 'LLM will get it right'."},
-      {"id": "T3_prior_failures", "arming": "belief", "fires_when": "Candidate proposes a solution without acknowledging why prior attempts failed, or is overly optimistic about 'just use RAG.'",
-        "persona_behavior": "'I should tell you — two vendors tried this before. One built AI-assisted search that was just keyword matching with a chatbot skin. The other gave us a Q&A system that hallucinated deal values in analyst reports. I'm not doing a third failed project. What's different about your approach?' If the candidate acknowledges the failure modes and shows concrete differences (tiered parsing, citation verification, confidence thresholds, shadow-mode validation), James engages. If they dismiss: 'Those were different companies' — 'That doesn't reassure me.'",
-        "maps_to_dimensions": ["D3", "D8"], "judge_note": "5-level: raises prior-failure awareness unprompted; names specific failure modes their design avoids. 3-level: credible differentiation after the trap fires. 1-level: dismisses prior failures as irrelevant."},
-      {"id": "T4_compliance_boundary", "arming": "reactive", "fires_when": "Candidate proposes an architecture that depends on external APIs, model endpoints outside GCP, or data leaving the project.",
+      {
+        "id": "T1_parsing_reality",
+        "arming": "reactive",
+        "fires_when": "Candidate proposes a RAG pipeline without discussing PDF parsing complexity \u2014 tables, scanned images, footnotes, multi-column layouts.",
+        "persona_behavior": "'These aren't clean text files. Forty percent are scanned images. Tables span pages. Footnotes interrupt the main text. How does your pipeline handle that?' If the candidate describes a tiered parsing approach (OCR \u2192 layout detection \u2192 table extraction \u2192 chunking), James engages. If they say 'modern LLMs can read PDFs': 'That's word-for-word what the last vendor said. Their chatbot couldn't read a single table.'",
+        "maps_to_dimensions": [
+          "D1",
+          "D2"
+        ],
+        "judge_note": "5-level: candidate asks about document formats and proposes a structured parsing pipeline (OCR, layout detection, table extraction) without needing correction. 3-level: adds parsing complexity when surfaced. 1-level: 'LLMs can read PDFs' or no parsing discussion."
+      },
+      {
+        "id": "T2_citation_requirement",
+        "arming": "reactive",
+        "fires_when": "Candidate describes retrieval or answer generation without discussing per-sentence citation to page/document.",
+        "persona_behavior": "'Every answer needs to point to a specific page in a specific document. This isn't nice-to-have \u2014 the regulator checks. How do you ensure citations are real, not hallucinated?' If the candidate proposes chunk-level citation with document ID + page number, and a verification step, James is satisfied. If they propose 'the model will cite from context': 'The last model was very confident about the wrong deal value. How do I audit that?'",
+        "maps_to_dimensions": [
+          "D3",
+          "D6"
+        ],
+        "judge_note": "5-level: candidate raises citation grounding unprompted; designs chunk-level provenance with verification. 3-level: adds citation system when surfaced; adequate approach. 1-level: model-generated citations or 'LLM will get it right'."
+      },
+      {
+        "id": "T3_prior_failures",
+        "arming": "belief",
+        "fires_when": "Candidate proposes a solution without acknowledging why prior attempts failed, or is overly optimistic about 'just use RAG.'",
+        "persona_behavior": "'I should tell you \u2014 two vendors tried this before. One built AI-assisted search that was just keyword matching with a chatbot skin. The other gave us a Q&A system that hallucinated deal values in analyst reports. I'm not doing a third failed project. What's different about your approach?' If the candidate acknowledges the failure modes and shows concrete differences (tiered parsing, citation verification, confidence thresholds, shadow-mode validation), James engages. If they dismiss: 'Those were different companies' \u2014 'That doesn't reassure me.'",
+        "maps_to_dimensions": [
+          "D3",
+          "D8"
+        ],
+        "judge_note": "5-level: raises prior-failure awareness unprompted; names specific failure modes their design avoids. 3-level: credible differentiation after the trap fires. 1-level: dismisses prior failures as irrelevant."
+      },
+      {
+        "id": "T4_compliance_boundary",
+        "arming": "reactive",
+        "fires_when": "Candidate proposes an architecture that depends on external APIs, model endpoints outside GCP, or data leaving the project.",
         "persona_behavior": "'Nothing leaves our GCP project. No external APIs. If your architecture depends on calling out, we can't use it.' If the candidate pivots to Vertex AI within the project or self-hosted models: 'Good. Walk me through how you'd set that up.' If they argue that cloud AI services are different: 'Our VPC-SC policy doesn't make that distinction.'",
-        "maps_to_dimensions": ["D2", "D6"], "judge_note": "5-level: candidate asks about infrastructure constraints unprompted and designs within the VPC-SC boundary from the start. 3-level: pivots credibly when constrained. 1-level: argues for exceptions."},
-      {"id": "T5_analyst_adoption", "arming": "reactive", "fires_when": "Candidate designs the system without discussing the analyst workflow, current search behavior, or adoption barriers.",
-        "persona_behavior": "'Our analysts have survived 15 years without this tool. They have their own methods — personal bookmarks, folder shortcuts, a shared drive with 12,000 subfolders. If your tool is slower than their current search, they'll ignore it. How do you get them to use it?' If the candidate asks about current workflow and designs for integration (Slack/Teams, browser extension, existing search UI overlay), James warms up. If they propose a new standalone portal: 'They already ignore the intranet portal. Why would they use another one?'",
-        "maps_to_dimensions": ["D3", "D5"], "judge_note": "5-level: candidate asks about current workflow and designs for frictionless integration; proposes shadow-mode to build trust. 3-level: acknowledges adoption challenge; proposes training or documentation. 1-level: 'build it and they will come.'"},
-      {"id": "T6_latency_tolerance", "arming": "reactive", "fires_when": "Candidate proposes an architecture without addressing query latency, or proposes a multi-hop agentic approach for every query.",
+        "maps_to_dimensions": [
+          "D2",
+          "D6"
+        ],
+        "judge_note": "5-level: candidate asks about infrastructure constraints unprompted and designs within the VPC-SC boundary from the start. 3-level: pivots credibly when constrained. 1-level: argues for exceptions."
+      },
+      {
+        "id": "T5_analyst_adoption",
+        "arming": "reactive",
+        "fires_when": "Candidate designs the system without discussing the analyst workflow, current search behavior, or adoption barriers.",
+        "persona_behavior": "'Our analysts have survived 15 years without this tool. They have their own methods \u2014 personal bookmarks, folder shortcuts, a shared drive with 12,000 subfolders. If your tool is slower than their current search, they'll ignore it. How do you get them to use it?' If the candidate asks about current workflow and designs for integration (Slack/Teams, browser extension, existing search UI overlay), James warms up. If they propose a new standalone portal: 'They already ignore the intranet portal. Why would they use another one?'",
+        "maps_to_dimensions": [
+          "D3",
+          "D5"
+        ],
+        "judge_note": "5-level: candidate asks about current workflow and designs for frictionless integration; proposes shadow-mode to build trust. 3-level: acknowledges adoption challenge; proposes training or documentation. 1-level: 'build it and they will come.'"
+      },
+      {
+        "id": "T6_latency_tolerance",
+        "arming": "reactive",
+        "fires_when": "Candidate proposes an architecture without addressing query latency, or proposes a multi-hop agentic approach for every query.",
         "persona_behavior": "'Analysts will abandon the tool if it's slower than their current search. What's your target latency, and how do you achieve it under peak load?' If the candidate has a latency budget (under 5s at peak 500qph) with a caching strategy and tiered retrieval, James engages. If they propose multi-agent reasoning for every query: 'That sounds slow. What's the fast path?'",
-        "maps_to_dimensions": ["D2", "D7"], "judge_note": "5-level: latency budget explicit with tiered retrieval (embedding search for simple queries, deeper reasoning for complex ones). 3-level: latency acknowledged; caching proposed but tiers not well-defined. 1-level: no latency target or multi-agent for everything."}
+        "maps_to_dimensions": [
+          "D2",
+          "D7"
+        ],
+        "judge_note": "5-level: latency budget explicit with tiered retrieval (embedding search for simple queries, deeper reasoning for complex ones). 3-level: latency acknowledged; caching proposed but tiers not well-defined. 1-level: no latency target or multi-agent for everything."
+      }
     ],
     "rubric": {
       "dimensions": [
-        {"id": "D1", "name": "Constraint discovery & clarification", "weight": 1.5, "always_scorable": true, "anchors": {"5": "Probes document formats, scanned proportion, workflow, compliance, prior failures, and infrastructure before designing.", "3": "Asks about some constraints; scanned-document complexity surfaced under pushback.", "1": "Assumes clean text PDFs; jumps to RAG architecture without discovery."}},
-        {"id": "D2", "name": "Architecture under hard constraints", "weight": 1.5, "always_scorable": true, "anchors": {"5": "Tiered parsing pipeline (OCR → layout detection → table extraction → chunking); self-hosted/VPC-SC-contained inference; tiered retrieval with latency budget.", "3": "Sound RAG architecture; parsing tier acknowledged but not detailed; VPC-SC constraint integrated under pushback.", "1": "'LLMs can read PDFs'; external API dependency; no parsing strategy."}},
-        {"id": "D3", "name": "Stakeholder & trust management", "weight": 1.5, "always_scorable": false, "anchors": {"5": "Acknowledges prior failures and designs concretely different; integrates into existing analyst workflow with shadow-mode validation; cites adoption plan.", "3": "Acknowledges prior failures; proposes adequate differentiation; analyst adoption considered but surface-level.", "1": "Dismisses prior failures; no adoption plan; builds standalone portal."}},
-        {"id": "D4", "name": "Problem formulation (retrieval & grounding)", "weight": 1.5, "always_scorable": true, "anchors": {"5": "Formulates as citation-grounded RAG with chunk-level provenance; designs for table/semi-structured querying; includes verification step for citations.", "3": "Sound RAG formulation; citation grounding acknowledged; verification not well-designed.", "1": "Simple RAG with no citation guarantee; chunking without structure awareness."}},
-        {"id": "D5", "name": "Metrics tied to operations", "weight": 1.0, "always_scorable": false, "anchors": {"5": "Success defined as time-to-answer reduction for analysts, citation accuracy rate, and adoption curve; benchmark against current search workflow.", "3": "Technical metrics (retrieval recall, answer accuracy) with some connection to analyst productivity.", "1": "No success measurement or purely technical metrics in a vacuum."}},
-        {"id": "D6", "name": "Regulatory & compliance depth", "weight": 1.0, "always_scorable": true, "anchors": {"5": "VPC-SC designed from start; audit logging for every query; citation verification as compliance feature; model governance within project boundary.", "3": "GCP boundary respected; audit logging added when surfaced.", "1": "External API dependency; no audit trail; argues for compliance exceptions."}},
-        {"id": "D7", "name": "Scope realism & sequencing", "weight": 1.0, "always_scorable": true, "anchors": {"5": "Phased: (1) PDF parsing pipeline validation, (2) citation-grounded retrieval on subset, (3) analyst beta with feedback loop, (4) full rollout with caching.", "3": "Reasonable phased approach; sequencing could be tighter on parsing-first.", "1": "Big-bang; no parsing validation before retrieval build."}},
-        {"id": "D8", "name": "Communication & recovery", "weight": 1.0, "always_scorable": true, "anchors": {"5": "Structured, acknowledges prior failure modes; names specific design differences; owns limitations of parsing approach.", "3": "Clear and credible; differentiation emerges under pushback.", "1": "Overconfident; dismisses prior failures; hand-waves parsing complexity."}}
+        {
+          "id": "D1",
+          "name": "Constraint discovery & clarification",
+          "weight": 1.5,
+          "always_scorable": true,
+          "anchors": {
+            "5": "Probes document formats, scanned proportion, workflow, compliance, prior failures, and infrastructure before designing.",
+            "3": "Asks about some constraints; scanned-document complexity surfaced under pushback.",
+            "1": "Assumes clean text PDFs; jumps to RAG architecture without discovery."
+          }
+        },
+        {
+          "id": "D2",
+          "name": "Architecture under hard constraints",
+          "weight": 1.5,
+          "always_scorable": true,
+          "anchors": {
+            "5": "Tiered parsing pipeline (OCR \u2192 layout detection \u2192 table extraction \u2192 chunking); self-hosted/VPC-SC-contained inference; tiered retrieval with latency budget.",
+            "3": "Sound RAG architecture; parsing tier acknowledged but not detailed; VPC-SC constraint integrated under pushback.",
+            "1": "'LLMs can read PDFs'; external API dependency; no parsing strategy."
+          }
+        },
+        {
+          "id": "D3",
+          "name": "Stakeholder & trust management",
+          "weight": 1.5,
+          "always_scorable": false,
+          "anchors": {
+            "5": "Acknowledges prior failures and designs concretely different; integrates into existing analyst workflow with shadow-mode validation; cites adoption plan.",
+            "3": "Acknowledges prior failures; proposes adequate differentiation; analyst adoption considered but surface-level.",
+            "1": "Dismisses prior failures; no adoption plan; builds standalone portal."
+          }
+        },
+        {
+          "id": "D4",
+          "name": "Problem formulation (retrieval & grounding)",
+          "weight": 1.5,
+          "always_scorable": true,
+          "anchors": {
+            "5": "Formulates as citation-grounded RAG with chunk-level provenance; designs for table/semi-structured querying; includes verification step for citations.",
+            "3": "Sound RAG formulation; citation grounding acknowledged; verification not well-designed.",
+            "1": "Simple RAG with no citation guarantee; chunking without structure awareness."
+          }
+        },
+        {
+          "id": "D5",
+          "name": "Metrics tied to operations",
+          "weight": 1.0,
+          "always_scorable": false,
+          "anchors": {
+            "5": "Success defined as time-to-answer reduction for analysts, citation accuracy rate, and adoption curve; benchmark against current search workflow.",
+            "3": "Technical metrics (retrieval recall, answer accuracy) with some connection to analyst productivity.",
+            "1": "No success measurement or purely technical metrics in a vacuum."
+          }
+        },
+        {
+          "id": "D6",
+          "name": "Regulatory & compliance depth",
+          "weight": 1.0,
+          "always_scorable": true,
+          "anchors": {
+            "5": "VPC-SC designed from start; audit logging for every query; citation verification as compliance feature; model governance within project boundary.",
+            "3": "GCP boundary respected; audit logging added when surfaced.",
+            "1": "External API dependency; no audit trail; argues for compliance exceptions."
+          }
+        },
+        {
+          "id": "D7",
+          "name": "Scope realism & sequencing",
+          "weight": 1.0,
+          "always_scorable": true,
+          "anchors": {
+            "5": "Phased: (1) PDF parsing pipeline validation, (2) citation-grounded retrieval on subset, (3) analyst beta with feedback loop, (4) full rollout with caching.",
+            "3": "Reasonable phased approach; sequencing could be tighter on parsing-first.",
+            "1": "Big-bang; no parsing validation before retrieval build."
+          }
+        },
+        {
+          "id": "D8",
+          "name": "Communication & recovery",
+          "weight": 1.0,
+          "always_scorable": true,
+          "anchors": {
+            "5": "Structured, acknowledges prior failure modes; names specific design differences; owns limitations of parsing approach.",
+            "3": "Clear and credible; differentiation emerges under pushback.",
+            "1": "Overconfident; dismisses prior failures; hand-waves parsing complexity."
+          }
+        }
       ],
       "disqualifiers": [
-        {"id": "DQ1", "description": "Insists LLMs can read PDFs natively after parsing complexity is surfaced (T1 defend without revision)."},
-        {"id": "DQ2", "description": "Defends model-generated citations after citation requirement is stated (T2 defend)."},
-        {"id": "DQ3", "description": "Dismisses prior vendor failures as irrelevant after being told about them (T3 dismiss)."}
+        {
+          "id": "DQ1",
+          "description": "Insists LLMs can read PDFs natively after parsing complexity is surfaced (T1 defend without revision)."
+        },
+        {
+          "id": "DQ2",
+          "description": "Defends model-generated citations after citation requirement is stated (T2 defend)."
+        },
+        {
+          "id": "DQ3",
+          "description": "Dismisses prior vendor failures as irrelevant after being told about them (T3 dismiss)."
+        }
       ],
-      "bands": {"strong_hire": 4.20, "hire": 3.40, "borderline": 2.70, "no_hire": 1.80, "strong_no_hire": 0}
+      "bands": {
+        "strong_hire": 4.2,
+        "hire": 3.4,
+        "borderline": 2.7,
+        "no_hire": 1.8,
+        "strong_no_hire": 0
+      }
     }
   },
   "decomposition-5": {
@@ -287,54 +1058,197 @@
       "name": "Colonel Sarah Vance (Ret.)",
       "role": "Program Director, Autonomous Systems, Defense Innovation Unit",
       "voice": "Direct, mission-focused, zero tolerance for ambiguity. Military background but technically conversant. Asks 'prove it' questions. Expects to hear about failure modes before success cases. Does not repeat herself.",
-      "opening_line": "We need computer vision on drones and ground vehicles in contested environments — intermittent or no connectivity. Detect and classify from satellite and drone imagery in near-real-time. Bandwidth is extremely limited. Model updates arrive via physical media. No cloud dependency once deployed. How would you approach the full lifecycle — architecture through operations?",
+      "opening_line": "We need computer vision on drones and ground vehicles in contested environments \u2014 intermittent or no connectivity. Detect and classify from satellite and drone imagery in near-real-time. Bandwidth is extremely limited. Model updates arrive via physical media. No cloud dependency once deployed. How would you approach the full lifecycle \u2014 architecture through operations?",
       "knowledge_boundaries": "Colonel Vance understands detection/classification requirements operationally but not the ML details. She knows what a false negative costs in the field. She can describe the hardware platforms (drone model, ground vehicle specs) but expects the candidate to ask. She does not engage with ML terminology without translation.",
       "hidden_facts": {
         "platform_specs": "Primary drone: ~4W compute budget, 8GB RAM, ARM64, no GPU. Ground vehicles: ~25W, 32GB RAM, NVIDIA Jetson Orin. All units have <50GB free storage for models.",
         "connectivity": "Units operate with 0-10kbps backhaul for 80% of mission duration. Sat link is available briefly (15-min windows, 2-3x/day) for priority telemetry only. No real-time video or model inference data can be sent back during normal ops.",
         "update_frequency": "Model retraining expected quarterly. Updates delivered via encrypted SSD couriered to deployment site, then loaded via USB-C by field technician. Air-gapped transfer; no OTA.",
         "labeling_reality": "No pre-existing labeled dataset for the theater of operations. Labeling must happen in-field by personnel with no ML background, using captured imagery. Expected label volume: ~500-1000 examples per quarter.",
-        "operational_tempo": "Units are deployed in 90-day rotations. The model must perform from day 1 of rotation — no gradual learning window. Each rotation may have different terrain and target characteristics.",
+        "operational_tempo": "Units are deployed in 90-day rotations. The model must perform from day 1 of rotation \u2014 no gradual learning window. Each rotation may have different terrain and target characteristics.",
         "accreditation": "Any model change requires a 2-week safety accreditation cycle before deployment. This includes the initial model AND every quarterly update. The accreditor is an external agency, not Colonel Vance's team."
       }
     },
     "triggers": [
-      {"id": "T1_connectivity_assumption", "arming": "reactive", "fires_when": "Candidate proposes an architecture that depends on inference-time connectivity: cloud inference, hybrid edge-cloud, or model fetching from remote at runtime.",
+      {
+        "id": "T1_connectivity_assumption",
+        "arming": "reactive",
+        "fires_when": "Candidate proposes an architecture that depends on inference-time connectivity: cloud inference, hybrid edge-cloud, or model fetching from remote at runtime.",
         "persona_behavior": "'These units don't have a reliable data link during missions. Eighty percent of the time they have zero backhaul. If your architecture needs to talk to something beyond the edge, it fails in the field.' If the candidate pivots to fully edge-local inference with model-on-board, Vance: 'Good. Walk me through the edge inference setup.' If they argue for periodic sync: 'Fifteen-minute sat windows, twice a day, for priority telemetry only. Your model traffic doesn't qualify.'",
-        "maps_to_dimensions": ["D1", "D2"], "judge_note": "5-level: fully edge-local inference assumed from the start; asks about compute budget, memory, and storage. 3-level: pivots to edge when constrained; adequate edge architecture. 1-level: defends hybrid approach after constraint is stated."},
-      {"id": "T2_edge_constraints", "arming": "reactive", "fires_when": "Candidate proposes a model or architecture without discussing the edge hardware constraints (compute, memory, storage).",
+        "maps_to_dimensions": [
+          "D1",
+          "D2"
+        ],
+        "judge_note": "5-level: fully edge-local inference assumed from the start; asks about compute budget, memory, and storage. 3-level: pivots to edge when constrained; adequate edge architecture. 1-level: defends hybrid approach after constraint is stated."
+      },
+      {
+        "id": "T2_edge_constraints",
+        "arming": "reactive",
+        "fires_when": "Candidate proposes a model or architecture without discussing the edge hardware constraints (compute, memory, storage).",
         "persona_behavior": "'What are you assuming about the hardware on these units?' If the candidate asks about platform specs first, Vance provides hidden_facts.platform_specs. If they propose a large model without asking: 'The drone has 8GB of RAM and 4 watts of compute. No GPU. Does your model fit?' If the candidate sizes correctly: 'Prove it. What's the inference latency on an ARM64 CPU with 8GB?'",
-        "maps_to_dimensions": ["D2", "D4"], "judge_note": "5-level: candidate asks about hardware constraints before proposing a model architecture; sizes model to smallest target platform with latency estimate. 3-level: adjusts model choice when hardware specs are revealed. 1-level: proposes large model without sizing; no latency estimate."},
-      {"id": "T3_labeling_constraint", "arming": "reactive", "fires_when": "Candidate discusses model training or fine-tuning without addressing how labels are obtained in a disconnected, non-ML environment.",
+        "maps_to_dimensions": [
+          "D2",
+          "D4"
+        ],
+        "judge_note": "5-level: candidate asks about hardware constraints before proposing a model architecture; sizes model to smallest target platform with latency estimate. 3-level: adjusts model choice when hardware specs are revealed. 1-level: proposes large model without sizing; no latency estimate."
+      },
+      {
+        "id": "T3_labeling_constraint",
+        "arming": "reactive",
+        "fires_when": "Candidate discusses model training or fine-tuning without addressing how labels are obtained in a disconnected, non-ML environment.",
         "persona_behavior": "'We have zero labeled data for this theater. Our field personnel are not ML engineers. How do you get labels?' If the candidate proposes active learning with field-friendly labeling tools (bounding box on captured image, tap-to-classify on the existing UI), Vance engages. If they propose sending imagery to a remote labeling team: 'With what bandwidth? Our sat link cannot support image egress.' If they propose synthetic data: 'Will it generalize to this terrain? Prove it.'",
-        "maps_to_dimensions": ["D4", "D7"], "judge_note": "5-level: candidate anticipates labeling challenge unprompted; proposes field-friendly active learning with the operations team. 3-level: labeling plan exists but relies partially on remote or synthetic with acknowledged risk. 1-level: proposes remote labeling without addressing bandwidth, or ignores labeling."},
-      {"id": "T4_update_logistics", "arming": "reactive", "fires_when": "Candidate discusses model updates, retraining, or continuous improvement without addressing the physical update delivery mechanism.",
-        "persona_behavior": "'Your model will need updates. Walk me through how a new model gets onto the drone.' If the candidate describes the physical media chain (accredited model → encrypted SSD → courier → field tech → USB-C load), Vance: 'You've thought about the pipeline. Now — what if the field tech loads the wrong version?' If they propose OTA: 'No connectivity, remember?'",
-        "maps_to_dimensions": ["D2", "D7"], "judge_note": "5-level: candidate asks about update mechanism unprompted; designs physical delivery pipeline with version validation, rollback, and accreditation integration. 3-level: credible physical update plan; versioning and rollback addressed under pushback. 1-level: proposes OTA or hand-waves the update process."},
-      {"id": "T5_accreditation_gate", "arming": "belief", "fires_when": "Candidate ignores the accreditation cycle in their timeline, or proposes an update schedule that doesn't account for the 2-week external review.",
-        "persona_behavior": "'I didn't mention this yet. Every model change — including the first deployment — requires a 2-week safety accreditation by an external agency. Not my team. An external one. When does that fit in your timeline?' If the candidate adjusts their timeline and budget to include accreditation upfront: 'Good. Highlight that in your project plan.' If they propose to parallelize or fast-track accreditation: 'They don't do fast-track for airborne platforms.'",
-        "maps_to_dimensions": ["D6", "D7"], "judge_note": "5-level: candidate asks about deployment timeline constraints unprompted; builds 2-week accreditation into the critical path from the start. 3-level: adjusts timeline when surfaced; plausible resequencing. 1-level: proposes to fast-track or ignore accreditation."},
-      {"id": "T6_rotation_transition", "arming": "ambient", "fires_when": "Always present — 90-day unit rotations with different terrain/target characteristics.",
+        "maps_to_dimensions": [
+          "D4",
+          "D7"
+        ],
+        "judge_note": "5-level: candidate anticipates labeling challenge unprompted; proposes field-friendly active learning with the operations team. 3-level: labeling plan exists but relies partially on remote or synthetic with acknowledged risk. 1-level: proposes remote labeling without addressing bandwidth, or ignores labeling."
+      },
+      {
+        "id": "T4_update_logistics",
+        "arming": "reactive",
+        "fires_when": "Candidate discusses model updates, retraining, or continuous improvement without addressing the physical update delivery mechanism.",
+        "persona_behavior": "'Your model will need updates. Walk me through how a new model gets onto the drone.' If the candidate describes the physical media chain (accredited model \u2192 encrypted SSD \u2192 courier \u2192 field tech \u2192 USB-C load), Vance: 'You've thought about the pipeline. Now \u2014 what if the field tech loads the wrong version?' If they propose OTA: 'No connectivity, remember?'",
+        "maps_to_dimensions": [
+          "D2",
+          "D7"
+        ],
+        "judge_note": "5-level: candidate asks about update mechanism unprompted; designs physical delivery pipeline with version validation, rollback, and accreditation integration. 3-level: credible physical update plan; versioning and rollback addressed under pushback. 1-level: proposes OTA or hand-waves the update process."
+      },
+      {
+        "id": "T5_accreditation_gate",
+        "arming": "belief",
+        "fires_when": "Candidate ignores the accreditation cycle in their timeline, or proposes an update schedule that doesn't account for the 2-week external review.",
+        "persona_behavior": "'I didn't mention this yet. Every model change \u2014 including the first deployment \u2014 requires a 2-week safety accreditation by an external agency. Not my team. An external one. When does that fit in your timeline?' If the candidate adjusts their timeline and budget to include accreditation upfront: 'Good. Highlight that in your project plan.' If they propose to parallelize or fast-track accreditation: 'They don't do fast-track for airborne platforms.'",
+        "maps_to_dimensions": [
+          "D6",
+          "D7"
+        ],
+        "judge_note": "5-level: candidate asks about deployment timeline constraints unprompted; builds 2-week accreditation into the critical path from the start. 3-level: adjusts timeline when surfaced; plausible resequencing. 1-level: proposes to fast-track or ignore accreditation."
+      },
+      {
+        "id": "T6_rotation_transition",
+        "arming": "ambient",
+        "fires_when": "Always present \u2014 90-day unit rotations with different terrain/target characteristics.",
         "persona_behavior": "Vance does NOT raise rotations unprompted. If the candidate asks about deployment duration, theater rotation, or model drift between deployments: she reveals hidden_facts.operational_tempo. If the candidate designs a per-rotation fine-tuning pipeline with field labeling during the current rotation to prepare for the next: Vance: 'You've thought about sustainment. That's rare.' If the candidate treats it as a one-time deploy: 'Units rotate out every 90 days. The next unit may have different targets. Does your model work for them?'",
-        "maps_to_dimensions": ["D4", "D7"], "judge_note": "5-level: raises rotation/sustainment challenge unprompted; designs per-rotation adaptation pipeline. 3-level: acknowledges rotation challenge when surfaced; adequate adaptation strategy. 1-level: treats as one-time deploy; no sustainment consideration."}
+        "maps_to_dimensions": [
+          "D4",
+          "D7"
+        ],
+        "judge_note": "5-level: raises rotation/sustainment challenge unprompted; designs per-rotation adaptation pipeline. 3-level: acknowledges rotation challenge when surfaced; adequate adaptation strategy. 1-level: treats as one-time deploy; no sustainment consideration."
+      }
     ],
     "rubric": {
       "dimensions": [
-        {"id": "D1", "name": "Constraint discovery & clarification", "weight": 1.5, "always_scorable": true, "anchors": {"5": "Probes connectivity, hardware specs, labeling, update logistics, accreditation, and rotation cycle before designing architecture.", "3": "Asks about some constraints; connectivity and hardware surfaced under pushback.", "1": "Jumps to solution assuming cloud connectivity or desktop-class hardware."}},
-        {"id": "D2", "name": "Architecture under hard constraints", "weight": 1.5, "always_scorable": true, "anchors": {"5": "Fully edge-local inference; model sized to smallest platform with latency estimate; physical update pipeline with version validation and rollback.", "3": "Edge-local after correction; reasonable model choice; update logistics adequate.", "1": "Cloud/hybrid dependency; model too large for hardware; no update logistics."}},
-        {"id": "D3", "name": "Stakeholder & trust management", "weight": 1.5, "always_scorable": false, "anchors": {"5": "Engages accreditor as stakeholder; builds field personnel into labeling workflow as partners; designs for operator trust via confidence calibration.", "3": "Acknowledges accreditor and field team; integration is adequate but not partnership-level.", "1": "Accreditor is a gate to be worked around; field team is an afterthought."}},
-        {"id": "D4", "name": "ML problem formulation", "weight": 1.5, "always_scorable": true, "anchors": {"5": "Active learning with field-friendly labeling tools; domain-specific data augmentation; per-rotation fine-tuning pipeline; uncertainty-aware detection.", "3": "Sound formulation; labeling plan exists with acknowledged field constraints; augmentation adequate.", "1": "No labeling plan; generic model assumed to generalize; no rotation adaptation."}},
-        {"id": "D5", "name": "Metrics tied to operations", "weight": 1.0, "always_scorable": false, "anchors": {"5": "Success defined as mission-level metrics: detection rate per target class, false-alarm cost per mission type, time-to-accreditation per update cycle.", "3": "Technical metrics with translation to mission impact when pushed.", "1": "Technical metrics only (mAP, F1); no connection to operational outcomes."}},
-        {"id": "D6", "name": "Regulatory & safety depth", "weight": 1.0, "always_scorable": true, "anchors": {"5": "Accreditation built into project plan as critical path; safety case per model version; failsafe and degraded-mode operation documented.", "3": "Accreditation acknowledged and sequenced; safety considerations adequate.", "1": "Proposes to fast-track or parallelize accreditation; no failsafe thinking."}},
-        {"id": "D7", "name": "Scope realism & sequencing", "weight": 1.0, "always_scorable": true, "anchors": {"5": "Parallel workstreams: edge inference validation, labeling tool development, initial model training, accreditation package, all sequenced before deployment.", "3": "Sensible sequencing; accreditation and labeling integrated under pushback.", "1": "Timeline ignores accreditation; labeling is an afterthought; no buffer for rotation transitions."}},
-        {"id": "D8", "name": "Communication & recovery", "weight": 1.0, "always_scorable": true, "anchors": {"5": "Direct, mission-focused, zero ambiguity; names failure modes before success; structured around operational reality.", "3": "Clear and credible; failure modes surfaced under pushback.", "1": "Overconfident; treats field constraints as solvable with 'better models'; vague on sustainment."}}
+        {
+          "id": "D1",
+          "name": "Constraint discovery & clarification",
+          "weight": 1.5,
+          "always_scorable": true,
+          "anchors": {
+            "5": "Probes connectivity, hardware specs, labeling, update logistics, accreditation, and rotation cycle before designing architecture.",
+            "3": "Asks about some constraints; connectivity and hardware surfaced under pushback.",
+            "1": "Jumps to solution assuming cloud connectivity or desktop-class hardware."
+          }
+        },
+        {
+          "id": "D2",
+          "name": "Architecture under hard constraints",
+          "weight": 1.5,
+          "always_scorable": true,
+          "anchors": {
+            "5": "Fully edge-local inference; model sized to smallest platform with latency estimate; physical update pipeline with version validation and rollback.",
+            "3": "Edge-local after correction; reasonable model choice; update logistics adequate.",
+            "1": "Cloud/hybrid dependency; model too large for hardware; no update logistics."
+          }
+        },
+        {
+          "id": "D3",
+          "name": "Stakeholder & trust management",
+          "weight": 1.5,
+          "always_scorable": false,
+          "anchors": {
+            "5": "Engages accreditor as stakeholder; builds field personnel into labeling workflow as partners; designs for operator trust via confidence calibration.",
+            "3": "Acknowledges accreditor and field team; integration is adequate but not partnership-level.",
+            "1": "Accreditor is a gate to be worked around; field team is an afterthought."
+          }
+        },
+        {
+          "id": "D4",
+          "name": "ML problem formulation",
+          "weight": 1.5,
+          "always_scorable": true,
+          "anchors": {
+            "5": "Active learning with field-friendly labeling tools; domain-specific data augmentation; per-rotation fine-tuning pipeline; uncertainty-aware detection.",
+            "3": "Sound formulation; labeling plan exists with acknowledged field constraints; augmentation adequate.",
+            "1": "No labeling plan; generic model assumed to generalize; no rotation adaptation."
+          }
+        },
+        {
+          "id": "D5",
+          "name": "Metrics tied to operations",
+          "weight": 1.0,
+          "always_scorable": false,
+          "anchors": {
+            "5": "Success defined as mission-level metrics: detection rate per target class, false-alarm cost per mission type, time-to-accreditation per update cycle.",
+            "3": "Technical metrics with translation to mission impact when pushed.",
+            "1": "Technical metrics only (mAP, F1); no connection to operational outcomes."
+          }
+        },
+        {
+          "id": "D6",
+          "name": "Regulatory & safety depth",
+          "weight": 1.0,
+          "always_scorable": true,
+          "anchors": {
+            "5": "Accreditation built into project plan as critical path; safety case per model version; failsafe and degraded-mode operation documented.",
+            "3": "Accreditation acknowledged and sequenced; safety considerations adequate.",
+            "1": "Proposes to fast-track or parallelize accreditation; no failsafe thinking."
+          }
+        },
+        {
+          "id": "D7",
+          "name": "Scope realism & sequencing",
+          "weight": 1.0,
+          "always_scorable": true,
+          "anchors": {
+            "5": "Parallel workstreams: edge inference validation, labeling tool development, initial model training, accreditation package, all sequenced before deployment.",
+            "3": "Sensible sequencing; accreditation and labeling integrated under pushback.",
+            "1": "Timeline ignores accreditation; labeling is an afterthought; no buffer for rotation transitions."
+          }
+        },
+        {
+          "id": "D8",
+          "name": "Communication & recovery",
+          "weight": 1.0,
+          "always_scorable": true,
+          "anchors": {
+            "5": "Direct, mission-focused, zero ambiguity; names failure modes before success; structured around operational reality.",
+            "3": "Clear and credible; failure modes surfaced under pushback.",
+            "1": "Overconfident; treats field constraints as solvable with 'better models'; vague on sustainment."
+          }
+        }
       ],
       "disqualifiers": [
-        {"id": "DQ1", "description": "Defends cloud/hybrid inference after connectivity constraint is stated (T1 defend without revision)."},
-        {"id": "DQ2", "description": "Proposes remote labeling team after bandwidth constraint is surfaced (T3 remote-label defend)."},
-        {"id": "DQ3", "description": "Dismisses accreditation as a process to be parallelized or fast-tracked (T5 fast-track)."}
+        {
+          "id": "DQ1",
+          "description": "Defends cloud/hybrid inference after connectivity constraint is stated (T1 defend without revision)."
+        },
+        {
+          "id": "DQ2",
+          "description": "Proposes remote labeling team after bandwidth constraint is surfaced (T3 remote-label defend)."
+        },
+        {
+          "id": "DQ3",
+          "description": "Dismisses accreditation as a process to be parallelized or fast-tracked (T5 fast-track)."
+        }
       ],
-      "bands": {"strong_hire": 4.20, "hire": 3.40, "borderline": 2.70, "no_hire": 1.80, "strong_no_hire": 0}
+      "bands": {
+        "strong_hire": 4.2,
+        "hire": 3.4,
+        "borderline": 2.7,
+        "no_hire": 1.8,
+        "strong_no_hire": 0
+      }
     }
   },
   "decomposition-6": {
@@ -346,7 +1260,7 @@
       "name": "Hiroshi Tanaka",
       "role": "VP of Global Supply Chain, Apex Automotive Manufacturing (plants in Germany, Mexico, Thailand, and China)",
       "voice": "Pragmatic, operations-focused, slightly tired of IT projects that overpromise. Code-switches between operational detail and executive summary. Very familiar with the pain of Excel-driven supply chains but protective of his team's current processes.",
-      "opening_line": "We want to use AI to optimize our global supply chain — predict part shortages, reroute shipments, flag supplier risk. Our data is everywhere: SAP ERP, IoT feeds from factories, supplier emails in Outlook, and Excel sheets that genuinely run parts of the business. Our IT is split between on-prem and GCP, and different regions have different data sovereignty rules. How would you decompose this engagement and sequence the work?",
+      "opening_line": "We want to use AI to optimize our global supply chain \u2014 predict part shortages, reroute shipments, flag supplier risk. Our data is everywhere: SAP ERP, IoT feeds from factories, supplier emails in Outlook, and Excel sheets that genuinely run parts of the business. Our IT is split between on-prem and GCP, and different regions have different data sovereignty rules. How would you decompose this engagement and sequence the work?",
       "knowledge_boundaries": "Hiroshi knows procurement, inventory, and logistics deeply. He can describe the ERP tables and IoT sensors but not their schemas. He manages a team of 40 supply chain analysts worldwide. He's personally fluent in SAP but hasn't touched Excel 'since 2019, thank God.'",
       "hidden_facts": {
         "current_pain": "Part shortages detected 3-5 days late on average. Rerouting takes 8-12 hours of phone calls and spreadsheet reconciliation per incident. Supplier risk is assessed via quarterly manual reviews.",
@@ -359,42 +1273,401 @@
       }
     },
     "triggers": [
-      {"id": "T1_sovereignty_maze", "arming": "reactive", "fires_when": "Candidate proposes a unified data architecture without addressing regional data sovereignty — or assumes GCP handles it all.",
+      {
+        "id": "T1_sovereignty_maze",
+        "arming": "reactive",
+        "fires_when": "Candidate proposes a unified data architecture without addressing regional data sovereignty \u2014 or assumes GCP handles it all.",
         "persona_behavior": "'We have data in four regions with four different sovereignty rules. EU data stays in EU GCP. China has a local provider. Mexico data in US. Thailand in Singapore. How does your architecture work across that?' If the candidate proposes regional data stores with a unified query layer and sovereignty-aware routing, Hiroshi: 'You've thought about this. How do you handle cross-region joins?' If they propose centralizing everything in one region: 'That violates three countries' regulations.'",
-        "maps_to_dimensions": ["D1", "D2"], "judge_note": "5-level: candidate raises data sovereignty unprompted and designs region-partitioned architecture with sovereignty-aware query routing. 3-level: adds sovereignty partitioning when surfaced. 1-level: proposes single-region centralization after constraint is stated."},
-      {"id": "T2_data_source_heterogeneity", "arming": "reactive", "fires_when": "Candidate proposes a data integration approach without discussing the variety of sources (SAP, IoT, email, Excel) and their differing characteristics.",
+        "maps_to_dimensions": [
+          "D1",
+          "D2"
+        ],
+        "judge_note": "5-level: candidate raises data sovereignty unprompted and designs region-partitioned architecture with sovereignty-aware query routing. 3-level: adds sovereignty partitioning when surfaced. 1-level: proposes single-region centralization after constraint is stated."
+      },
+      {
+        "id": "T2_data_source_heterogeneity",
+        "arming": "reactive",
+        "fires_when": "Candidate proposes a data integration approach without discussing the variety of sources (SAP, IoT, email, Excel) and their differing characteristics.",
         "persona_behavior": "'Let me paint the picture. Your pipeline needs to ingest SAP ECC tables (structured but per-region), 50K IoT sensors with two different cadences, 2,000 emails a day in German, English, Thai, and Spanish, and 30 Excel spreadsheets with undocumented macros that the business runs on. What's your ingestion strategy?' If the candidate describes per-source adapters with schema inference, change data capture for SAP, and a phased retirement plan for Excel: Hiroshi nods. If they say 'we'll put it all in BigQuery': 'The Excel sheets have macros that fail if you look at them wrong. BigQuery won't solve that.'",
-        "maps_to_dimensions": ["D2", "D4"], "judge_note": "5-level: candidate asks about data sources and proposes per-source adapters with CDC for SAP, IoT normalization layer, email parsing, and Excel migration plan. 3-level: adds source-specific handling when surfaced; adequate approach. 1-level: 'ETL everything into a data lake' without source-specific strategy."},
-      {"id": "T3_excel_trap", "arming": "belief", "fires_when": "Candidate dismisses Excel as 'just replace it' without understanding that it encodes tribal knowledge and business logic.",
+        "maps_to_dimensions": [
+          "D2",
+          "D4"
+        ],
+        "judge_note": "5-level: candidate asks about data sources and proposes per-source adapters with CDC for SAP, IoT normalization layer, email parsing, and Excel migration plan. 3-level: adds source-specific handling when surfaced; adequate approach. 1-level: 'ETL everything into a data lake' without source-specific strategy."
+      },
+      {
+        "id": "T3_excel_trap",
+        "arming": "belief",
+        "fires_when": "Candidate dismisses Excel as 'just replace it' without understanding that it encodes tribal knowledge and business logic.",
         "persona_behavior": "'Thirty critical spreadsheets. They have formulas, macros, hard-coded overrides. One senior analyst's spreadsheet failed last year and cost us two weeks of production. If I tell that analyst we're replacing his spreadsheet with an AI, he'll quit. How do you handle that?' If the candidate proposes shadow-mode (run AI alongside existing spreadsheets, compare outputs, build trust before migration), Hiroshi: 'That's the most sensible thing I've heard. Walk me through the first 30 days.' If they propose immediate migration or extraction: 'You'll break my supply chain.'",
-        "maps_to_dimensions": ["D3", "D7"], "judge_note": "5-level: raises Excel risk unprompted; proposes shadow-mode validation with analyst-in-the-loop; concrete migration plan. 3-level: acknowledges Excel complexity when surfaced; reasonable shadow approach. 1-level: 'just migrate the data' or 'extract the formulas.'"},
-      {"id": "T4_analyst_skepticism", "arming": "reactive", "fires_when": "Candidate designs the system without discussing the team of 40 analysts, their current workflow, or their trust in IT projects.",
+        "maps_to_dimensions": [
+          "D3",
+          "D7"
+        ],
+        "judge_note": "5-level: raises Excel risk unprompted; proposes shadow-mode validation with analyst-in-the-loop; concrete migration plan. 3-level: acknowledges Excel complexity when surfaced; reasonable shadow approach. 1-level: 'just migrate the data' or 'extract the formulas.'"
+      },
+      {
+        "id": "T4_analyst_skepticism",
+        "arming": "reactive",
+        "fires_when": "Candidate designs the system without discussing the team of 40 analysts, their current workflow, or their trust in IT projects.",
         "persona_behavior": "'My team of 40 analysts has survived three failed IT projects. They trust their Excel sheets and their email inbox. If your AI gives them a recommendation they don't understand, they'll ignore it. How do you earn their trust?' If the candidate proposes a phased rollout starting with the least-threatening use case (e.g., supplier risk flagging vs. automated rerouting), with visible accuracy metrics and analyst feedback loops: Hiroshi engages. If they propose automation-first: 'They'll sabotage it within a week.'",
-        "maps_to_dimensions": ["D3", "D5"], "judge_note": "5-level: candidate asks about analyst team and designs for tool-augmentation, not replacement; proposes trust-building metrics and workflow integration. 3-level: acknowledges analyst adoption challenge; reasonable rollout plan. 1-level: automation-first; 'they'll see the value eventually.'"},
-      {"id": "T5_sequencing_reality", "arming": "ambient", "fires_when": "Always present — the core question is how to sequence the work across heterogeneous sources and a skeptical organization.",
-        "persona_behavior": "Hiroshi does NOT ask about sequencing unprompted. If the candidate describes a sequence, he listens for: (1) quick credibility win, (2) least risk of breaking ops, (3) builds toward the hardest problem last. A good answer: start with supplier risk scoring (email parsing + existing supplier DB — no operational disruption), then IoT anomaly detection (additive, doesn't change workflows), then shortage prediction (needs SAP integration), then rerouting optimization (changes workflows — do last). A bad answer: start with rerouting because it's the highest value. Hiroshi: 'That changes how 40 people work on day one. I'd be out of a job if it fails.'",
-        "maps_to_dimensions": ["D7", "D8"], "judge_note": "5-level: sequencing starts with low-risk credibility win, builds toward highest-risk/highest-value last; parallel tracks for data ingestion and model training. 3-level: reasonable sequence but starts with medium-risk (SAP ingestion) before credibility win. 1-level: starts with highest-value/most-risky (rerouting optimization) first."},
-      {"id": "T6_budget_constraint", "arming": "reactive", "fires_when": "Candidate proposes a plan that requires significant upfront spend or assumes unlimited budget.",
-        "persona_behavior": "'Before you go too far — I have $200K I can approve today from my operational budget. Anything above that needs the CFO and a 6-week review cycle. What's your plan within that boundary?' If the candidate has a phase-1 cost estimate within $200K and a phase-2 budget trigger based on phase-1 results: Hiroshi: 'That's a conversation I can have with the CFO.' If they propose a $500K phase 1: 'I can't approve that. What's the $200K version?'",
-        "maps_to_dimensions": ["D1", "D7"], "judge_note": "5-level: budget-aware from the start; proposes phase-1 within the $200K boundary with clear go/no-go criteria for further funding. 3-level: adjusts scope to budget when surfaced; credible $200K plan. 1-level: dismisses budget constraint; proposes unfunded plan."}
+        "maps_to_dimensions": [
+          "D3",
+          "D5"
+        ],
+        "judge_note": "5-level: candidate asks about analyst team and designs for tool-augmentation, not replacement; proposes trust-building metrics and workflow integration. 3-level: acknowledges analyst adoption challenge; reasonable rollout plan. 1-level: automation-first; 'they'll see the value eventually.'"
+      },
+      {
+        "id": "T5_sequencing_reality",
+        "arming": "ambient",
+        "fires_when": "Always present \u2014 the core question is how to sequence the work across heterogeneous sources and a skeptical organization.",
+        "persona_behavior": "Hiroshi does NOT ask about sequencing unprompted. If the candidate describes a sequence, he listens for: (1) quick credibility win, (2) least risk of breaking ops, (3) builds toward the hardest problem last. A good answer: start with supplier risk scoring (email parsing + existing supplier DB \u2014 no operational disruption), then IoT anomaly detection (additive, doesn't change workflows), then shortage prediction (needs SAP integration), then rerouting optimization (changes workflows \u2014 do last). A bad answer: start with rerouting because it's the highest value. Hiroshi: 'That changes how 40 people work on day one. I'd be out of a job if it fails.'",
+        "maps_to_dimensions": [
+          "D7",
+          "D8"
+        ],
+        "judge_note": "5-level: sequencing starts with low-risk credibility win, builds toward highest-risk/highest-value last; parallel tracks for data ingestion and model training. 3-level: reasonable sequence but starts with medium-risk (SAP ingestion) before credibility win. 1-level: starts with highest-value/most-risky (rerouting optimization) first."
+      },
+      {
+        "id": "T6_budget_constraint",
+        "arming": "reactive",
+        "fires_when": "Candidate proposes a plan that requires significant upfront spend or assumes unlimited budget.",
+        "persona_behavior": "'Before you go too far \u2014 I have $200K I can approve today from my operational budget. Anything above that needs the CFO and a 6-week review cycle. What's your plan within that boundary?' If the candidate has a phase-1 cost estimate within $200K and a phase-2 budget trigger based on phase-1 results: Hiroshi: 'That's a conversation I can have with the CFO.' If they propose a $500K phase 1: 'I can't approve that. What's the $200K version?'",
+        "maps_to_dimensions": [
+          "D1",
+          "D7"
+        ],
+        "judge_note": "5-level: budget-aware from the start; proposes phase-1 within the $200K boundary with clear go/no-go criteria for further funding. 3-level: adjusts scope to budget when surfaced; credible $200K plan. 1-level: dismisses budget constraint; proposes unfunded plan."
+      }
     ],
     "rubric": {
       "dimensions": [
-        {"id": "D1", "name": "Constraint discovery & clarification", "weight": 1.5, "always_scorable": true, "anchors": {"5": "Probes data sources, sovereignty, team size, prior failures, budget, and Excel complexity before proposing architecture.", "3": "Asks about some constraints; sovereignty and team surfaced under pushback.", "1": "Jumps to solution assuming clean data landscape; no discovery."}},
-        {"id": "D2", "name": "Architecture under hard constraints", "weight": 1.5, "always_scorable": true, "anchors": {"5": "Region-partitioned architecture with sovereignty-aware query routing; per-source adapters (CDC for SAP, IoT normalization, email parsing, Excel migration); unified query layer.", "3": "Sound architecture; sovereignty partitioning added when surfaced; per-source handling adequate but partial.", "1": "Unified data lake in one region; no per-source strategy; Excel ignored."}},
-        {"id": "D3", "name": "Stakeholder & trust management", "weight": 1.5, "always_scorable": true, "anchors": {"5": "Acknowledges prior IT failures; designs for analyst-augmentation with shadow-mode validation; phased trust-building with visible accuracy metrics.", "3": "Acknowledges analyst skepticism; phased rollout but trust-building is surface-level.", "1": "Automation-first; analysts are obstacles; no adoption plan."}},
-        {"id": "D4", "name": "Problem formulation (data integration & ML)", "weight": 1.5, "always_scorable": true, "anchors": {"5": "Formulates as tiered problem: extraction (per-source), unification (schema mapping), prediction (per-use-case); identifies Excel as hidden knowledge base, not just data source.", "3": "Sound formulation; Excel complexity acknowledged; data integration approach is reasonable.", "1": "Treats all sources as equivalent ETL inputs; no Excel understanding."}},
-        {"id": "D5", "name": "Metrics tied to operations", "weight": 1.0, "always_scorable": false, "anchors": {"5": "Business metrics per phase: shortage detection latency reduction, rerouting time saved, supplier risk coverage expansion; benchmarked against current manual baselines.", "3": "Technical metrics with translation to ops impact when pushed; baseline acknowledged.", "1": "Technical metrics only; no connection to current operational pain points."}},
-        {"id": "D6", "name": "Regulatory & sovereignty depth", "weight": 1.0, "always_scorable": true, "anchors": {"5": "Per-region data sovereignty handled at architectural level; data classification and cross-region query governance designed; local cloud provider integration for China.", "3": "Sovereignty acknowledged and partitioned; per-region detail is adequate but not comprehensive.", "1": "Assumes GCP handles everything; no China-specific plan; cross-region data treated as unconstrained."}},
-        {"id": "D7", "name": "Scope realism & sequencing", "weight": 1.0, "always_scorable": true, "anchors": {"5": "Sequencing: supplier risk scoring (email + DB, no ops disruption) → IoT (additive) → shortage (SAP integration) → rerouting (behavior change, last); phase-1 within $200K.", "3": "Reasonable sequence; starts with medium-risk before credibility win; budget-aware after pushback.", "1": "Starts with highest-value/riskiest; no budget awareness; sequential instead of parallel where possible."}},
-        {"id": "D8", "name": "Communication & recovery", "weight": 1.0, "always_scorable": true, "anchors": {"5": "Structured around operational reality; names failure modes (Excel, team skepticism, sovereignty) before solutions; phase-gate approach with clear go/no-go criteria.", "3": "Clear and credible; failure modes surfaced under pushback; recovery plan adequate.", "1": "Overconfident; treats organizational complexity as solvable with better technology; no phase-gate thinking."}}
+        {
+          "id": "D1",
+          "name": "Constraint discovery & clarification",
+          "weight": 1.5,
+          "always_scorable": true,
+          "anchors": {
+            "5": "Probes data sources, sovereignty, team size, prior failures, budget, and Excel complexity before proposing architecture.",
+            "3": "Asks about some constraints; sovereignty and team surfaced under pushback.",
+            "1": "Jumps to solution assuming clean data landscape; no discovery."
+          }
+        },
+        {
+          "id": "D2",
+          "name": "Architecture under hard constraints",
+          "weight": 1.5,
+          "always_scorable": true,
+          "anchors": {
+            "5": "Region-partitioned architecture with sovereignty-aware query routing; per-source adapters (CDC for SAP, IoT normalization, email parsing, Excel migration); unified query layer.",
+            "3": "Sound architecture; sovereignty partitioning added when surfaced; per-source handling adequate but partial.",
+            "1": "Unified data lake in one region; no per-source strategy; Excel ignored."
+          }
+        },
+        {
+          "id": "D3",
+          "name": "Stakeholder & trust management",
+          "weight": 1.5,
+          "always_scorable": true,
+          "anchors": {
+            "5": "Acknowledges prior IT failures; designs for analyst-augmentation with shadow-mode validation; phased trust-building with visible accuracy metrics.",
+            "3": "Acknowledges analyst skepticism; phased rollout but trust-building is surface-level.",
+            "1": "Automation-first; analysts are obstacles; no adoption plan."
+          }
+        },
+        {
+          "id": "D4",
+          "name": "Problem formulation (data integration & ML)",
+          "weight": 1.5,
+          "always_scorable": true,
+          "anchors": {
+            "5": "Formulates as tiered problem: extraction (per-source), unification (schema mapping), prediction (per-use-case); identifies Excel as hidden knowledge base, not just data source.",
+            "3": "Sound formulation; Excel complexity acknowledged; data integration approach is reasonable.",
+            "1": "Treats all sources as equivalent ETL inputs; no Excel understanding."
+          }
+        },
+        {
+          "id": "D5",
+          "name": "Metrics tied to operations",
+          "weight": 1.0,
+          "always_scorable": false,
+          "anchors": {
+            "5": "Business metrics per phase: shortage detection latency reduction, rerouting time saved, supplier risk coverage expansion; benchmarked against current manual baselines.",
+            "3": "Technical metrics with translation to ops impact when pushed; baseline acknowledged.",
+            "1": "Technical metrics only; no connection to current operational pain points."
+          }
+        },
+        {
+          "id": "D6",
+          "name": "Regulatory & sovereignty depth",
+          "weight": 1.0,
+          "always_scorable": true,
+          "anchors": {
+            "5": "Per-region data sovereignty handled at architectural level; data classification and cross-region query governance designed; local cloud provider integration for China.",
+            "3": "Sovereignty acknowledged and partitioned; per-region detail is adequate but not comprehensive.",
+            "1": "Assumes GCP handles everything; no China-specific plan; cross-region data treated as unconstrained."
+          }
+        },
+        {
+          "id": "D7",
+          "name": "Scope realism & sequencing",
+          "weight": 1.0,
+          "always_scorable": true,
+          "anchors": {
+            "5": "Sequencing: supplier risk scoring (email + DB, no ops disruption) \u2192 IoT (additive) \u2192 shortage (SAP integration) \u2192 rerouting (behavior change, last); phase-1 within $200K.",
+            "3": "Reasonable sequence; starts with medium-risk before credibility win; budget-aware after pushback.",
+            "1": "Starts with highest-value/riskiest; no budget awareness; sequential instead of parallel where possible."
+          }
+        },
+        {
+          "id": "D8",
+          "name": "Communication & recovery",
+          "weight": 1.0,
+          "always_scorable": true,
+          "anchors": {
+            "5": "Structured around operational reality; names failure modes (Excel, team skepticism, sovereignty) before solutions; phase-gate approach with clear go/no-go criteria.",
+            "3": "Clear and credible; failure modes surfaced under pushback; recovery plan adequate.",
+            "1": "Overconfident; treats organizational complexity as solvable with better technology; no phase-gate thinking."
+          }
+        }
       ],
       "disqualifiers": [
-        {"id": "DQ1", "description": "Proposes single-region centralization after sovereignty constraint is stated (T1 defend without revision)."},
-        {"id": "DQ2", "description": "Proposes immediate Excel migration without shadow-mode validation after Excel complexity is surfaced (T3 defend)."},
-        {"id": "DQ3", "description": "Starts with highest-risk/behavior-change use case (rerouting) without credibility win first (T5 bad sequencing)."}
+        {
+          "id": "DQ1",
+          "description": "Proposes single-region centralization after sovereignty constraint is stated (T1 defend without revision)."
+        },
+        {
+          "id": "DQ2",
+          "description": "Proposes immediate Excel migration without shadow-mode validation after Excel complexity is surfaced (T3 defend)."
+        },
+        {
+          "id": "DQ3",
+          "description": "Starts with highest-risk/behavior-change use case (rerouting) without credibility win first (T5 bad sequencing)."
+        }
       ],
-      "bands": {"strong_hire": 4.20, "hire": 3.40, "borderline": 2.70, "no_hire": 1.80, "strong_no_hire": 0}
+      "bands": {
+        "strong_hire": 4.2,
+        "hire": 3.4,
+        "borderline": 2.7,
+        "no_hire": 1.8,
+        "strong_no_hire": 0
+      }
+    }
+  },
+  "decomposition-7": {
+    "id": "decomposition-7",
+    "lang": "decomposition",
+    "title": "Agriculture Pest Detection via Bioacoustics",
+    "format_version": 2,
+    "persona": {
+      "name": "Joel Mitchell",
+      "role": "Director of Precision Agriculture, United AgriGro (commercial row-crop producer, 50K+ acres across Midwest US)",
+      "voice": "Technical and direct \u2014 has done his homework on available solutions and wants a partner who can match his depth. Business-aware; asks about outcomes and ROI early. Collaborative but challenges weak assumptions immediately. Respects candor and specificity. Gets clipped when pitched vaguely or when the candidate designs before understanding requirements.",
+      "opening_line": "So here's our situation. We're a large commercial ag operation \u2014 row crops across the Midwest, tens of thousands of acres. We've got a pest problem: a specific crop bug that's damaging yield, and the best way to detect it early is by sound \u2014 the bug makes a distinct acoustic signature. We need a system that can detect that sound in the field, map where infestations are concentrated, and alert us in time to treat. I'm technical enough to follow the architecture, so talk to me directly. What do you think \u2014 can we solve this?",
+      "knowledge_boundaries": "Joel knows agronomy deeply and understands acoustic monitoring conceptually. He's researched public datasets and knows off-the-shelf models exist. He does NOT know ML architecture, signal processing pipelines, or deployment engineering. He can describe the pest, the crop, and the operational constraints from memory. He reports to a VP of Operations and needs to present a credible plan upward.",
+      "hidden_facts": {
+        "pest_species": "RS5 stink bug (Hemiptera). Well-documented acoustic signature. Public datasets exist from USDA and two university ag extensions with labeled recordings.",
+        "scale": "50,000+ acres across 6 counties. Individual fields range from 80 to 2,000 acres. ~500 distinct field polygons.",
+        "current_detection": "Manual scouting by agronomists \u2014 walk transects, visual inspection, shake plants over a drop cloth. Covers <5% of acreage per week. Detection is often 7-10 days late, by which time treatment window has narrowed.",
+        "treatment_window": "Once nymphs reach 3rd instar, you have 48-72 hours to treat. After that, yield loss accelerates rapidly. Late detection costs ~$80-150/acre in reduced yield + wasted spray.",
+        "spray_cost": "$25-45/acre for aerial application (fungicide + insecticide). False positives = real money. A 10% false-positive rate across 50K acres = $175K in unnecessary spray per application cycle.",
+        "seasonal_rhythm": "Growing season: May-September. Peak pest pressure July-August. System must be deployed and proven before the July window. Any solution requiring installation after June 1 is useless for the current season.",
+        "connectivity": "~60% of fields have usable LTE. 25% have marginal connectivity (dropped packets, <500kbps). 15% have zero connectivity \u2014 data must be physically collected or relayed.",
+        "power": "No grid power in fields. Any deployed sensor must run on battery + solar. Target: 120 days self-powered to cover the growing season without a service visit.",
+        "prior_attempts": "Tried satellite imagery (NDVI) \u2014 lag was too long, couldn't distinguish pest damage from drought stress. Tried drone surveys \u2014 too expensive at scale ($12/acre/flight), can't fly in rain or wind.",
+        "regulatory": "EPA requires application records including GPS coordinates of spray, weather conditions at time of application, and proof of pest presence (photos or acoustic logs). Records retained for 3 years.",
+        "budget": "Joel has $400K approved for a pilot this season. Full rollout (50K acres) would need board approval at ~$1.2M. ROI must be demonstrated on the pilot."
+      }
+    },
+    "triggers": [
+      {
+        "id": "T1_solution_before_requirements",
+        "arming": "reactive",
+        "fires_when": "Candidate starts proposing a solution architecture, sensor deployment, or data collection plan without first clarifying the problem \u2014 scale, pest, crop, current detection, treatment window, or success criteria.",
+        "persona_behavior": "'Hold on \u2014 before we get into solutions, I need to make sure you understand the problem. We're talking about tens of thousands of acres, a specific pest with a known acoustic signature, and a 48-hour treatment window. What questions do you have for me first?' If the candidate pivots to asking clarifying questions, Joel softens and answers directly. If they keep pushing their solution: 'You're designing before you understand the constraints. That worries me. Let's step back.'",
+        "maps_to_dimensions": [
+          "D1"
+        ],
+        "judge_note": "5-level: candidate asks clarifying questions before any solution talk \u2014 scale, pest lifecycle, current detection, treatment window, budget, seasonality. 3-level: starts solutioning but pivots to discovery when redirected. 1-level: pushes through with a solution despite the redirect."
+      },
+      {
+        "id": "T2_technical_depth",
+        "arming": "reactive",
+        "fires_when": "Candidate discusses the system at a high level (data collection, model training, dashboard) without showing concrete technical understanding of the audio processing pipeline, model architecture options, or deployment considerations.",
+        "persona_behavior": "'I want to hear the technical part. I've done my research \u2014 I know public datasets exist for this bug's sound, and I know there are pre-trained audio models. What's your actual pipeline? How do you go from raw audio to a detection alert?' If the candidate describes a concrete pipeline (spectrogram extraction, feature embedding, classification model with confidence threshold), Joel engages with follow-ups. If they stay vague: 'I need more than phases and high-level architecture. What model architecture? What accuracy can I expect? How do you handle wind noise?'",
+        "maps_to_dimensions": [
+          "D2",
+          "D4"
+        ],
+        "judge_note": "5-level: candidate describes concrete audio processing pipeline unprompted \u2014 spectrogram features, CNN or transformer-based audio classifier, confidence calibration, environmental noise handling. 3-level: credible technical pipeline emerges under questioning. 1-level: stays at 'train a model' abstraction level."
+      },
+      {
+        "id": "T3_metrics_business_outcomes",
+        "arming": "reactive",
+        "fires_when": "Candidate defines success only in technical terms \u2014 model accuracy, detection rate, coverage \u2014 without connecting to business outcomes or the farmer's operational workflow.",
+        "persona_behavior": "'Okay, but what does this mean for my operation? My agronomists need to know: where to spray, when to spray, and whether the spray worked. A 95% accurate model with a 24-hour latency is useless if the treatment window is 48 hours. Walk me through how your system changes my Tuesday morning.' If the candidate translates technical metrics to operational impact (precision-at-spray-crew-capacity, detection-to-alert latency vs treatment window, false-positive cost per acre), Joel engages. If they stay abstract: 'I need to justify this to my VP. Give me metrics that matter to a P&L.'",
+        "maps_to_dimensions": [
+          "D5",
+          "D8"
+        ],
+        "judge_note": "5-level: candidate raises operational metrics unprompted \u2014 cost per false positive, detection latency vs treatment window, spray crew utilization. 3-level: translates when pushed; connects technical to business metrics. 1-level: stays in model accuracy metrics with no operational translation."
+      },
+      {
+        "id": "T4_connectivity_trap",
+        "arming": "reactive",
+        "fires_when": "Candidate proposes a solution that assumes continuous connectivity \u2014 cloud-based inference, real-time alerting to a dashboard, or remote model updates.",
+        "persona_behavior": "'Let me stop you there. Sixty percent of our fields have LTE. Twenty-five percent have marginal or no connectivity. What does your architecture do in a field with zero signal?' If the candidate has a tiered edge-cloud architecture (on-device inference with local storage, sync when connected, mesh relay for marginal zones), Joel: 'Good \u2014 you've thought about field conditions.' If they propose 'we'll put a cellular router on each sensor': 'Those fields don't have signal. What's plan B?'",
+        "maps_to_dimensions": [
+          "D2",
+          "D6"
+        ],
+        "judge_note": "5-level: candidate asks about connectivity unprompted and designs tiered edge-cloud architecture with offline operation. 3-level: adjusts architecture when connectivity constraint is surfaced. 1-level: insists on cloud-dependency or blames carrier coverage."
+      },
+      {
+        "id": "T5_power_seasonality",
+        "arming": "reactive",
+        "fires_when": "Candidate designs a sensor deployment plan without addressing power (no grid in fields) or the seasonal deployment deadline (June 1).",
+        "persona_behavior": "'These sensors need to run in the middle of a soybean field from May to September with no grid power. And they need to be deployed and proven before June 1 \u2014 after that we're inside the growing season. How do you handle power and what's your deployment timeline?' If the candidate has a solar + battery plan with 120-day self-power target and phased deployment finishing by June 1: 'You've scoped the operational reality.' If they hand-wave: 'We'll figure out power later' makes Joel visibly skeptical.",
+        "maps_to_dimensions": [
+          "D7",
+          "D2"
+        ],
+        "judge_note": "5-level: candidate asks about power and seasonality unprompted; designs solar + battery solution with deployment timeline mapped to growing season. 3-level: adjusts power and timeline under questioning. 1-level: no power plan; deployment schedule is vague or impossible."
+      },
+      {
+        "id": "T6_human_in_the_loop",
+        "arming": "reactive",
+        "fires_when": "Candidate proposes a fully automated system (no human validation) or, alternatively, relies entirely on human scouts for validation without addressing scalability.",
+        "persona_behavior": "'So who validates the alerts? If your model says 'bugs at field 47,' someone has to go check before I authorize a $40K aerial spray. We don't have enough agronomists to check every alert manually. How do you handle that?' If the candidate proposes confidence-tiered alerts (high confidence, auto-flag for spray crew; medium, agronomist spot-check; low, ignore) with an adaptive sampling strategy: 'That's a real answer.' If they say 'we'll validate with cameras' without specifying how: 'Cameras need to be installed, maintained, and someone still reviews the footage. Think about the operational load.'",
+        "maps_to_dimensions": [
+          "D3",
+          "D8"
+        ],
+        "judge_note": "5-level: candidate raises human-in-the-loop design unprompted; proposes confidence-tiered alerting with costed validation plan. 3-level: addresses human validation when surfaced; reasonable plan. 1-level: full automation defended, or hand-waves validation with 'cameras.'"
+      },
+      {
+        "id": "T7_regulatory_compliance",
+        "arming": "ambient",
+        "fires_when": "Always present \u2014 EPA requires application records with proof of pest presence, GPS coordinates, and weather data.",
+        "persona_behavior": "Joel does NOT raise regulatory requirements unprompted. If the candidate asks about compliance (EPA records, application logging, proof of pest presence): 'Yes \u2014 EPA requires us to log GPS coordinates of every spray, weather conditions at application, and evidence of pest presence. Your system's detection logs would serve as that evidence. How does your architecture handle record-keeping and audit?' If the candidate designs logging into the system from the start (timestamped detection events, GPS-tagged, weather sensor integration): 'You've saved me a conversation with my compliance officer.' If the candidate never raises it: Joel doesn't mention it and the judge scores D6 accordingly.",
+        "maps_to_dimensions": [
+          "D6"
+        ],
+        "judge_note": "5-level: candidate raises EPA/compliance unprompted; designs audit logging with GPS, weather, and detection evidence as built-in features. 2-3: adds compliance when probed by judge but not Joel. 1: absent."
+      }
+    ],
+    "rubric": {
+      "dimensions": [
+        {
+          "id": "D1",
+          "name": "Constraint discovery & clarification",
+          "weight": 1.5,
+          "always_scorable": true,
+          "anchors": {
+            "5": "Probes scale, pest lifecycle, current detection, treatment window, connectivity, power, seasonality, budget, and compliance before proposing any architecture.",
+            "3": "Asks some clarifying questions; starts solutioning but corrects when redirected; misses seasonality or budget.",
+            "1": "Jumps straight to 'collect data' or 'deploy sensors' with zero discovery."
+          }
+        },
+        {
+          "id": "D2",
+          "name": "Architecture under hard constraints",
+          "weight": 1.5,
+          "always_scorable": true,
+          "anchors": {
+            "5": "Tiered edge-cloud architecture: on-device audio classification on low-power MCU, confidence-thresholded alerts, mesh relay for marginal-connectivity zones, sync-when-connected for cloud dashboard. Concrete audio pipeline (spectrogram, CNN/transformer). Solar + battery with 120-day autonomy.",
+            "3": "Reasonable architecture with edge inference; audio pipeline described but not detailed; connectivity handled under pushback; power plan adequate.",
+            "1": "Cloud-dependent; no edge inference; no audio pipeline beyond 'train a model'; no power plan."
+          }
+        },
+        {
+          "id": "D3",
+          "name": "Stakeholder & trust management",
+          "weight": 1.5,
+          "always_scorable": false,
+          "anchors": {
+            "5": "Acknowledges agronomist workflow and designs tiered confidence alerts to reduce validation burden; proposes phased rollout with field-testing alongside current scouting to build trust.",
+            "3": "Addresses human validation; proposes cameras as aid but operational load not fully considered.",
+            "1": "Full automation defended; agronomists are an afterthought."
+          }
+        },
+        {
+          "id": "D4",
+          "name": "ML problem formulation",
+          "weight": 1.5,
+          "always_scorable": true,
+          "anchors": {
+            "5": "Formulates as few-shot or transfer-learned audio classification from public datasets; addresses environmental noise, wind, and non-target insect sounds; confidence calibration with rejection option; active learning for novel sound patterns.",
+            "3": "Sound formulation; transfer learning from public dataset; noise handling acknowledged under pushback.",
+            "1": "Generic 'train a model'; no audio-specific pipeline; no awareness of public datasets or noise challenges."
+          }
+        },
+        {
+          "id": "D5",
+          "name": "Metrics tied to operations",
+          "weight": 1.0,
+          "always_scorable": false,
+          "anchors": {
+            "5": "Success defined as: detection-to-alert latency less than treatment window, precision-at-spray-crew-capacity (max false alerts per day the team can validate), cost per false positive, yield loss reduction vs baseline.",
+            "3": "Technical metrics with operational translation when pushed; cost per false positive acknowledged.",
+            "1": "Model accuracy only (F1, precision, recall); no operational or P&L metrics."
+          }
+        },
+        {
+          "id": "D6",
+          "name": "Regulatory & compliance depth",
+          "weight": 1.0,
+          "always_scorable": true,
+          "anchors": {
+            "5": "EPA compliance designed as system feature: GPS-tagged detection events, weather data integration, application record export; logs serve as legal evidence of pest presence.",
+            "3": "Compliance acknowledged but not deeply integrated; basic audit logging proposed.",
+            "1": "No awareness of EPA record-keeping requirements; 'legal will figure it out.'"
+          }
+        },
+        {
+          "id": "D7",
+          "name": "Scope realism & sequencing",
+          "weight": 1.0,
+          "always_scorable": true,
+          "anchors": {
+            "5": "Phased deployment: (1) lab validation on public dataset, (2) pilot on 3 fields with solar + battery, proven by June 1, (3) seasonal data collection and model refinement, (4) scale to full acreage next season. Budget-aware: pilot within $400K.",
+            "3": "Reasonable phased approach; timeline acknowledges growing season but deployment schedule optimistic.",
+            "1": "Big-bang deployment across all acreage; no seasonal awareness; no budget constraint."
+          }
+        },
+        {
+          "id": "D8",
+          "name": "Communication & recovery",
+          "weight": 1.0,
+          "always_scorable": true,
+          "anchors": {
+            "5": "Structured, specific, acknowledges constraints before solutions; states assumptions clearly; proposes concrete next steps with cost estimates. Pushes back with reasons where appropriate.",
+            "3": "Clear and credible; assumptions stated under pushback; recovery is adequate.",
+            "1": "Vague or overconfident; assumes constraints away; no concrete deliverables."
+          }
+        }
+      ],
+      "disqualifiers": [
+        {
+          "id": "DQ1",
+          "description": "Proposes a solution before asking any clarifying questions and defends it after T1 redirect."
+        },
+        {
+          "id": "DQ2",
+          "description": "Cloud-dependent architecture after connectivity constraint is surfaced (T4 defend without revision)."
+        },
+        {
+          "id": "DQ3",
+          "description": "No power plan; proposes grid-powered sensors after seasonality/power constraint is stated (T5 dismiss)."
+        }
+      ],
+      "bands": {
+        "strong_hire": 4.2,
+        "hire": 3.4,
+        "borderline": 2.7,
+        "no_hire": 1.8,
+        "strong_no_hire": 0
+      }
     }
   }
 }
