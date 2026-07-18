@@ -3871,6 +3871,8 @@ function sendMessage() {
   if (current.lang === 'design') {
     requestInterview({question_id: current.id, message: text, requirements_only: clarifyMode});
     armPacingNudge();
+  } else if (current.lang === 'decomposition') {
+    requestInterview({question_id: current.id, message: text});
   } else {
     requestHint({question_id: current.id, code: cm.getValue(), actual: lastRunSummary, message: text});
     if (sqlClarifyMode) {
