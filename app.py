@@ -585,7 +585,22 @@ def pattern_for(q):
 
 
 def topic_for(q):
-    text = (q["title"] + " " + q["prompt"] + " " + q.get("concept", "")).lower()
+    # ponytail: decomposition/system-design scenarios use persona/triggers/rubric
+    # (no flat "prompt" key), so pull whatever descriptive text exists.
+    parts = [
+        q.get("title", ""),
+        q.get("prompt", ""),
+        q.get("concept", ""),
+        q.get("persona", ""),
+        q.get("rubric", ""),
+    ]
+    triggers = q.get("triggers", [])
+    if isinstance(triggers, list):
+        parts.extend(triggers)
+    elif isinstance(triggers, str):
+        parts.append(triggers)
+    desc = " ".join(str(p) for p in parts)
+    text = desc.lower()
     for keyword, topic in TOPIC_KEYWORDS:
         if keyword in text:
             return topic
