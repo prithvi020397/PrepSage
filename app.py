@@ -4530,9 +4530,9 @@ Rules:
                          "the failure scenario — what broke, what alerts fired, who's affected. "
                          "Ask the candidate how they'd start troubleshooting. 2-3 sentences, calm but urgent tone.)")
         elif decomposition:
-            v2_question = q.get("format_version") == 2 and q.get("persona", {}).get("opening_line")
+            v2_question = q.get("format_version") == 2 and (p.get("opening_line") if archetype_key and q.get("archetypes", {}).get(archetype_key) else q.get("persona", {}).get("opening_line"))
             if v2_question:
-                user_turn = f"(The engagement is starting. Roleplay as the client. Your opening line is below — say it exactly as written, then wait for the candidate to respond.)\n\n{q['persona']['opening_line']}"
+                user_turn = f"(The engagement is starting. Roleplay as the client. Your opening line is below — say it exactly as written, then wait for the candidate to respond.)\n\n{p['opening_line']}"
             else:
                 user_turn = ("(The engagement is starting. Roleplay as the client stakeholder introducing the problem. "
                              "Give ONLY 2 sentences: one describing the data situation vaguely, one stating the goal. "
