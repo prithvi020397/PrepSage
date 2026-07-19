@@ -5,6 +5,15 @@ function log(...args) {
     console.debug("[loop]", ...args);
   }
 }
+// Single fetch wrapper (Step 4): identical to api() but auto-logs every
+// network call when debug is on. Migrate call sites from api(...) to api(...).
+async function api(path, opts) {
+  const t0 = performance.now();
+  const method = (opts && opts.method) || "GET";
+  const res = await fetch(path, opts);
+  log(method, path, res.status, Math.round(performance.now() - t0) + "ms");
+  return res;
+}
 let cm = CodeMirror.fromTextArea(document.getElementById('editor'), {theme: 'material-darker', lineNumbers: true});
 requestAnimationFrame(() => cm.refresh());
 new ResizeObserver(() => cm.refresh()).observe(document.getElementById('editor-card'));

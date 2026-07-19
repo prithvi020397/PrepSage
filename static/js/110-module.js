@@ -113,7 +113,7 @@ async function requestInterview(body) {
   const placeholder = addMsg('tutor', 'thinking…');
   const textEl = placeholder.querySelector('.msg-text');
   try {
-    const r = await fetch('/api/interview', {
+    const r = await api('/api/interview', {
       method: 'POST', headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({...body, diagram: clarifyMode ? '' : serializeCanvasForLLM(), persona: selectedPersona,
                              archetype: selectedArchetype || undefined,
@@ -271,7 +271,7 @@ async function requestInterview(body) {
         }
         document.getElementById('refdesign-btn').style.display = '';
         document.getElementById('staffcomp-btn').style.display = '';
-        fetch('/api/takeaways', {
+        api('/api/takeaways', {
           method: 'POST', headers: {'Content-Type': 'application/json'},
           body: JSON.stringify({question_id: current.id, missed_concepts: res.missed_concepts || [], rubric_scores: res.rubric_scores || {}})
         }).then(r => r.json()).then(t => renderTakeaways(t.takeaways)).catch(() => {});
@@ -285,7 +285,7 @@ async function requestInterview(body) {
         dlBtn.onclick = () => {
           const body = {question_id: current.id};
           if (res.decomposition) body.decomposition = true;
-          fetch('/api/export', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)})
+          api('/api/export', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)})
             .then(r => r.ok ? r.text() : Promise.reject())
             .then(md => {
               const blob = new Blob([md], {type: 'text/markdown'});

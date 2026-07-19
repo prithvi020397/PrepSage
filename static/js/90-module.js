@@ -4,7 +4,7 @@ async function requestHint(body) {
   const placeholder = addMsg('tutor', 'thinking…');
   const textEl = placeholder.querySelector('.msg-text');
   try {
-    const r = await fetch('/api/hint', {
+    const r = await api('/api/hint', {
       method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)
     });
     const res = await r.json();
@@ -22,7 +22,7 @@ async function requestHint(body) {
 
 async function requestCoach(body) {
   try {
-    const r = await fetch('/api/coach', {
+    const r = await api('/api/coach', {
       method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)
     });
     const res = await r.json();

@@ -111,7 +111,7 @@ async function checkTrace() {
   btn.disabled = true;
   btn.textContent = 'Checking…';
   try {
-    const res = await (await fetch('/api/trace-check', {
+    const res = await (await api('/api/trace-check', {
       method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({question_id: qid, answers})
     })).json();
@@ -135,7 +135,7 @@ async function checkTrace() {
 async function loadTrace(qid) {
   if (traceProgress[qid]) { renderTraceSteps(qid); return; }
   document.getElementById('trace-box').style.display = 'none';
-  const res = await (await fetch('/api/trace', {
+  const res = await (await api('/api/trace', {
     method:'POST', headers:{'Content-Type':'application/json'},
     body:JSON.stringify({question_id: qid, code: cm.getValue()})
   })).json();
@@ -149,7 +149,7 @@ async function loadTrace(qid) {
 
 async function loadConceptMapper(qid) {
   const el = document.getElementById('concept-mapper');
-  const res = await (await fetch('/api/concept-map', {
+  const res = await (await api('/api/concept-map', {
     method:'POST', headers:{'Content-Type':'application/json'},
     body:JSON.stringify({question_id: qid})
   })).json();

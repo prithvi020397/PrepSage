@@ -42,7 +42,7 @@ async function gradeTradeoff() {
   btn.disabled = true;
   el.className = 'pending';
   el.textContent = 'Grading…';
-  const res = await (await fetch('/api/tradeoff-grade', {
+  const res = await (await api('/api/tradeoff-grade', {
     method: 'POST', headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({question_id: current.id, answer})
   })).json();
@@ -61,7 +61,7 @@ async function rerollTradeoff() {
   const btn = document.getElementById('tradeoff-reroll-btn');
   btn.disabled = true;
   btn.textContent = 'Loading…';
-  const res = await (await fetch('/api/tradeoff-regenerate', {
+  const res = await (await api('/api/tradeoff-regenerate', {
     method: 'POST', headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({question_id: current.id})
   })).json();
@@ -100,7 +100,7 @@ async function sendTradeoffSpar(prefill) {
   if (!message) return;
   appendSparTurn('you', message);
   inputEl.value = '';
-  const res = await (await fetch('/api/tradeoff-spar', {
+  const res = await (await api('/api/tradeoff-spar', {
     method: 'POST', headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({question_id: current.id, message})
   })).json();
@@ -138,7 +138,7 @@ async function submitDebrief() {
   pendingLine.className = 'line pending';
   pendingLine.textContent = 'Grading…';
   fb.appendChild(pendingLine);
-  const res = await (await fetch('/api/debrief', {
+  const res = await (await api('/api/debrief', {
     method: 'POST', headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({question_id: current.id, code: cm.getValue(), complexity, edge_cases, narration: narrationVal})
   })).json();
@@ -161,7 +161,7 @@ async function submitDebrief() {
     fb.appendChild(narrationLine);
   }
   // Phase 2: surface exactly 3 prioritized takeaways from this debrief
-  fetch('/api/takeaways', {
+  api('/api/takeaways', {
     method: 'POST', headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({question_id: current.id, complexity_ok: res.complexity_ok, edge_ok: res.edge_ok})
   }).then(r => r.json()).then(t => renderTakeaways(t.takeaways)).catch(() => {});

@@ -82,7 +82,7 @@ async function showReferenceDesign() {
   const placeholder = addMsg('tutor', 'thinking…');
   const textEl = placeholder.querySelector('.msg-text');
   try {
-    const r = await fetch('/api/reference-design', {
+    const r = await api('/api/reference-design', {
       method: 'POST', headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({question_id: current.id})
     });
@@ -189,7 +189,7 @@ async function startAdversarialMode() {
   btn.disabled = true;
   btn.textContent = 'Loading flawed design…';
   try {
-    const r = await fetch('/api/adversarial-design', {
+    const r = await api('/api/adversarial-design', {
       method: 'POST', headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({question_id: current.id})
     });
@@ -246,7 +246,7 @@ async function startIncidentMode() {
   btn.disabled = true;
   btn.textContent = 'Generating failure scenario…';
   try {
-    const r = await fetch('/api/incident-scenario', {
+    const r = await api('/api/incident-scenario', {
       method: 'POST', headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({question_id: current.id})
     });
@@ -283,7 +283,7 @@ async function showStaffComparison() {
   const placeholder = addMsg('tutor', 'thinking…');
   const textEl = placeholder.querySelector('.msg-text');
   try {
-    const r = await fetch('/api/staff-comparison', {
+    const r = await api('/api/staff-comparison', {
       method: 'POST', headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({
         question_id: current.id,
@@ -340,14 +340,14 @@ function endClarifyDrill() {
 // to redraw each snapshot — no new diagram rendering code needed.
 async function startReplay() {
   const isDecomp = current && current.lang === 'decomposition';
-  const r = await fetch(`/api/interview-history?question_id=${encodeURIComponent(current.id)}&adversarial=${adversarialMode ? '1' : '0'}&requirements_only=${clarifyMode ? '1' : '0'}&incident=${incidentMode ? '1' : '0'}&decomposition=${isDecomp ? '1' : '0'}`);
+  const r = await api(`/api/interview-history?question_id=${encodeURIComponent(current.id)}&adversarial=${adversarialMode ? '1' : '0'}&requirements_only=${clarifyMode ? '1' : '0'}&incident=${incidentMode ? '1' : '0'}&decomposition=${isDecomp ? '1' : '0'}`);
   const res = await r.json();
   replayTurns = res.turns || [];
   if (!replayTurns.length) {
     addMsg('tutor', 'Nothing to replay yet — have a few exchanges first.');
     return;
   }
-  const cr = await fetch(`/api/replay-comments?question_id=${encodeURIComponent(current.id)}&adversarial=${adversarialMode ? '1' : '0'}&requirements_only=${clarifyMode ? '1' : '0'}&incident=${incidentMode ? '1' : '0'}&decomposition=${isDecomp ? '1' : '0'}`);
+  const cr = await api(`/api/replay-comments?question_id=${encodeURIComponent(current.id)}&adversarial=${adversarialMode ? '1' : '0'}&requirements_only=${clarifyMode ? '1' : '0'}&incident=${incidentMode ? '1' : '0'}&decomposition=${isDecomp ? '1' : '0'}`);
   replayComments = (await cr.json()).comments || [];
   window.speechSynthesis && window.speechSynthesis.cancel();
   clearPacingNudge();
@@ -386,7 +386,7 @@ function escapeHtml(s) {
 }
 
 async function startMockLoop() {
-  const res = await (await fetch('/api/mock-loop/start')).json();
+  const res = await (await api('/api/mock-loop/start')).json();
   if (!res.ids || !res.ids.length) { showToast('Not enough questions across categories to start a mock interview.'); return; }
   mockLoop = {ids: res.ids, stage: 0};
   document.getElementById('mock-loop-bar').style.display = 'flex';
@@ -419,7 +419,7 @@ async function finishMockLoop() {
   const ids = mockLoop.ids;
   document.getElementById('mock-loop-bar').style.display = 'none';
   mockLoop = null;
-  const res = await (await fetch('/api/mock-loop/report?ids=' + ids.join(','))).json();
+  const res = await (await api('/api/mock-loop/report?ids=' + ids.join(','))).json();
   renderMockReport(res.report || []);
 }
 
@@ -469,7 +469,7 @@ async function postReplayComment() {
   if (!text) return;
   const author = document.getElementById('replay-comment-author').value.trim();
   const idx = Number(document.getElementById('replay-slider').value);
-  const res = await (await fetch('/api/replay-comment', {
+  const res = await (await api('/api/replay-comment', {
     method: 'POST', headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({
       question_id: current.id, adversarial: adversarialMode ? '1' : '0', requirements_only: clarifyMode ? '1' : '0', incident: incidentMode ? '1' : '0',
@@ -524,7 +524,7 @@ function speakTutor(text) {
   if (!ttsEnabled || !text) return;
   if (_ttsAudio) { _ttsAudio.pause(); _ttsAudio = null; }
   const clean = text.replace(/[*_`#]/g, '').replace(/```[\s\S]*?```/g, '');
-  fetch('/api/tts', {
+  api('/api/tts', {
     method: 'POST', headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({text: clean})
   })
@@ -746,7 +746,7 @@ loadDeadline();
 refreshStreak();
 
 function refreshStreak() {
-  fetch('/api/streak').then(r => r.json()).then(s => {
+  api('/api/streak').then(r => r.json()).then(s => {
     document.getElementById('streak-count').textContent = s.streak || 0;
   }).catch(() => {});
 }
@@ -794,7 +794,7 @@ async function authSubmit() {
   authError.classList.remove('show');
   try {
     const endpoint = authMode === 'signup' ? '/api/signup' : '/api/login';
-    const r = await fetch(endpoint, {
+    const r = await api(endpoint, {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({email, password}),
@@ -823,7 +823,7 @@ async function testLogin(fresh) {
   authSubmitBtn.disabled = true;
   authError.classList.remove('show');
   try {
-    const r = await fetch('/api/test-login' + (fresh ? '?fresh=1' : ''), {method: 'POST'});
+    const r = await api('/api/test-login' + (fresh ? '?fresh=1' : ''), {method: 'POST'});
     const data = await r.json();
     if (!r.ok || data.error) { authShowError(data.error || 'Test login failed.'); authSubmitBtn.disabled = false; return; }
     if (data.access_token) localStorage.setItem('loop_token', data.access_token);
@@ -853,7 +853,7 @@ function hideAuthOverlay() {
 
 (async function checkAuth() {
   try {
-    const r = await fetch('/api/me');
+    const r = await api('/api/me');
     const data = await r.json();
     if (data.mode === 'legacy') return; // legacy: never show overlay
   } catch { /* Supabase unreachable — fall through to token check */ }
@@ -861,7 +861,7 @@ function hideAuthOverlay() {
   const token = localStorage.getItem('loop_token');
   if (!token) { showAuthOverlay(); return; }
   try {
-    const r2 = await fetch('/api/me', { headers: {'Authorization': 'Bearer ' + token} });
+    const r2 = await api('/api/me', { headers: {'Authorization': 'Bearer ' + token} });
     const data2 = await r2.json();
     if (data2.user_id) {
       // valid session — keep overlay hidden
@@ -873,7 +873,7 @@ function hideAuthOverlay() {
 })();
 
 async function loadDeadline() {
-  const r = await fetch('/api/deadline');
+  const r = await api('/api/deadline');
   const d = await r.json();
   renderDeadlineWidget(d.deadline);
 }
@@ -889,7 +889,7 @@ function renderDeadlineWidget(deadline) {
 async function setInterviewDeadline() {
   const input = prompt('Interview date (YYYY-MM-DD), blank to clear:', document.getElementById('deadline-widget').dataset.deadline || '');
   if (input === null) return;
-  const r = await fetch('/api/deadline', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({deadline: input.trim()})});
+  const r = await api('/api/deadline', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({deadline: input.trim()})});
   const d = await r.json();
   renderDeadlineWidget(d.deadline);
 }

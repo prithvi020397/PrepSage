@@ -2,7 +2,7 @@
 // ("gold") transcript's expected ranges, so they see the gap dimension by dimension.
 function showCalibration(userJudge) {
   log("showCalibration");
-  fetch('/api/calibration', {method: 'POST', headers: {'Content-Type': 'application/json'},
+  api('/api/calibration', {method: 'POST', headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({question_id: current.id})})
     .then(r => r.ok ? r.json() : Promise.reject())
     .then(data => renderCalibration(data, userJudge))
@@ -89,7 +89,7 @@ async function loadReview(qid, code, recallAnswer) {
   const placeholder = addMsg('tutor', 'reviewing your solution…');
   const textEl = placeholder.querySelector('.msg-text');
   try {
-    const r = await fetch('/api/review', {
+    const r = await api('/api/review', {
       method: 'POST', headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({question_id: qid, code, recall_answer: recallAnswer || ''})
     });

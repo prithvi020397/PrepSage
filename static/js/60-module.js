@@ -24,7 +24,7 @@ async function showWhatIf() {
   box.style.display = 'none';
   if (!current || !current.id) return;
   try {
-    const r = await fetch('/api/whatif', {
+    const r = await api('/api/whatif', {
       method: 'POST', headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({question_id: current.id, code: cm.getValue()})
     });
@@ -48,7 +48,7 @@ async function submitWhatIf() {
   btn.disabled = true;
   status.textContent = 'Grading…';
   try {
-    const r = await fetch('/api/whatif', {
+    const r = await api('/api/whatif', {
       method: 'POST', headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({question_id: current.id, code: cm.getValue(), user_answer: answer, scenario: whatifScenario})
     });
@@ -83,7 +83,7 @@ cm.on('change', resetIdleTimer);
 async function loadList() {
   let qs;
   try {
-    const r = await fetch('/api/questions');
+    const r = await api('/api/questions');
     qs = await r.json();
   } catch (e) {
     console.error('loadList failed:', e);
@@ -211,7 +211,7 @@ async function startPractice(lane) {
   const btn = document.querySelector('.cc-start');
   if (btn) { btn.disabled = true; btn.textContent = 'Picking…'; }
   try {
-    const res = await (await fetch('/api/start' + (lane ? '?lane=' + encodeURIComponent(lane) : ''))).json();
+    const res = await (await api('/api/start' + (lane ? '?lane=' + encodeURIComponent(lane) : ''))).json();
     if (!res.id) {
       showToast(res.message || 'No questions available — pick one from the sidebar.');
       return;
@@ -355,7 +355,7 @@ async function loadQuestion(id) {
   clearPacingNudge();
   clearReqChips();
   saveCurrentState();
-  const q = await (await fetch(`/api/questions/${id}`)).json();
+  const q = await (await api(`/api/questions/${id}`)).json();
   current = q;
   document.getElementById('empty-panel').style.display = 'none';
   // restore layout after command center was full-width

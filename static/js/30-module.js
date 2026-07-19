@@ -34,7 +34,7 @@ async function resetCurrentQuestion() {
   btn.disabled = true;
   btn.innerHTML = 'Resetting…';
   try {
-    const r = await fetch(`/api/reset-question/${current.id}`, {method: 'POST'});
+    const r = await api(`/api/reset-question/${current.id}`, {method: 'POST'});
     if (!r.ok) throw new Error('reset failed');
     delete stateCache[current.id];
     await loadQuestion(current.id, true);
@@ -87,7 +87,7 @@ function startRecording() {
       const indicator = document.getElementById('live-transcript');
       if (indicator) { indicator.textContent = '⏳ Transcribing…'; indicator.classList.remove('active'); }
       try {
-        const res = await fetch('/api/transcribe', { method: 'POST', body: formData });
+        const res = await api('/api/transcribe', { method: 'POST', body: formData });
         const data = await res.json();
         if (indicator) indicator.textContent = '';
         if (data.transcript) {
@@ -284,7 +284,7 @@ async function checkApproach() {
   const plan = document.getElementById('plan-input').value;
   btn.disabled = true;
   setPlanFeedback('pending', 'Checking your approach…');
-  const res = await (await fetch('/api/check-approach', {
+  const res = await (await api('/api/check-approach', {
     method: 'POST', headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({question_id: current.id, plan})
   })).json();
@@ -302,7 +302,7 @@ async function startSpotBug() {
   const btn = document.getElementById('spotbug-menu');
   btn.disabled = true;
   btn.innerHTML = '<svg class="icon" viewBox="0 0 24 24"><use href="#i-bug"/></svg>Loading…';
-  const res = await (await fetch('/api/spot-bug', {
+  const res = await (await api('/api/spot-bug', {
     method: 'POST', headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({question_id: current.id})
   })).json();
@@ -329,7 +329,7 @@ async function gradeSpotBug() {
   btn.disabled = true;
   el.className = 'pending';
   el.textContent = 'Grading…';
-  const res = await (await fetch('/api/spot-bug-grade', {
+  const res = await (await api('/api/spot-bug-grade', {
     method: 'POST', headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({question_id: current.id, bug_note: spotBugNote, answer})
   })).json();
@@ -344,7 +344,7 @@ async function startReverse() {
   const btn = document.getElementById('reverse-menu');
   btn.disabled = true;
   btn.innerHTML = '<svg class="icon" viewBox="0 0 24 24"><use href="#i-mask"/></svg>Loading…';
-  const res = await (await fetch('/api/reverse', {
+  const res = await (await api('/api/reverse', {
     method:'POST', headers:{'Content-Type':'application/json'},
     body:JSON.stringify({question_id: current.id})
   })).json();
@@ -392,7 +392,7 @@ async function sendReverse() {
   if (!text || !reverseState) return;
   input.value = '';
   addRevChat('user', text);
-  const res = await (await fetch('/api/reverse', {
+  const res = await (await api('/api/reverse', {
     method:'POST', headers:{'Content-Type':'application/json'},
     body:JSON.stringify({question_id: reverseState.qid, message: text})
   })).json();
@@ -408,7 +408,7 @@ async function startCurveball() {
   const btn = document.getElementById('curveball-menu');
   btn.disabled = true;
   btn.innerHTML = '<svg class="icon" viewBox="0 0 24 24"><use href="#i-zap"/></svg>Loading…';
-  const res = await (await fetch('/api/curveball', {
+  const res = await (await api('/api/curveball', {
     method: 'POST', headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({question_id: current.id, use_web: useWebAngle})
   })).json();

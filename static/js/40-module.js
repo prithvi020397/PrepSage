@@ -7,7 +7,7 @@ async function requestFreshAngle() {
   const placeholder = addMsg('tutor', 'pulling a real-world angle from the web…');
   const textEl = placeholder.querySelector('.msg-text');
   try {
-    const r = await fetch('/api/fresh-angle', {
+    const r = await api('/api/fresh-angle', {
       method: 'POST', headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({question_id: current.id})
     });
@@ -33,7 +33,7 @@ async function gradeCurveball() {
   btn.disabled = true;
   el.className = 'pending';
   el.textContent = 'Grading…';
-  const res = await (await fetch('/api/curveball-grade', {
+  const res = await (await api('/api/curveball-grade', {
     method: 'POST', headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({question_id: current.id, code: cm.getValue()})
   })).json();

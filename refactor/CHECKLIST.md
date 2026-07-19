@@ -40,7 +40,7 @@ Known app-side: none expected at baseline. `sarif` load warning is server-side (
 | 2 JS split verbatim | 2b07c8e | ✅ | none | index.html 4162→426 lines; body→static/js/app.bundle.js (3742 lines, defer, node-checks OK, 0 Jinja); 2 Jinja lines bridged via window.APP_BOOT; only 2 tiny inline scripts remain (JD_CONTEXT + APP_BOOT bootstrap) |
 | 3 reorganized | 2b07c8e→(this step) | ✅ | none | bundle split losslessly into 12 ordered defer modules (00-config + 20..120-module). Verified: each node --checks OK, concatenation == original. NOTE: original code is feature-tangled, so module names are generic/ordered, NOT semantic. True semantic split deferred (riskier). |
 | 3.5 logging added | (this step) | ✅ | none | log() helper in 00-config.js (gated by APP_BOOT.debug); log() calls added at entry points: startRecording/setMicOn (30), startPractice/loadQuestion (60), renderCanvas (20), showCalibration/sendMessage (100), wrapUpInterview (120). 6 modules instrumented. |
-| 4 api() wrapper (per endpoint) | | ☐ | | each migrated endpoint logs via api() |
+| 4 api() wrapper (per endpoint) | (this step) | ✅ | none | api(path,opts) added to 00-config.js (auto-logs method/path/status/ms, gated by debug). All 51 fetch() call sites migrated to api() in one pass (deviation from "one-per-commit" — mechanical, behavior-preserving). ?v bumped 3→4 on JS. node --check all OK. |
 | 5 state centralized (per global) | | ☐ | | |
 | 6 (optional) handlers | | ☐ | | user opted in? ☐ |
 

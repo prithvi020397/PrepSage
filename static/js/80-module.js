@@ -69,7 +69,7 @@ async function startDebug() {
   const btn = document.getElementById('debug-menu');
   btn.disabled = true;
   btn.innerHTML = '<svg class="icon" viewBox="0 0 24 24"><use href="#i-psy"/></svg>Debugging…';
-  const res = await (await fetch('/api/debug', {
+  const res = await (await api('/api/debug', {
     method: 'POST', headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({question_id: current.id, code: cm.getValue()})
   })).json();
@@ -157,7 +157,7 @@ async function showDiff(qid) {
   document.getElementById('diff-user-lines').textContent = 'Loading…';
   document.getElementById('diff-solution-lines').textContent = 'Loading…';
   document.getElementById('diff-context-bar').textContent = '';
-  const res = await (await fetch('/api/diff', {
+  const res = await (await api('/api/diff', {
     method:'POST', headers:{'Content-Type':'application/json'},
     body:JSON.stringify({question_id: qid, code: cm.getValue()})
   })).json();
@@ -185,7 +185,7 @@ function closeDiff() {
 }
 
 async function runSample() {
-  const res = await (await fetch('/api/run', {
+  const res = await (await api('/api/run', {
     method: 'POST', headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({question_id: current.id, code: cm.getValue()})
   })).json();
@@ -223,7 +223,7 @@ async function runSample() {
 }
 
 async function submitCode() {
-  const res = await (await fetch('/api/submit', {
+  const res = await (await api('/api/submit', {
     method: 'POST', headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({question_id: current.id, code: cm.getValue()})
   })).json();
