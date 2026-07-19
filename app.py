@@ -51,7 +51,8 @@ def favicon():
 # The Loop: single-user local interview prep platform
 HEADROOM_ENABLED = os.environ.get("HEADROOM_ENABLED", "").lower() in ("1", "true", "yes")
 API_BASE = "http://localhost:9090/v1" if HEADROOM_ENABLED else "https://openrouter.ai/api/v1"
-client = OpenAI(base_url=API_BASE, api_key=os.environ.get("OPENROUTER_API_KEY", "sk-placeholder-not-used"))
+client = OpenAI(base_url=API_BASE, api_key=os.environ.get("OPENROUTER_API_KEY", "sk-placeholder-not-used"),
+                timeout=60, max_retries=1)
 MODEL = "deepseek/deepseek-v4-flash"
 
 DEEPGRAM_API_KEY = os.environ.get("DEEPGRAM_API_KEY", "")
