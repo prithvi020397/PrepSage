@@ -31,7 +31,7 @@ phase N is ✅.
 |-------|-------------|-------------|-------------------|-----------------|-------|
 | 0 logging | (local, not pushed) | ☑ 43 passed | ☑ 72 rules match | ☑ (no route/behavior change) | RotatingFileHandler(5MB×5) + stderr; log.exception in 18 LLM/parse/auth except blocks; print()→log.debug for 3 debug dumps; after_request already logged method/path/status/ms |
 | 1 duplicate routes | (local, not pushed) | ☑ 44 passed | ☑ 72 rules match | ☑ | Removed Whisper `transcribe()` dup at L5600; kept Deepgram `transcribe_audio` (returns `transcript`, matches frontend). Added test_route_inventory asserting exactly one `/api/transcribe`. NOTE: this was a live bug — Flask served the last-registered (Whisper) route, which returns `text` + needs OPENAI_API_KEY (unset in cloud), so transcription was effectively broken in production. |
-| 2 characterization tests | | ☐ | ☐ | ☐ | new tests: |
+| 2 characterization tests | (local, not pushed) | ☑ 63 passed | ☑ 72 rules match | ☑ | Added test_backend_characterization.py (19 tests) pinning: topic_for (classic + v2 decomposition schema, no `prompt`), _repair_truncated_json (5 cases incl LIFO closers + unterminated string), hire_verdict bands (pct 0.85/0.60 + points 0/-3 boundaries), is_solved/is_due, schedule_review interval (0→7, 1-2→3, >2→1). No behavior change — these were verified against CURRENT behavior (fixed 2 wrong assumptions about schedule_review truncation + hire_verdict points). |
 | 3 core/ extracted | | ☐ | ☐ | ☐ | |
 | 4 services/ extracted | | ☐ | ☐ | ☐ | |
 | 5 blueprints | | ☐ | ☐ | ☐ | |
