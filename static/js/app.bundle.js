@@ -1,0 +1,3742 @@
+let cm = CodeMirror.fromTextArea(document.getElementById('editor'), {theme: 'material-darker', lineNumbers: true});
+requestAnimationFrame(() => cm.refresh());
+new ResizeObserver(() => cm.refresh()).observe(document.getElementById('editor-card'));
+let current = null;
+let clarifyMode = false;
+let selectedPersona = '';
+let selectedArchetype = '';
+let __compareData = null; // {label, chatHTML, band, score, dimScores}
+let adversarialMode = false;
+let adversarialFlaws = [];
+let scalingMode = false;
+let incidentMode = false;
+let incidentScenario = '';
+let replayTurns = [];
+let replayComments = [];
+let mockLoop = null; // {ids: [...], stage: 0} — null when no loop is active
+let savedChatHTMLBeforeReplay = null;
+let savedShapesBeforeReplay = null;
+let ttsEnabled = true;
+let designChips = [];
+let pacingTimer = null;
+let lastRunSummary = '';
+let __compareMode = null;
+const CONCEPT_TAXONOMIES = (window.APP_BOOT && window.APP_BOOT.concept_taxonomies) || [];
+
+const IDLE_NUDGE_MS = 45000;
+let idleTimer = null;
+let stuck = false;
+let nudgeSent = false;
+let reinforced = false;
+let pendingRecallReview = null;
+let stateCache = {}; // qid -> {code, chatHTML, resultsHTML, resultsClass, lastRunSummary, stuck, nudgeSent, reinforced, shapes}
+let timers = {}; // qid -> {elapsed, running}
+let timerInterval = null;
+
+// ---- design canvas (system design questions) ----
+let shapes = []; // {id, type:'box'|'text', label, x, y, w, h} | {id, type:'arrow', fromId, toId, label}
+let shapeSeq = 1;
+let canvasTool = 'select';
+let selectedShapeId = null;
+let lastClickShapeId = null;
+let lastClickTime = 0;
+let arrowDraft = null; // {fromId}
+let dragState = null; // {id, offsetX, offsetY} or {id, end:'fromId'|'toId'}
+let lastCanvasClick = {x: 140, y: 100};
+const measureCtx = document.createElement('canvas').getContext('2d');
+measureCtx.font = '12px Inter, sans-serif';
+
+function wrapText(text, maxWidth) {
+  const words = String(text).split(/\s+/).filter(Boolean);
+  if (!words.length) return [''];
+  const lines = [];
+  let line = words[0];
+  for (let i = 1; i < words.length; i++) {
+    const test = line + ' ' + words[i];
+    if (measureCtx.measureText(test).width > maxWidth) {
+      lines.push(line);
+      line = words[i];
+    } else {
+      line = test;
+    }
+  }
+  lines.push(line);
+  return lines;
+}
+let narrationText = '';
+
+function newShapeId() { return 's' + (shapeSeq++); }
+
+function boxAt(x, y) {
+  return shapes.find(s => s.type === 'box' && x >= s.x && x <= s.x + s.w && y >= s.y && y <= s.y + s.h);
+}
+
+function shapeAt(x, y, type) {
+  return shapes.find(s => s.type === type && x >= s.x && x <= s.x + s.w && y >= s.y && y <= s.y + s.h);
+}
+
+function setCanvasTool(tool) {
+  canvasTool = tool;
+  arrowDraft = null;
+  document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
+  const btn = document.getElementById('tool-' + tool);
+  if (btn) btn.classList.add('active');
+  const svg = document.getElementById('design-canvas');
+  if (svg) svg.classList.toggle('select-mode', tool === 'select');
+  renderCanvas();
+}
+
+function svgPoint(evt) {
+  const svg = document.getElementById('design-canvas');
+  const rect = svg.getBoundingClientRect();
+  return {x: evt.clientX - rect.left, y: evt.clientY - rect.top};
+}
+
+function canvasMouseDown(evt) {
+  evt.preventDefault();
+  const openEdit = document.querySelector('.canvas-inline-edit');
+  if (openEdit) openEdit.blur();
+  const pt = svgPoint(evt);
+  lastCanvasClick = pt;
+  const hitBox = boxAt(pt.x, pt.y);
+  const hitText = shapeAt(pt.x, pt.y, 'text');
+
+  if (canvasTool === 'box') {
+    if (hitBox) return;
+    const shape = {id: newShapeId(), type: 'box', label: '', x: snap(pt.x - 55), y: snap(pt.y - 25), w: 110, h: 50};
+    shapes.push(shape);
+    setCanvasTool('select');
+    startInlineEdit(shape);
+    return;
+  }
+  if (canvasTool === 'text') {
+    if (hitText) return;
+    const shape = {id: newShapeId(), type: 'text', label: '', x: snap(pt.x - 50), y: snap(pt.y - 20), w: 100, h: 40};
+    shapes.push(shape);
+    setCanvasTool('select');
+    startInlineEdit(shape);
+    return;
+  }
+  if (canvasTool === 'arrow') {
+    const hitAnchor = hitBox || hitText;
+    if (!hitAnchor) return;
+    if (!arrowDraft) {
+      arrowDraft = {fromId: hitAnchor.id};
+      renderCanvas();
+    } else if (hitAnchor.id !== arrowDraft.fromId) {
+      shapes.push({id: newShapeId(), type: 'arrow', fromId: arrowDraft.fromId, toId: hitAnchor.id, label: ''});
+      arrowDraft = null;
+      setCanvasTool('select');
+      saveCurrentState();
+    }
+    return;
+  }
+  // select tool
+  const shape = hitBox || hitText;
+  if (shape) {
+    const now = Date.now();
+    const isDoubleClick = lastClickShapeId === shape.id && now - lastClickTime < 400;
+    lastClickShapeId = shape.id;
+    lastClickTime = now;
+    selectedShapeId = shape.id;
+    if (isDoubleClick) {
+      lastClickShapeId = null;
+      renderCanvas();
+      startInlineEdit(shape);
+      return;
+    }
+    dragState = {id: shape.id, offsetX: pt.x - shape.x, offsetY: pt.y - shape.y};
+  } else {
+    lastClickShapeId = null;
+    selectedShapeId = null;
+  }
+  renderCanvas();
+}
+
+function canvasMouseMove(evt) {
+  if (!dragState) return;
+  const pt = svgPoint(evt);
+  const shape = shapes.find(s => s.id === dragState.id);
+  if (!shape) return;
+  if (dragState.end) {
+    const hitAnchor = boxAt(pt.x, pt.y) || shapeAt(pt.x, pt.y, 'text');
+    if (hitAnchor && hitAnchor.id !== shape[dragState.end === 'fromId' ? 'toId' : 'fromId']) shape[dragState.end] = hitAnchor.id;
+  } else if (dragState.resize) {
+    shape.w = Math.max(60, snap(pt.x - shape.x));
+    shape.h = Math.max(30, snap(pt.y - shape.y));
+  } else {
+    shape.x = snap(pt.x - dragState.offsetX);
+    shape.y = snap(pt.y - dragState.offsetY);
+  }
+  renderCanvas();
+}
+
+function canvasMouseUp() {
+  if (dragState) saveCurrentState();
+  dragState = null;
+}
+
+function startArrowHandleDrag(arrowId, end, evt) {
+  evt.stopPropagation();
+  selectedShapeId = arrowId;
+  dragState = {id: arrowId, end};
+}
+
+function deleteSelected() {
+  if (!selectedShapeId) return;
+  shapes = shapes.filter(s => s.id !== selectedShapeId && s.fromId !== selectedShapeId && s.toId !== selectedShapeId);
+  selectedShapeId = null;
+  renderCanvas();
+  saveCurrentState();
+}
+
+function showToast(message) {
+  const existing = document.querySelector('.toast');
+  if (existing) existing.remove();
+  const t = document.createElement('div');
+  t.className = 'toast';
+  t.textContent = message;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 5000);
+}
+
+function showConfirm(message, onConfirm) {
+  const overlay = document.createElement('div');
+  overlay.className = 'confirm-overlay';
+  overlay.innerHTML = '<div class="confirm-box"><div class="confirm-msg"></div><div class="confirm-actions">'
+    + '<button class="btn btn-ghost" id="confirm-no">Cancel</button>'
+    + '<button class="btn btn-primary" id="confirm-yes">Clear</button></div></div>';
+  overlay.querySelector('.confirm-msg').textContent = message;
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+  overlay.querySelector('#confirm-no').onclick = () => overlay.remove();
+  overlay.querySelector('#confirm-yes').onclick = () => { overlay.remove(); onConfirm(); };
+  document.body.appendChild(overlay);
+}
+
+function clearCanvas() {
+  if (!shapes.length) return;
+  showConfirm("Clear the whole whiteboard? This can't be undone.", () => {
+    shapes = [];
+    selectedShapeId = null;
+    renderCanvas();
+    saveCurrentState();
+  });
+}
+
+const GRID = 10;
+function snap(v) { return Math.round(v / GRID) * GRID; }
+
+// port-snapped edge point: pick the cardinal side facing the other shape instead of
+// a raw center-to-center intersection, so arrows always leave/enter straight (no corner-clipping).
+function edgePoint(box, towardX, towardY) {
+  const cx = box.x + box.w / 2, cy = box.y + box.h / 2;
+  const dx = towardX - cx, dy = towardY - cy;
+  if (!dx && !dy) return {x: cx, y: cy};
+  if (Math.abs(dx) > Math.abs(dy)) return {x: dx > 0 ? box.x + box.w : box.x, y: cy};
+  return {x: cx, y: dy > 0 ? box.y + box.h : box.y};
+}
+
+function svgEl(tag, attrs) {
+  const el = document.createElementNS('http://www.w3.org/2000/svg', tag);
+  for (const k in attrs) el.setAttribute(k, attrs[k]);
+  return el;
+}
+
+const LAYER_COLORS = {
+  source: {stroke: '#5ee6d8', fill: 'rgba(94,230,216,0.35)'},
+  processing: {stroke: '#7c6cf6', fill: 'rgba(124,108,246,0.35)'},
+  storage: {stroke: '#3ddc97', fill: 'rgba(61,220,151,0.35)'},
+  consumer: {stroke: '#f5c542', fill: 'rgba(245,197,66,0.35)'}
+};
+function layerColors(layer) { return LAYER_COLORS[layer] || {stroke: '#9299ab', fill: 'rgba(146,153,171,0.28)'}; }
+
+let roughSvgGen = null;
+function getRC(svg) { if (!roughSvgGen) roughSvgGen = rough.svg(svg); return roughSvgGen; }
+
+// small deterministic tilt so notes read as hand-placed sticky notes, not a UI element
+function noteTilt(id) { const n = parseInt(id.slice(1), 10) || 0; return (n % 2 === 0 ? 1 : -1) * 1.4; }
+
+function renderCanvas() {
+  const svg = document.getElementById('design-canvas');
+  if (!svg) return;
+  svg.innerHTML = '<defs>'
+    + '<pattern id="dot-grid" width="' + GRID * 2 + '" height="' + GRID * 2 + '" patternUnits="userSpaceOnUse">'
+    + '<circle cx="1.5" cy="1.5" r="1.5" fill="rgba(255,255,255,0.055)"></circle></pattern>'
+    + ['default', 'source', 'processing', 'storage', 'consumer'].map(l => {
+        const color = l === 'default' ? '#9299ab' : LAYER_COLORS[l].stroke;
+        return '<marker id="arrowhead-' + l + '" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto">'
+          + '<path d="M0,0 L9,4.5 L0,9 z" fill="' + color + '"></path></marker>';
+      }).join('')
+    + '</defs>';
+  svg.appendChild(svgEl('rect', {x: 0, y: 0, width: '100%', height: '100%', fill: 'url(#dot-grid)', 'pointer-events': 'none'}));
+  const rc = getRC(svg);
+  const byId = Object.fromEntries(shapes.map(s => [s.id, s]));
+
+  if (shapes.length === 0) {
+    const hint = svgEl('text', {x: '50%', y: '44%', 'text-anchor': 'middle', class: 'canvas-hint'});
+    hint.textContent = 'Sketch your architecture here';
+    svg.appendChild(hint);
+    const sub = svgEl('text', {x: '50%', y: '44%', dy: '22', 'text-anchor': 'middle', class: 'canvas-hint canvas-hint-sub'});
+    sub.textContent = 'Box for a component · Arrow to connect two · Note for assumptions — syncs to the tutor automatically';
+    svg.appendChild(sub);
+  }
+
+  shapes.filter(s => s.type === 'arrow').forEach(a => {
+    const from = byId[a.fromId], to = byId[a.toId];
+    if (!from || !to) return;
+    const p1 = edgePoint(from, to.x + to.w / 2, to.y + to.h / 2);
+    const p2 = edgePoint(to, from.x + from.w / 2, from.y + from.h / 2);
+    const selected = a.id === selectedShapeId;
+    const color = layerColors(from.layer).stroke;
+    const line = rc.line(p1.x, p1.y, p2.x, p2.y, {stroke: color, strokeWidth: selected ? 2.4 : 1.6, roughness: 1.3, bowing: 1});
+    line.setAttribute('class', 'shape-arrow' + (selected ? ' selected' : ''));
+    line.setAttribute('marker-end', 'url(#arrowhead-' + (from.layer || 'default') + ')');
+    line.addEventListener('mousedown', (e) => {
+      e.stopPropagation();
+      canvasTool = 'select';
+      setCanvasTool('select');
+      const now = Date.now();
+      const isDoubleClick = lastClickShapeId === a.id && now - lastClickTime < 400;
+      lastClickShapeId = a.id;
+      lastClickTime = now;
+      selectedShapeId = a.id;
+      renderCanvas();
+      if (isDoubleClick) {
+        lastClickShapeId = null;
+        startArrowLabelEdit(a, (p1.x + p2.x) / 2, (p1.y + p2.y) / 2);
+      }
+    });
+    svg.appendChild(line);
+    if (a.label) {
+      const t = svgEl('text', {x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2 - 6, style: 'fill:var(--text-faint); font-size:11px;'});
+      t.textContent = a.label;
+      svg.appendChild(t);
+    }
+    if (selected) {
+      [['fromId', p1], ['toId', p2]].forEach(([end, p]) => {
+        const h = svgEl('circle', {cx: p.x, cy: p.y, r: 5, class: 'arrow-handle'});
+        h.addEventListener('mousedown', (e) => startArrowHandleDrag(a.id, end, e));
+        svg.appendChild(h);
+      });
+    }
+  });
+
+  // baseline nudge: SVG has no reliable cross-browser vertical-center text alignment,
+  // so bake the offset into the tspan y instead of relying on dominant-baseline.
+  const TEXT_BASELINE_NUDGE = 4;
+
+  shapes.filter(s => s.type === 'box').forEach(b => {
+    const lineHeight = 15;
+    const lines = wrapText(b.label || '(untitled)', b.w - 16);
+    b.h = Math.max(b.h || 50, lines.length * lineHeight + 16);
+    const selected = b.id === selectedShapeId;
+    const colors = layerColors(b.layer);
+    const rect = rc.rectangle(b.x, b.y, b.w, b.h, {
+      stroke: colors.stroke, fill: colors.fill, fillStyle: 'hachure', fillWeight: 0.8, hachureGap: 5,
+      roughness: 1.15, strokeWidth: selected ? 2.5 : 1.5
+    });
+    rect.setAttribute('class', 'shape-box' + (selected ? ' selected' : ''));
+    const rectTitle = svgEl('title', {});
+    rectTitle.textContent = b.layer ? `layer: ${b.layer} (press L to cycle)` : 'select and press L to tag a layer (source/processing/storage/consumer)';
+    rect.appendChild(rectTitle);
+    svg.appendChild(rect);
+    const t = svgEl('text', {x: b.x + b.w / 2, y: b.y + b.h / 2 - (lines.length - 1) * lineHeight / 2 + TEXT_BASELINE_NUDGE, class: 'shape-label'});
+    t.style.pointerEvents = 'none';
+    lines.forEach((line, i) => {
+      const tspan = svgEl('tspan', {x: b.x + b.w / 2, dy: i === 0 ? 0 : lineHeight});
+      tspan.textContent = line;
+      t.appendChild(tspan);
+    });
+    svg.appendChild(t);
+    if (selected) {
+      const handle = svgEl('rect', {x: b.x + b.w - 7, y: b.y + b.h - 7, width: 10, height: 10, class: 'resize-handle'});
+      handle.addEventListener('mousedown', (e) => { e.stopPropagation(); dragState = {id: b.id, resize: true}; });
+      svg.appendChild(handle);
+    }
+  });
+
+  shapes.filter(s => s.type === 'text').forEach(tx => {
+    const lineHeight = 15;
+    const lines = wrapText(tx.label || '(empty note)', tx.w - 16);
+    tx.h = Math.max(tx.h || 40, lines.length * lineHeight + 16);
+    const selected = tx.id === selectedShapeId;
+    const cx = tx.x + tx.w / 2, cy = tx.y + tx.h / 2;
+    const g = svgEl('g', {transform: `rotate(${noteTilt(tx.id)} ${cx} ${cy})`, class: 'rough-shadow'});
+    const rect = rc.rectangle(tx.x, tx.y, tx.w, tx.h, {
+      stroke: '#c99a2e', fill: '#f5c542', fillStyle: 'solid', roughness: 1.6, strokeWidth: selected ? 2.5 : 1.5
+    });
+    rect.setAttribute('class', 'shape-note' + (selected ? ' selected' : ''));
+    g.appendChild(rect);
+    const t = svgEl('text', {x: cx, y: cy - (lines.length - 1) * lineHeight / 2 + TEXT_BASELINE_NUDGE, class: 'shape-label note-label'});
+    t.style.pointerEvents = 'none';
+    lines.forEach((line, i) => {
+      const tspan = svgEl('tspan', {x: cx, dy: i === 0 ? 0 : lineHeight});
+      tspan.textContent = line;
+      t.appendChild(tspan);
+    });
+    g.appendChild(t);
+    if (selected) {
+      const handle = svgEl('rect', {x: tx.x + tx.w - 7, y: tx.y + tx.h - 7, width: 10, height: 10, class: 'resize-handle'});
+      handle.addEventListener('mousedown', (e) => { e.stopPropagation(); dragState = {id: tx.id, resize: true}; });
+      g.appendChild(handle);
+    }
+    svg.appendChild(g);
+  });
+
+  if (arrowDraft) {
+    const from = byId[arrowDraft.fromId];
+    if (from) {
+      const hint = svgEl('text', {x: from.x, y: from.y - 8, style: 'fill:var(--accent); font-size:11px;'});
+      hint.textContent = 'click a target box…';
+      svg.appendChild(hint);
+    }
+  }
+
+  const deleteBtn = document.getElementById('canvas-delete-btn');
+  if (deleteBtn) deleteBtn.disabled = !selectedShapeId;
+
+  const wrapper = document.getElementById('canvas-scroll');
+  if (wrapper) {
+    const contentBottom = shapes.reduce((max, s) => Math.max(max, (s.y || 0) + (s.h || 0)), 0) + 40;
+    svg.style.height = contentBottom > wrapper.clientHeight ? contentBottom + 'px' : '100%';
+  }
+}
+
+function createInlineEditInput(midX, midY, initialValue, onCommit) {
+  const card = document.getElementById('design-canvas-card');
+  const svg = document.getElementById('design-canvas');
+  const existing = card.querySelector('.canvas-inline-edit');
+  if (existing) existing.remove();
+  const input = document.createElement('input');
+  input.className = 'canvas-inline-edit';
+  input.value = initialValue || '';
+  const cardRect = card.getBoundingClientRect();
+  const svgRect = svg.getBoundingClientRect();
+  const offsetX = svgRect.left - cardRect.left;
+  const offsetY = svgRect.top - cardRect.top;
+  input.style.left = (offsetX + midX - 50) + 'px';
+  input.style.top = (offsetY + midY - 10) + 'px';
+  input.style.width = '100px';
+  const commit = () => {
+    onCommit(input.value.trim());
+    input.remove();
+    renderCanvas();
+    saveCurrentState();
+  };
+  input.addEventListener('keydown', (e) => { if (e.key === 'Enter') input.blur(); });
+  input.addEventListener('blur', commit);
+  card.appendChild(input);
+  input.focus();
+  input.select();
+}
+
+function startInlineEdit(shape) {
+  createInlineEditInput(shape.x + shape.w / 2, shape.y + shape.h / 2, shape.label, (val) => { shape.label = val; });
+}
+
+function startArrowLabelEdit(arrow, midX, midY) {
+  createInlineEditInput(midX, midY, arrow.label, (val) => { arrow.label = val; });
+}
+
+function serializeCanvasForLLM() {
+  if (!shapes.length) return '';
+  const byId = Object.fromEntries(shapes.map(s => [s.id, s]));
+  const lines = [];
+  shapes.filter(s => s.type === 'box').forEach(b => lines.push(`Box: ${b.label || '(unlabeled)'}${b.layer ? ` [${b.layer}]` : ''}`));
+  shapes.filter(s => s.type === 'arrow').forEach(a => {
+    const from = byId[a.fromId], to = byId[a.toId];
+    if (!from || !to) return;
+    lines.push(`Arrow: ${from.label || '(unlabeled)'} -> ${to.label || '(unlabeled)'}${a.label ? ` [${a.label}]` : ''}`);
+  });
+  shapes.filter(s => s.type === 'text').forEach(t => lines.push(`Note: ${t.label}`));
+  return lines.join('\n');
+}
+
+// --- Phase: Mic-on by default (Option B) ---
+// Live, zero-cost speech recognition via webkitSpeechRecognition — replaced with
+// Deepgram-based recording + /api/transcribe for higher accuracy. Records audio on
+// mic toggle, sends to server for transcription, inserts result into active field.
+let micOn = false; // off by default (user clicks to record)
+let mediaRecorder = null;
+let audioChunks = [];
+let isRecording = false;
+let recTimer = null; // interval id for the visible recording timer
+let recSeconds = 0;
+const REC_MAX_SECONDS = 90; // auto-stop so audio never piles up silently
+
+function liveTargetField() {
+  if (current && current.lang === 'design') return document.getElementById('chatbox');
+  const narr = document.getElementById('narration-input');
+  if (narr && narr.offsetParent !== null) return narr;
+  if (canvasVoiceNote && current && current.lang === 'design') return 'CANVAS_NOTE';
+  return document.getElementById('chatbox');
+}
+
+let canvasVoiceNote = false;
+function toggleDrillsMenu() {
+  const menu = document.getElementById('drills-menu');
+  const btn = document.getElementById('more-drills-btn');
+  const open = menu.classList.toggle('open');
+  btn.classList.toggle('active', open);
+}
+
+async function resetCurrentQuestion() {
+  if (!current) return;
+  if (!confirm(`Reset "${current.title}"? This clears your saved code, trace, and notes for this question. Your solved status is kept.`)) return;
+  const btn = document.querySelector('.dm-item.dm-danger');
+  const old = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = 'Resetting…';
+  try {
+    const r = await fetch(`/api/reset-question/${current.id}`, {method: 'POST'});
+    if (!r.ok) throw new Error('reset failed');
+    delete stateCache[current.id];
+    await loadQuestion(current.id, true);
+    showToast('Question reset — fresh starter code loaded.');
+  } catch (e) {
+    showToast('Could not reset question.');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = old;
+  }
+}
+
+document.addEventListener('click', (e) => {
+  const wrap = document.querySelector('.more-drills-wrap');
+  if (wrap && !wrap.contains(e.target)) {
+    document.getElementById('drills-menu').classList.remove('open');
+    document.getElementById('more-drills-btn').classList.remove('active');
+  }
+});
+
+function toggleCanvasVoiceNote() {
+  canvasVoiceNote = !canvasVoiceNote;
+  const btn = document.getElementById('tool-mic');
+  btn.classList.toggle('active', canvasVoiceNote);
+  if (canvasVoiceNote && !micOn) setMicOn(true);
+  showToast(canvasVoiceNote ? 'Voice note on — speak, it drops onto the canvas. Click again to stop.' : 'Voice note off.');
+}
+
+function dropCanvasVoiceNote(text) {
+  if (!text) return;
+  const cx = (lastCanvasClick && lastCanvasClick.x ? lastCanvasClick.x : 200) - 70;
+  const cy = (lastCanvasClick && lastCanvasClick.y ? lastCanvasClick.y : 150) - 20;
+  shapes.push({id: newShapeId(), type: 'text', label: text, x: cx, y: cy, w: 140, h: 40});
+  renderCanvas();
+  saveCurrentState();
+}
+
+function startRecording() {
+  navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
+    const mime = MediaRecorder.isTypeSupported('audio/webm;codecs=opus') ? 'audio/webm;codecs=opus' : 'audio/webm';
+    mediaRecorder = new MediaRecorder(stream, { mimeType: mime });
+    audioChunks = [];
+    mediaRecorder.ondataavailable = e => e.data.size && audioChunks.push(e.data);
+    mediaRecorder.onstop = async () => {
+      stream.getTracks().forEach(t => t.stop());
+      const blob = new Blob(audioChunks, { type: mime });
+      const formData = new FormData();
+      formData.append('audio', blob, 'recording.webm');
+      const indicator = document.getElementById('live-transcript');
+      if (indicator) { indicator.textContent = '⏳ Transcribing…'; indicator.classList.remove('active'); }
+      try {
+        const res = await fetch('/api/transcribe', { method: 'POST', body: formData });
+        const data = await res.json();
+        if (indicator) indicator.textContent = '';
+        if (data.transcript) {
+          const field = liveTargetField();
+          if (field === 'CANVAS_NOTE') {
+            dropCanvasVoiceNote(data.transcript.trim());
+          } else {
+            const cur = field.value;
+            field.value = (cur ? cur + ' ' : '') + data.transcript.trim();
+            field.dispatchEvent(new Event('input'));
+            field.focus();
+          }
+        } else if (data.error) {
+          showToast('Transcription failed: ' + data.error);
+        }
+      } catch (e) {
+        if (indicator) indicator.textContent = '';
+        showToast('Transcription failed. Check Deepgram API key.');
+      }
+    };
+    mediaRecorder.start();
+    isRecording = true;
+    recSeconds = 0;
+    const indicator = document.getElementById('live-transcript');
+    const tick = () => {
+      recSeconds += 1;
+      if (indicator) indicator.textContent = `🔴 Recording… ${recSeconds}s (click Mic to stop, auto-stops at ${REC_MAX_SECONDS}s)`;
+      if (recSeconds >= REC_MAX_SECONDS) {
+        showToast('Max recording length reached — transcribing now.');
+        setMicOn(false);
+      }
+    };
+    if (indicator) indicator.classList.add('active');
+    tick();
+    recTimer = setInterval(tick, 1000);
+  }).catch(() => {
+    showToast('Microphone access needed — type instead.');
+    setMicOn(false);
+  });
+}
+
+function stopRecording() {
+  if (recTimer) { clearInterval(recTimer); recTimer = null; }
+  if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+    mediaRecorder.stop();
+    isRecording = false;
+  }
+}
+
+function setMicOn(on) {
+  micOn = on;
+  const toggle = document.getElementById('mic-toggle');
+  if (toggle) {
+    toggle.classList.toggle('on', on);
+    document.getElementById('mic-toggle-label').textContent = on ? 'Recording…' : 'Record';
+  }
+  if (on) {
+    startRecording();
+  } else {
+    stopRecording();
+  }
+}
+
+document.getElementById('mic-toggle').addEventListener('click', () => setMicOn(!micOn));
+
+const LAYER_CYCLE = ['', 'source', 'processing', 'storage', 'consumer'];
+function duplicateSelected() {
+  const shape = shapes.find(s => s.id === selectedShapeId);
+  if (!shape || shape.type === 'arrow') return;
+  const clone = {...shape, id: newShapeId(), x: shape.x + 20, y: shape.y + 20};
+  shapes.push(clone);
+  selectedShapeId = clone.id;
+  renderCanvas();
+  saveCurrentState();
+}
+function cycleLayer() {
+  const shape = shapes.find(s => s.id === selectedShapeId);
+  if (!shape || shape.type !== 'box') return;
+  shape.layer = LAYER_CYCLE[(LAYER_CYCLE.indexOf(shape.layer || '') + 1) % LAYER_CYCLE.length];
+  renderCanvas();
+  saveCurrentState();
+}
+
+document.addEventListener('keydown', (e) => {
+  if (!(current && current.lang === 'design' && selectedShapeId
+      && !['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName))) return;
+  if (e.key === 'Delete' || e.key === 'Backspace') {
+    e.preventDefault();
+    deleteSelected();
+  } else if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'd') {
+    e.preventDefault();
+    duplicateSelected();
+  } else if (e.key.toLowerCase() === 'l' && !e.metaKey && !e.ctrlKey) {
+    e.preventDefault();
+    cycleLayer();
+  }
+});
+
+function formatTime(s) {
+  return String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0');
+}
+
+function isSolved(id) {
+  const item = document.querySelector(`.q-item[data-id="${id}"]`);
+  return !!(item && item.classList.contains('solved'));
+}
+
+function updateTimerDisplay() {
+  if (!current) return;
+  const t = timers[current.id];
+  const el = document.getElementById('q-timer');
+  el.textContent = formatTime(t.elapsed);
+  el.className = t.running ? '' : 'stopped';
+}
+
+function startTimerFor(id) {
+  clearInterval(timerInterval);
+  if (!timers[id]) timers[id] = {elapsed: 0, running: true};
+  if (isSolved(id)) timers[id].running = false;
+  updateTimerDisplay();
+  if (timers[id].running) {
+    timerInterval = setInterval(() => {
+      timers[id].elapsed++;
+      updateTimerDisplay();
+    }, 1000);
+  }
+}
+
+function stopTimer(id) {
+  if (timers[id]) timers[id].running = false;
+  clearInterval(timerInterval);
+  updateTimerDisplay();
+}
+
+function renderConceptBox(q, solved) {
+  const box = document.getElementById('concept-box');
+  box.style.display = 'block';
+  box.className = 'concept-box ' + (solved ? 'revealed' : 'locked');
+  box.innerHTML = '';
+  const label = document.createElement('div');
+  label.className = 'concept-label';
+  label.textContent = solved ? '💡 Key idea' : '🔒 Key idea';
+  const text = document.createElement('div');
+  text.className = 'concept-text';
+  text.textContent = solved ? q.concept : 'Solve this to reveal the underlying pattern and the common trap.';
+  box.appendChild(label);
+  box.appendChild(text);
+}
+
+let planApproved = false;
+
+function saveCurrentState() {
+  if (!current) return;
+  stateCache[current.id] = {
+    code: cm.getValue(),
+    chatHTML: document.getElementById('chatlog').innerHTML,
+    resultsHTML: document.getElementById('results').innerHTML,
+    resultsClass: document.getElementById('results').className,
+    lastRunSummary, stuck, nudgeSent, reinforced,
+    plan: document.getElementById('plan-input').value,
+    approved: planApproved,
+    feedbackHTML: document.getElementById('plan-feedback').outerHTML,
+    complexityInput: document.getElementById('complexity-input').value,
+    edgeInput: document.getElementById('edge-input').value,
+    debriefFeedbackHTML: document.getElementById('debrief-feedback').outerHTML,
+    shapes: JSON.parse(JSON.stringify(shapes)),
+    persona: selectedPersona,
+    scaling: scalingMode,
+    tradeoffInput: document.getElementById('tradeoff-input').value,
+    tradeoffFeedbackHTML: document.getElementById('tradeoff-feedback').outerHTML,
+  };
+}
+
+function onPlanInput() {
+  document.getElementById('check-approach-btn').disabled = document.getElementById('plan-input').value.trim().length === 0;
+}
+
+function setEditorLocked(locked) {
+  cm.setOption('readOnly', locked);
+  cm.getWrapperElement().classList.toggle('locked', locked);
+  document.getElementById('run-btn').disabled = locked;
+  document.getElementById('submit-btn').disabled = locked;
+}
+
+function setPlanFeedback(kind, text) {
+  const el = document.getElementById('plan-feedback');
+  el.className = kind;
+  el.textContent = text;
+}
+
+async function checkApproach() {
+  const btn = document.getElementById('check-approach-btn');
+  const plan = document.getElementById('plan-input').value;
+  btn.disabled = true;
+  setPlanFeedback('pending', 'Checking your approach…');
+  const res = await (await fetch('/api/check-approach', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({question_id: current.id, plan})
+  })).json();
+  btn.disabled = false;
+  setPlanFeedback(res.ok ? 'ok' : 'bad', (res.ok ? '✓ ' : '✗ ') + res.feedback);
+  if (res.ok) {
+    planApproved = true;
+    setEditorLocked(false);
+  }
+}
+
+let spotBugNote = null;
+
+async function startSpotBug() {
+  const btn = document.getElementById('spotbug-menu');
+  btn.disabled = true;
+  btn.innerHTML = '<svg class="icon" viewBox="0 0 24 24"><use href="#i-bug"/></svg>Loading…';
+  const res = await (await fetch('/api/spot-bug', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({question_id: current.id})
+  })).json();
+  btn.disabled = false;
+  btn.innerHTML = '<svg class="icon" viewBox="0 0 24 24"><use href="#i-bug"/></svg>Spot the bug';
+  if (res.error) { showToast('Could not generate a code-review drill: ' + res.error); return; }
+  spotBugNote = res.bug_note;
+  document.getElementById('spotbug-code').textContent = res.code;
+  document.getElementById('spotbug-input').value = '';
+  document.getElementById('spotbug-feedback').textContent = '';
+  document.getElementById('spotbug-card').style.display = 'block';
+}
+
+function closeSpotBug() {
+  document.getElementById('spotbug-card').style.display = 'none';
+  spotBugNote = null;
+}
+
+async function gradeSpotBug() {
+  const answer = document.getElementById('spotbug-input').value.trim();
+  if (!answer || !spotBugNote) return;
+  const btn = document.getElementById('spotbug-grade-btn');
+  const el = document.getElementById('spotbug-feedback');
+  btn.disabled = true;
+  el.className = 'pending';
+  el.textContent = 'Grading…';
+  const res = await (await fetch('/api/spot-bug-grade', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({question_id: current.id, bug_note: spotBugNote, answer})
+  })).json();
+  btn.disabled = false;
+  el.className = res.ok ? 'ok' : 'bad';
+  el.textContent = (res.ok ? '✓ ' : '✗ ') + res.feedback;
+}
+
+let reverseState = null;
+
+async function startReverse() {
+  const btn = document.getElementById('reverse-menu');
+  btn.disabled = true;
+  btn.innerHTML = '<svg class="icon" viewBox="0 0 24 24"><use href="#i-mask"/></svg>Loading…';
+  const res = await (await fetch('/api/reverse', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({question_id: current.id})
+  })).json();
+  btn.disabled = false;
+  btn.innerHTML = '<svg class="icon" viewBox="0 0 24 24"><use href="#i-mask"/></svg>Be the interviewer';
+  if (res.error) { showToast('Could not start reverse interview: ' + res.error); return; }
+  reverseState = {qid: current.id};
+  const panel = document.getElementById('reversal-panel');
+  panel.style.display = 'block';
+  document.getElementById('reversal-code').textContent = res.code;
+  document.getElementById('reversal-input').value = '';
+  document.getElementById('reversal-chat').innerHTML = '';
+  renderBugs(res.bugs || []);
+  addRevChat('candidate', res.reply);
+}
+
+function closeReverse() {
+  document.getElementById('reversal-panel').style.display = 'none';
+  reverseState = null;
+}
+
+function renderBugs(bugs) {
+  const el = document.getElementById('reversal-bugs');
+  el.innerHTML = '<div style="font-weight:600; color:var(--text-dim); margin-bottom:4px; font-size:11px;">🐞 Bugs to find</div>';
+  bugs.forEach((b, i) => {
+    const d = document.createElement('div');
+    d.className = 'rev-bug-item' + (b.found ? ' found' : '');
+    d.innerHTML = `<span class="rev-bug-icon">${b.found ? '✅' : '⬜'}</span><span>${b.found ? 'Found:' : 'Hidden:'} ${b.note}</span>`;
+    el.appendChild(d);
+  });
+}
+
+function addRevChat(who, text) {
+  const el = document.getElementById('reversal-chat');
+  const d = document.createElement('div');
+  d.className = 'rev-chat-bubble ' + who;
+  d.textContent = text;
+  el.appendChild(d);
+  el.scrollTop = el.scrollHeight;
+}
+
+async function sendReverse() {
+  const input = document.getElementById('reversal-input');
+  const text = input.value.trim();
+  if (!text || !reverseState) return;
+  input.value = '';
+  addRevChat('user', text);
+  const res = await (await fetch('/api/reverse', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({question_id: reverseState.qid, message: text})
+  })).json();
+  if (res.error) { addRevChat('candidate', 'Error: ' + res.error); return; }
+  addRevChat('candidate', res.reply);
+  renderBugs(res.bugs || []);
+}
+
+let curveballActive = false;
+let useWebAngle = false;  // HYBRID: when on, hints & curveballs request a Firecrawl-grounded real-world angle
+
+async function startCurveball() {
+  const btn = document.getElementById('curveball-menu');
+  btn.disabled = true;
+  btn.innerHTML = '<svg class="icon" viewBox="0 0 24 24"><use href="#i-zap"/></svg>Loading…';
+  const res = await (await fetch('/api/curveball', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({question_id: current.id, use_web: useWebAngle})
+  })).json();
+  btn.disabled = false;
+  btn.innerHTML = '<svg class="icon" viewBox="0 0 24 24"><use href="#i-zap"/></svg>Curveball';
+  if (res.error) { showToast('Could not generate a curveball: ' + res.error); return; }
+  curveballActive = true;
+  document.getElementById('curveball-twist').textContent = '🌀 Interviewer: ' + res.twist;
+  document.getElementById('curveball-feedback').textContent = '';
+  document.getElementById('curveball-card').style.display = 'block';
+  addMsg('system', 'Interviewer changed the requirements mid-solve');
+}
+
+function closeCurveball() {
+  document.getElementById('curveball-card').style.display = 'none';
+  curveballActive = false;
+}
+
+function toggleWebAngle() {
+  useWebAngle = !useWebAngle;
+  const label = document.getElementById('webtoggle-label');
+  if (label) label.textContent = useWebAngle ? 'On' : 'Off';
+  showToast(useWebAngle
+    ? 'Web angle ON — hints & curveballs will pull a real-world framing (falls back silently if offline).'
+    : 'Web angle OFF — using the precomputed bank.');
+}
+
+async function requestFreshAngle() {
+  if (!current) { showToast('Open a question first.'); return; }
+  const btn = document.getElementById('webangle-menu');
+  const prev = btn.innerHTML;
+  btn.innerHTML = '<svg class="icon" viewBox="0 0 24 24"><use href="#i-grid"/></svg>Fetching…';
+  const placeholder = addMsg('tutor', 'pulling a real-world angle from the web…');
+  const textEl = placeholder.querySelector('.msg-text');
+  try {
+    const r = await fetch('/api/fresh-angle', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({question_id: current.id})
+    });
+    const res = await r.json();
+    if (!r.ok || !res.angle) {
+      placeholder.className += ' err';
+      textEl.textContent = 'No live angle available right now — using the precomputed framing instead.';
+    } else {
+      textEl.textContent = '🌐 Real-world angle: ' + res.angle;
+    }
+  } catch (e) {
+    placeholder.className += ' err';
+    textEl.textContent = 'Could not reach the web layer — using the precomputed framing instead.';
+  } finally {
+    btn.innerHTML = prev;
+  }
+}
+
+async function gradeCurveball() {
+  if (!curveballActive) return;
+  const btn = document.getElementById('curveball-grade-btn');
+  const el = document.getElementById('curveball-feedback');
+  btn.disabled = true;
+  el.className = 'pending';
+  el.textContent = 'Grading…';
+  const res = await (await fetch('/api/curveball-grade', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({question_id: current.id, code: cm.getValue()})
+  })).json();
+  btn.disabled = false;
+  el.className = res.ok ? 'ok' : 'bad';
+  el.textContent = (res.ok ? '✓ ' : '✗ ') + res.feedback;
+}
+
+let sqlClarifyMode = false;
+let sqlClarifyAsked = 0;
+const SQL_CLARIFY_MIN = 2;
+
+function toggleSqlClarify() {
+  if (sqlClarifyMode) { revealSqlClarify(); return; }
+  sqlClarifyMode = true;
+  sqlClarifyAsked = 0;
+  document.getElementById('sample').style.display = 'none';
+  document.getElementById('clarify-menu').classList.add('active');
+  renderSqlClarifyGate();
+  addMsg('system', "Clarify-first mode — I'll ask about the schema and edge cases before coding");
+}
+
+function renderSqlClarifyGate() {
+  const gate = document.getElementById('clarify-gate');
+  gate.style.display = 'block';
+  const remaining = Math.max(0, SQL_CLARIFY_MIN - sqlClarifyAsked);
+  gate.innerHTML = `🎯 Schema hidden — ask the tutor about the table shape, nulls, ties, or edge cases first.` +
+    `<div class="clarify-progress">${remaining > 0 ? `Ask ${remaining} more clarifying question${remaining === 1 ? '' : 's'} to unlock, or reveal now.` : 'Ready when you are.'}</div>` +
+    `<button class="btn btn-ghost" onclick="revealSqlClarify()">Reveal schema &amp; start coding</button>`;
+}
+
+function revealSqlClarify() {
+  sqlClarifyMode = false;
+  if (current) renderSample(current);
+  document.getElementById('clarify-gate').style.display = 'none';
+  document.getElementById('clarify-menu').classList.remove('active');
+}
+
+function closeSqlClarify() {
+  sqlClarifyMode = false;
+  sqlClarifyAsked = 0;
+  if (current) renderSample(current);
+  document.getElementById('clarify-gate').style.display = 'none';
+  document.getElementById('clarify-menu').classList.remove('active');
+}
+
+async function gradeTradeoff() {
+  const btn = document.getElementById('tradeoff-grade-btn');
+  const answer = document.getElementById('tradeoff-input').value;
+  const el = document.getElementById('tradeoff-feedback');
+  btn.disabled = true;
+  el.className = 'pending';
+  el.textContent = 'Grading…';
+  const res = await (await fetch('/api/tradeoff-grade', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({question_id: current.id, answer})
+  })).json();
+  btn.disabled = false;
+  el.className = res.ok ? 'ok' : 'bad';
+  el.textContent = (res.ok ? '✓ ' : '✗ ') + res.feedback;
+  if (res.ok) markSolved(current.id);
+}
+
+function setQuestionTitle(title) {
+  const prefix = window.JD_CONTEXT ? window.JD_CONTEXT + ' — ' : '';
+  document.getElementById('title').textContent = prefix + title;
+}
+
+async function rerollTradeoff() {
+  const btn = document.getElementById('tradeoff-reroll-btn');
+  btn.disabled = true;
+  btn.textContent = 'Loading…';
+  const res = await (await fetch('/api/tradeoff-regenerate', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({question_id: current.id})
+  })).json();
+  btn.disabled = false;
+  btn.textContent = '🎲 New scenario';
+  if (res.error) { showToast('Could not generate a new scenario: ' + res.error); return; }
+  current.title = res.title;
+  current.prompt = res.prompt;
+  setQuestionTitle(res.title);
+  document.getElementById('prompt').textContent = res.prompt;
+  document.getElementById('tradeoff-input').value = '';
+  document.getElementById('tradeoff-feedback').outerHTML = '<div id="tradeoff-feedback"></div>';
+  resetTradeoffSpar();
+}
+
+let tradeoffSparStarted = false;
+
+function resetTradeoffSpar() {
+  tradeoffSparStarted = false;
+  document.getElementById('tradeoff-spar').style.display = 'none';
+  document.getElementById('tradeoff-spar-log').innerHTML = '';
+}
+
+async function startTradeoffSpar() {
+  document.getElementById('tradeoff-spar').style.display = '';
+  if (tradeoffSparStarted) return;
+  tradeoffSparStarted = true;
+  const opener = document.getElementById('tradeoff-input').value.trim() ||
+    "I'll go with whichever option seems safer here — convince me otherwise.";
+  await sendTradeoffSpar(opener);
+}
+
+async function sendTradeoffSpar(prefill) {
+  const inputEl = document.getElementById('tradeoff-spar-input');
+  const message = prefill !== undefined ? prefill : inputEl.value.trim();
+  if (!message) return;
+  appendSparTurn('you', message);
+  inputEl.value = '';
+  const res = await (await fetch('/api/tradeoff-spar', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({question_id: current.id, message})
+  })).json();
+  if (res.error) { appendSparTurn('tutor', 'Error: ' + res.error); return; }
+  appendSparTurn('tutor', res.reply);
+}
+
+function appendSparTurn(who, text) {
+  const log = document.getElementById('tradeoff-spar-log');
+  const div = document.createElement('div');
+  div.innerHTML = `<b>${who === 'you' ? 'You' : '🥊 Tutor'}:</b> ${escapeHtml(text)}`;
+  log.appendChild(div);
+  log.scrollTop = log.scrollHeight;
+}
+
+
+async function submitDebrief() {
+  const complexity = document.getElementById('complexity-input').value.trim();
+  const edge_cases = document.getElementById('edge-input').value.trim();
+  const narrationVal = (document.getElementById('narration-input').value.trim() || narrationText).trim();
+  const isSql = current.lang === 'sql';
+  const btn = document.getElementById('debrief-btn');
+  const fb = document.getElementById('debrief-feedback');
+  if ((!isSql && !complexity) || !edge_cases) {
+    fb.innerHTML = '';
+    const line = document.createElement('div');
+    line.className = 'line bad';
+    line.textContent = isSql ? 'Fill in the edge cases field.' : 'Fill in both fields.';
+    fb.appendChild(line);
+    return;
+  }
+  btn.disabled = true;
+  fb.innerHTML = '';
+  const pendingLine = document.createElement('div');
+  pendingLine.className = 'line pending';
+  pendingLine.textContent = 'Grading…';
+  fb.appendChild(pendingLine);
+  const res = await (await fetch('/api/debrief', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({question_id: current.id, code: cm.getValue(), complexity, edge_cases, narration: narrationVal})
+  })).json();
+  btn.disabled = false;
+  fb.innerHTML = '';
+  if (!isSql) {
+    const complexityLine = document.createElement('div');
+    complexityLine.className = 'line ' + (res.complexity_ok ? 'ok' : 'bad');
+    complexityLine.textContent = (res.complexity_ok ? '✓' : '✗') + ' complexity: ' + res.complexity_feedback;
+    fb.appendChild(complexityLine);
+  }
+  const edgeLine = document.createElement('div');
+  edgeLine.className = 'line ' + (res.edge_ok ? 'ok' : 'bad');
+  edgeLine.textContent = (res.edge_ok ? '✓' : '✗') + ' edge cases: ' + res.edge_feedback;
+  fb.appendChild(edgeLine);
+  if ('narration_ok' in res) {
+    const narrationLine = document.createElement('div');
+    narrationLine.className = 'line ' + (res.narration_ok ? 'ok' : 'bad');
+    narrationLine.textContent = (res.narration_ok ? '✓' : '✗') + ' narration: ' + res.narration_feedback;
+    fb.appendChild(narrationLine);
+  }
+  // Phase 2: surface exactly 3 prioritized takeaways from this debrief
+  fetch('/api/takeaways', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({question_id: current.id, complexity_ok: res.complexity_ok, edge_ok: res.edge_ok})
+  }).then(r => r.json()).then(t => renderTakeaways(t.takeaways)).catch(() => {});
+  narrationText = '';
+  document.getElementById('narration-input').value = '';
+  document.getElementById('narration-readout').style.display = 'none';
+  // trigger what-if after debrief
+  showWhatIf();
+}
+
+function renderTakeaways(items) {
+  const box = document.getElementById('takeaways-box');
+  const list = document.getElementById('takeaways-list');
+  if (!items || !items.length) { box.style.display = 'none'; return; }
+  list.innerHTML = '';
+  items.forEach(it => {
+    const li = document.createElement('li');
+    li.style.marginBottom = '6px';
+    li.innerHTML = `<strong>${it.label}</strong> — ${it.text}`;
+    list.appendChild(li);
+  });
+  box.style.display = '';
+}
+
+let whatifScenario = '';
+
+async function showWhatIf() {
+  const box = document.getElementById('whatif-box');
+  const scenario = document.getElementById('whatif-scenario');
+  const feedback = document.getElementById('whatif-feedback');
+  const input = document.getElementById('whatif-input');
+  box.style.display = 'none';
+  if (!current || !current.id) return;
+  try {
+    const r = await fetch('/api/whatif', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({question_id: current.id, code: cm.getValue()})
+    });
+    const res = await r.json();
+    if (!r.ok || res.error) return;
+    whatifScenario = res.what_if;
+    scenario.textContent = whatifScenario;
+    feedback.innerHTML = '';
+    input.value = '';
+    box.style.display = '';
+  } catch (e) { /* silent fail — what-if is optional */ }
+}
+
+async function submitWhatIf() {
+  const input = document.getElementById('whatif-input');
+  const answer = input.value.trim();
+  if (!answer) return;
+  const btn = document.getElementById('whatif-btn');
+  const status = document.getElementById('whatif-status');
+  const feedback = document.getElementById('whatif-feedback');
+  btn.disabled = true;
+  status.textContent = 'Grading…';
+  try {
+    const r = await fetch('/api/whatif', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({question_id: current.id, code: cm.getValue(), user_answer: answer, scenario: whatifScenario})
+    });
+    const res = await r.json();
+    if (!r.ok || res.error) { status.textContent = 'Could not grade — discuss in chat'; btn.disabled = false; return; }
+    status.textContent = '';
+    feedback.innerHTML = `<div style="color:${res.ok ? 'var(--success)' : 'var(--warn)'};">${res.ok ? '✓' : '💡'} ${res.feedback}</div>`;
+    input.disabled = true;
+    btn.disabled = true;
+    btn.textContent = 'Done';
+  } catch (e) {
+    status.textContent = 'Error — try again';
+    btn.disabled = false;
+  }
+}
+
+function resetIdleTimer() {
+  clearTimeout(idleTimer);
+  if (stuck && !nudgeSent) {
+    idleTimer = setTimeout(sendIdleNudge, IDLE_NUDGE_MS);
+  }
+}
+
+function sendIdleNudge() {
+  nudgeSent = true;
+  requestHint({question_id: current.id, code: cm.getValue(), actual: lastRunSummary, proactive: true});
+  fabAlert('Stuck? Click me');
+}
+
+cm.on('change', resetIdleTimer);
+
+async function loadList() {
+  let qs;
+  try {
+    const r = await fetch('/api/questions');
+    qs = await r.json();
+  } catch (e) {
+    console.error('loadList failed:', e);
+    return;
+  }
+  const sb = document.getElementById('sidebar-list');
+
+  const groups = [
+    {lang: 'sql', label: 'SQL'},
+    {lang: 'python', label: 'Python'},
+    {lang: 'design', label: 'System Design'},
+    {lang: 'tradeoff', label: 'Tradeoff Drills'},
+    {lang: 'decomposition', label: 'FDE Decomposition'},
+  ];
+
+  groups.forEach(({lang, label}) => {
+    const items = qs.filter(q => q.lang === lang);
+    if (!items.length) return;
+
+    const header = document.createElement('div');
+    // auto-expand a section if it holds any due questions — those are the priority
+    const hasDue = items.some(q => q.due);
+    header.className = 'q-section-header ' + (hasDue ? '' : 'collapsed ') + lang;
+    header.innerHTML = `<span class="chevron">▾</span><span class="dot"></span><span>${label}</span><span class="count">${items.length}</span>`;
+    header.onclick = () => { header.classList.toggle('collapsed'); applySidebarFilter(); };
+    sb.appendChild(header);
+
+    // prioritized section: due reviews + unsolved, sorted due-first, on top of the section
+    const priority = items.filter(q => q.due || !q.solved)
+      .sort((a, b) => (b.due - a.due) || (a.solved - b.solved));
+    const rest = items.filter(q => !q.due && q.solved);
+
+    [...priority, ...rest].forEach(q => {
+      const d = document.createElement('div');
+      d.className = 'q-item' + (q.solved ? ' solved' : '') + (q.due ? ' due' : '');
+      d.dataset.id = q.id;
+
+      const badge = document.createElement('span');
+      badge.className = 'q-lang-badge ' + q.lang;
+      badge.textContent = {sql: 'SQL', python: 'PY', design: 'SYS', tradeoff: 'T/O', decomposition: 'FDE'}[q.lang];
+
+      const title = document.createElement('span');
+      title.className = 'q-title';
+      title.textContent = q.title;
+
+      const check = document.createElement('span');
+      check.className = 'q-check';
+      check.textContent = '✓';
+
+      d.appendChild(badge);
+      d.appendChild(title);
+      if (q.difficulty) {
+        const diff = document.createElement('span');
+        diff.className = 'q-diff-dot ' + q.difficulty.toLowerCase();
+        diff.title = q.difficulty;
+        d.appendChild(diff);
+      }
+      if (q.due) {
+        const due = document.createElement('span');
+        due.className = 'q-due-dot';
+        due.title = 'due for review';
+        due.textContent = '↻';
+        d.appendChild(due);
+      }
+      d.appendChild(check);
+      d.onclick = () => selectQuestion(d, q.id);
+      sb.appendChild(d);
+    });
+  });
+
+  // hint to browse all when everything's collapsed away
+  const browseHint = document.createElement('div');
+  browseHint.className = 'q-browse-hint';
+  browseHint.innerHTML = 'Sections collapse as you clear them — use the filter above to browse all 201.';
+  sb.appendChild(browseHint);
+
+  updateProgress();
+  applySidebarFilter();
+  const deepLinkId = new URLSearchParams(location.search).get('q');
+  const deepLinkQ = qs.find(q => q.id === deepLinkId);
+  const deepLinkEl = deepLinkQ && document.querySelector(`.q-item[data-id="${deepLinkId}"]`);
+  if (deepLinkEl) {
+    const header = document.querySelector('.q-section-header.' + deepLinkQ.lang);
+    if (header) { header.classList.remove('collapsed'); applySidebarFilter(); }
+    document.querySelectorAll('.q-item.active').forEach(x => x.classList.remove('active'));
+    deepLinkEl.classList.add('active');
+    await loadQuestion(deepLinkId);
+    const params = new URLSearchParams(location.search);
+    if (params.get('replay') === '1') {
+      adversarialMode = params.get('adversarial') === '1';
+      clarifyMode = params.get('requirements_only') === '1';
+      incidentMode = params.get('incident') === '1';
+      startReplay();
+    }
+  } else if (!current) {
+    renderEmptyState(qs);
+  }
+}
+
+function applySidebarFilter() {
+  const term = document.getElementById('q-search').value.trim().toLowerCase();
+  document.querySelectorAll('.q-section-header').forEach(h => {
+    const collapsed = h.classList.contains('collapsed');
+    let visible = 0;
+    let next = h.nextElementSibling;
+    while (next && !next.classList.contains('q-section-header')) {
+      const match = !term || next.querySelector('.q-title').textContent.toLowerCase().includes(term);
+      next.style.display = (match && (!collapsed || term)) ? '' : 'none';
+      if (match) visible++;
+      next = next.nextElementSibling;
+    }
+    h.style.display = visible ? '' : 'none';
+  });
+}
+
+function selectQuestion(el, id) {
+  document.querySelectorAll('.q-item.active').forEach(x => x.classList.remove('active'));
+  el.classList.add('active');
+  loadQuestion(id);
+  if (current && (current.lang === 'design' || current.lang === 'decomposition') && !micOn) setMicOn(true);
+}
+
+async function startPractice(lane) {
+  const btn = document.querySelector('.cc-start');
+  if (btn) { btn.disabled = true; btn.textContent = 'Picking…'; }
+  try {
+    const res = await (await fetch('/api/start' + (lane ? '?lane=' + encodeURIComponent(lane) : ''))).json();
+    if (!res.id) {
+      showToast(res.message || 'No questions available — pick one from the sidebar.');
+      return;
+    }
+    const el = document.querySelector(`.q-item[data-id="${res.id}"]`);
+    if (el) { selectQuestion(el, res.id); }
+    else { await loadQuestion(res.id); }
+    const q = QUESTIONS[res.id] || current;
+    if (q && (q.lang === 'design' || q.lang === 'decomposition') && !micOn) setMicOn(true);
+  } catch (e) {
+    showToast('Could not start practice: ' + e.message);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '▶ Start Practice'; }
+  }
+}
+
+function markSolved(id) {
+  const item = document.querySelector(`.q-item[data-id="${id}"]`);
+  if (item) { item.classList.add('solved'); item.classList.remove('due'); }
+  updateProgress();
+  if (current && current.id === id) loadConceptMapper(id);
+}
+
+function updateProgress() {
+  const total = document.querySelectorAll('.q-item').length;
+  const solved = document.querySelectorAll('.q-item.solved').length;
+  document.getElementById('solved-count').textContent = `${solved}/${total} solved`;
+  document.getElementById('solved-bar').style.width = (total ? solved / total * 100 : 0) + '%';
+}
+
+const FEATURE_FAMILIES = [
+  {name: 'Solve', icon: 'i-play', tools: [
+    {label: 'Run', icon: 'i-play', tip: 'Run your code against the sample case to check it before submitting.'},
+    {label: 'Submit', icon: 'i-check', tip: 'Submit — graded against all hidden test cases. Passing locks in the concept.'},
+    {label: 'Debug', icon: 'i-psy', tip: 'Step through your Python line-by-line and watch variables change.'},
+    {label: 'Diff', icon: 'i-grid', tip: 'After a fail, see your code side-by-side with the ideal solution.'},
+  ]},
+  {name: 'Coach', icon: 'i-bulb', tools: [
+    {label: 'Hint', icon: 'i-bulb', tip: 'Stuck? Get a nudge grounded in the concept — never the full answer.'},
+    {label: 'Trace', icon: 'i-grid', tip: 'Build the solution line-by-line with a scaffolded code-translation drill.'},
+    {label: 'Plan check', icon: 'i-check', tip: 'State your approach + complexity first; the tutor grades it.'},
+    {label: 'Concept map', icon: 'i-chart', tip: 'See how Problem → Approach → Pattern → Skeleton → Solution connect.'},
+  ]},
+  {name: 'Pressure', icon: 'i-zap', tools: [
+    {label: 'Curveball', icon: 'i-zap', tip: 'Mid-solve the interviewer changes the requirement — adapt your code.'},
+    {label: 'Twist', icon: 'i-repeat', tip: 'Once solved, a follow-up variation on the same problem.'},
+    {label: 'Dry run', icon: 'i-shoe', tip: 'Trace your own code by hand on a sample input.'},
+    {label: 'Spot the bug', icon: 'i-bug', tip: 'Review someone else’s buggy code and find the flaw.'},
+  ]},
+  {name: 'Interview sim', icon: 'i-mask', tools: [
+    {label: 'Clarify first', icon: 'i-target', tip: 'Hide the schema and ask clarifying questions before coding.'},
+    {label: 'Adversarial', icon: 'i-shield', tip: 'Break your own design — find what fails at scale.'},
+    {label: 'Incident', icon: 'i-fire', tip: '3am on-call: diagnose and stabilize a failing pipeline.'},
+    {label: 'Scaling', icon: 'i-scale', tip: 'Pressure-test the design across 6 growth tiers.'},
+  ]},
+  {name: 'Mock', icon: 'i-loop', tools: [
+    {label: 'Mock loop', icon: 'i-loop', tip: 'Chain a SQL/Python + design + tradeoff interview back-to-back.'},
+    {label: 'Tradeoff', icon: 'i-scale', tip: 'Pick a side and defend it against the tutor.'},
+    {label: 'Takeaways', icon: 'i-bulb', tip: 'After each solve, get 3 things worth remembering.'},
+  ]},
+];
+
+function renderFeatureCompass() {
+  const wrap = document.getElementById('cc-families');
+  if (!wrap) return;
+  wrap.innerHTML = FEATURE_FAMILIES.map(f => `
+    <div class="cc-family">
+      <div class="cc-family-head">
+        <span class="cc-family-ico"><svg class="icon" viewBox="0 0 24 24"><use href="#${f.icon}"/></svg></span>
+        <span class="cc-family-name">${f.name}</span>
+      </div>
+      <div class="cc-family-tools">
+        ${f.tools.map(t => `
+          <div class="cc-tool">
+            <span class="cc-tool-info">
+              <svg class="icon" viewBox="0 0 24 24"><use href="#${t.icon}"/></svg>
+              <span class="cc-tip"><b>${t.label}.</b> ${t.tip}</span>
+            </span>
+            <span>${t.label}</span>
+          </div>`).join('')}
+      </div>
+    </div>`).join('');
+}
+
+function toggleCompass() {
+  const compass = document.getElementById('cc-compass');
+  const toggle = document.getElementById('cc-compass-toggle');
+  const label = document.getElementById('cc-compass-label');
+  const open = compass.classList.toggle('open');
+  toggle.classList.toggle('open', open);
+  label.textContent = open ? 'Hide tools' : 'See all tools';
+}
+
+function renderEmptyState(qs) {
+  const total = qs.length;
+  const sqlCount = qs.filter(q => q.lang === 'sql').length;
+  const pyCount = qs.length - sqlCount;
+  const solved = document.querySelectorAll('.q-item.solved').length;
+  const due = qs.filter(q => q.due);
+  const weak = document.querySelectorAll('.q-item:not(.solved)').length;
+  const greeting = document.getElementById('cc-greeting');
+  const now = new Date();
+  const hour = now.getHours();
+  const hi = hour < 12 ? 'Morning' : hour < 18 ? 'Afternoon' : 'Evening';
+  greeting.textContent = `${hi} — let's get into a loop.`;
+  const streakEl = document.getElementById('streak-count');
+  const streak = streakEl ? streakEl.textContent : '0';
+  const momentum = document.getElementById('cc-momentum');
+  momentum.innerHTML = `<span class="cc-pill">🔥 ${streak}d streak</span>`
+    + (due.length ? `<span class="cc-pill due">↻ ${due.length} due</span>` : '')
+    + (solved ? `<span class="cc-pill">✓ ${solved}/${total} solved</span>` : '');
+  const standings = document.getElementById('cc-standings');
+  const rows = [
+    ['Total questions', total],
+    ['SQL / Python', `${sqlCount} / ${pyCount}`],
+    ['Solved', `${solved} (${total ? Math.round(solved / total * 100) : 0}%)`],
+    ['Still to crack', weak],
+  ];
+  standings.innerHTML = rows.map(([l, v]) =>
+    `<div class="cc-standing"><span class="cc-standing-l">${l}</span><span class="cc-standing-v">${v}</span></div>`
+  ).join('');
+  const panel = document.getElementById('empty-panel');
+  panel.style.display = '';
+  document.getElementById('command-center').style.display = '';
+  // full-width command center: hide the left panel + resizer
+  document.getElementById('main-left').style.display = 'none';
+  document.getElementById('sidebar-resizer').style.display = 'none';
+  document.getElementById('main-right').style.borderLeft = 'none';
+  // reset compass to collapsed
+  document.getElementById('cc-compass').classList.remove('open');
+  document.getElementById('cc-compass-toggle').classList.remove('open');
+  document.getElementById('cc-compass-label').textContent = 'See all tools';
+  renderFeatureCompass();
+}
+
+async function loadQuestion(id) {
+  try {
+  if (document.getElementById('replay-bar').style.display !== 'none') exitReplay();
+  window.speechSynthesis && window.speechSynthesis.cancel();
+  clearPacingNudge();
+  clearReqChips();
+  saveCurrentState();
+  const q = await (await fetch(`/api/questions/${id}`)).json();
+  current = q;
+  document.getElementById('empty-panel').style.display = 'none';
+  // restore layout after command center was full-width
+  document.getElementById('main-left').style.display = '';
+  document.getElementById('sidebar-resizer').style.display = '';
+  document.getElementById('main-right').style.borderLeft = '';
+  clearTimeout(idleTimer);
+  const card = document.getElementById('question-card');
+  card.classList.remove('fade-in');
+  void card.offsetWidth;
+  card.classList.add('fade-in');
+  setQuestionTitle(q.title);
+  document.getElementById('prompt').textContent = q.prompt;
+  renderQuestionContext(q.context);
+  const langBadge = document.getElementById('lang-badge');
+  langBadge.className = 'badge ' + q.lang;
+  langBadge.textContent = {sql: 'SQL', python: 'PYTHON', design: 'SYSTEM DESIGN', tradeoff: 'TRADEOFF', decomposition: 'FDE DECOMPOSITION'}[q.lang];
+
+  const isDesign = q.lang === 'design';
+  const isDecomposition = q.lang === 'decomposition';
+  const isTradeoff = q.lang === 'tradeoff';
+  const isDrill = isDesign || isDecomposition;
+  document.getElementById('editor-card').style.display = (isDrill || isTradeoff) ? 'none' : '';
+  document.getElementById('concept-box').style.display = (isDrill || isTradeoff) ? 'none' : '';
+  if (isDrill || isTradeoff) document.getElementById('concept-mapper').style.display = 'none';
+  if (isDrill || isTradeoff) document.getElementById('sample').style.display = 'none';
+  document.getElementById('results').style.display = (isDrill || isTradeoff) ? 'none' : '';
+  document.getElementById('design-canvas-card').style.display = isDrill ? 'flex' : 'none';
+  document.getElementById('wrapup-btn').style.display = isDrill ? '' : 'none';
+  document.getElementById('clarify-btn').style.display = isDesign ? '' : 'none';
+  document.getElementById('adversarial-btn').style.display = isDesign ? '' : 'none';
+  document.getElementById('incident-btn').style.display = isDesign ? '' : 'none';
+  document.getElementById('scaling-btn').style.display = isDesign ? '' : 'none';
+  document.getElementById('framework-btn').style.display = isDesign ? '' : 'none';
+  document.getElementById('replay-btn').style.display = isDrill ? '' : 'none';
+  document.getElementById('end-drill-btn').style.display = 'none';
+  document.getElementById('selfrate-panel').style.display = 'none';
+  document.getElementById('refdesign-btn').style.display = 'none';
+  resetTradeoffSpar();
+  document.getElementById('tradeoff-card').style.display = isTradeoff ? '' : 'none';
+  document.getElementById('chatpanel').style.display = isTradeoff ? 'none' : '';
+  clarifyMode = false;
+  adversarialMode = false;
+  adversarialFlaws = [];
+  scalingMode = false;
+  incidentMode = false;
+  stopFrameworkMode();
+
+  if (isTradeoff) {
+    document.getElementById('trace-box').style.display = 'none';
+    document.getElementById('debrief-row').style.display = 'none';
+    startTimerFor(id);
+    const cached = stateCache[id];
+    document.getElementById('tradeoff-input').value = (cached && cached.tradeoffInput) || '';
+    document.getElementById('tradeoff-feedback').outerHTML = (cached && cached.tradeoffFeedbackHTML) || '<div id="tradeoff-feedback"></div>';
+    resetIdleTimer();
+    return;
+  }
+
+  if (isDesign) {
+    document.getElementById('trace-box').style.display = 'none';
+    document.getElementById('debrief-row').style.display = 'none';
+    startTimerFor(id);
+    const cached = stateCache[id];
+    const chatlog = document.getElementById('chatlog');
+    shapes = cached && cached.shapes ? JSON.parse(JSON.stringify(cached.shapes)) : [];
+    selectedShapeId = null;
+    setCanvasTool('select');
+    if (cached) {
+      selectedPersona = cached.persona || '';
+      scalingMode = !!cached.scaling;
+      chatlog.innerHTML = cached.chatHTML;
+    } else {
+      selectedPersona = '';
+      scalingMode = false;
+      chatlog.innerHTML = '';
+      renderPersonaPicker('Pick an interviewer temperament to start:', PERSONA_OPTIONS, () => startInterview(id));
+    }
+    resetIdleTimer();
+    return;
+  }
+
+  if (isDecomposition) {
+    document.getElementById('trace-box').style.display = 'none';
+    document.getElementById('debrief-row').style.display = 'none';
+    startTimerFor(id);
+    const cached = stateCache[id];
+    if (cached) {
+      document.getElementById('chatlog').innerHTML = cached.chatHTML;
+    }
+    selectedArchetype = '';
+    // Remove any leftover archetype picker from a previous question
+    document.querySelectorAll('.archetype-picker').forEach(p => p.remove());
+    if (q.archetypes) {
+      const archetypeNames = Object.keys(q.archetypes);
+      const picker = document.createElement('div');
+      picker.className = 'archetype-picker';
+      picker.style.cssText = 'margin:8px 0; display:flex; gap:8px; align-items:center; flex-wrap:wrap;';
+      picker.innerHTML = '<span style="font-size:13px; font-weight:600;">Stakeholder style:</span>';
+      archetypeNames.forEach(key => {
+        const btn = document.createElement('button');
+        btn.className = 'btn btn-ghost';
+        btn.textContent = q.archetypes[key].label || key;
+        btn.style.cssText = 'font-size:12px; padding:4px 10px; border-radius:6px;';
+        btn.onclick = () => {
+          document.querySelectorAll('.archetype-btn').forEach(b => b.style.border = '');
+          btn.style.border = '2px solid var(--accent)';
+          selectedArchetype = key;
+        };
+        btn.className = 'btn btn-ghost archetype-btn';
+        picker.appendChild(btn);
+      });
+      // Default: standard (no archetype)
+      selectedArchetype = '';
+      document.getElementById('debrief-row').before(picker);
+      // Auto-start for comparison mode
+      if (__compareMode) {
+        const autoArchetype = __compareMode;
+        __compareMode = null;
+        selectedArchetype = autoArchetype;
+        setTimeout(() => requestInterview({question_id: id, decomposition: true, start: true}), 100);
+      }
+    }
+    resetIdleTimer();
+    return;
+  }
+
+  document.getElementById('editor-lang-label').textContent = q.lang === 'sql' ? 'SQL' : 'PYTHON';
+  document.getElementById('debug-menu').style.display = q.lang === 'python' ? '' : 'none';
+  renderSample(q);
+  renderConceptBox(q, isSolved(id));
+  loadTrace(id);
+  loadConceptMapper(id);
+  startTimerFor(id);
+  document.getElementById('twist-menu').disabled = !isSolved(id);
+  const reverseBtn = document.getElementById('reverse-menu');
+  reverseBtn.disabled = !isSolved(id);
+  const dryrunBtn = document.getElementById('dryrun-menu');
+  dryrunBtn.style.display = q.lang === 'python' ? '' : 'none';
+  dryrunBtn.disabled = !isSolved(id);
+  cm.setOption('mode', q.lang === 'sql' ? 'text/x-sql' : 'python');
+
+  const cached = stateCache[id];
+  const results = document.getElementById('results');
+  const planInput = document.getElementById('plan-input');
+  if (cached) {
+    cm.setValue(cached.code);
+    document.getElementById('chatlog').innerHTML = cached.chatHTML;
+    results.innerHTML = cached.resultsHTML;
+    results.className = cached.resultsClass;
+    lastRunSummary = cached.lastRunSummary;
+    stuck = cached.stuck;
+    nudgeSent = cached.nudgeSent;
+    reinforced = cached.reinforced;
+    planInput.value = cached.plan || '';
+    planApproved = !!cached.approved;
+    document.getElementById('plan-feedback').outerHTML = cached.feedbackHTML || '<div id="plan-feedback"></div>';
+    document.getElementById('complexity-input').value = cached.complexityInput || '';
+    document.getElementById('edge-input').value = cached.edgeInput || '';
+    document.getElementById('debrief-feedback').outerHTML = cached.debriefFeedbackHTML || '<div id="debrief-feedback"></div>';
+  } else {
+    cm.setValue(q.code || q.starter_code);
+    results.innerHTML = '';
+    results.className = '';
+    document.getElementById('chatlog').innerHTML = '';
+    lastRunSummary = '';
+    stuck = false;
+    nudgeSent = false;
+    reinforced = false;
+    pendingRecallReview = null;
+    const srb = document.getElementById('skip-review-btn');
+    if (srb) srb.style.display = 'none';
+    planInput.value = '';
+    planApproved = false;
+    document.getElementById('plan-feedback').outerHTML = '<div id="plan-feedback"></div>';
+    document.getElementById('complexity-input').value = '';
+    document.getElementById('edge-input').value = '';
+    document.getElementById('narration-input').value = '';
+    document.getElementById('debrief-feedback').outerHTML = '<div id="debrief-feedback"></div>';
+    document.getElementById('takeaways-box').style.display = 'none';
+  }
+  document.getElementById('debrief-row').style.display = isSolved(id) ? 'flex' : 'none';
+  document.getElementById('complexity-input').style.display = (q.lang === 'sql') ? 'none' : '';
+  narrationText = '';
+  canvasVoiceNote = false;
+  const toolMic = document.getElementById('tool-mic');
+  if (toolMic) toolMic.classList.remove('active');
+  document.getElementById('narration-readout').style.display = 'none';
+  closeSpotBug();
+  closeSqlClarify();
+  closeCurveball();
+  setEditorLocked(!planApproved);
+  onPlanInput();
+  resetIdleTimer();
+  } catch (e) { showToast('Could not open question: ' + e.message); }
+}
+
+function makeTable(columns, rows) {
+  const table = document.createElement('table');
+  table.className = 'datatable';
+  if (columns && columns.length) {
+    const thead = document.createElement('tr');
+    columns.forEach(c => { const th = document.createElement('th'); th.textContent = c; thead.appendChild(th); });
+    table.appendChild(thead);
+  }
+  (rows || []).forEach(r => {
+    const tr = document.createElement('tr');
+    r.forEach(v => { const td = document.createElement('td'); td.textContent = v === null ? 'NULL' : v; tr.appendChild(td); });
+    table.appendChild(tr);
+  });
+  return table;
+}
+
+function makeLabeled(label, node) {
+  const wrap = document.createElement('div');
+  const h = document.createElement('div');
+  h.className = 'tname';
+  h.textContent = label;
+  wrap.appendChild(h);
+  wrap.appendChild(node);
+  return wrap;
+}
+
+function renderSkeleton(skeletonHTML) {
+  const el = document.getElementById('trace-skeleton');
+  if (!el) return;
+  if (!skeletonHTML) { el.style.display = 'none'; return; }
+  el.style.display = 'block';
+  el.innerHTML = skeletonHTML;
+}
+
+function toggleTrace() {
+  const body = document.getElementById('trace-body');
+  const chev = document.querySelector('#trace-toggle .trace-chevron');
+  const open = body.style.display !== 'none';
+  body.style.display = open ? 'none' : 'block';
+  if (chev) chev.style.transform = open ? '' : 'rotate(90deg)';
+}
+
+let traceProgress = {}; // qid -> {pattern, skeleton, steps: [{q, a, status: 'open'|'correct'|'revealed', attempts, guess}]}
+
+function renderTraceSteps(qid) {
+  const box = document.getElementById('trace-box');
+  const stepsEl = document.getElementById('trace-steps');
+  const t = traceProgress[qid];
+  if (!t || !t.steps.length) { box.style.display = 'none'; return; }
+  box.style.display = 'block';
+  const sub = document.getElementById('trace-toggle-sub');
+  sub.textContent = t.pattern ? ` · ${t.pattern} · ${t.steps.length} steps` : ` · ${t.steps.length} steps`;
+  stepsEl.innerHTML = '';
+  let correctCount = 0;
+  t.steps.forEach((s, i) => {
+    const card = document.createElement('div');
+    card.style.cssText = 'background:var(--card-2);border:1px solid var(--border-soft);border-radius:8px;padding:10px 12px;';
+    const qP = document.createElement('div');
+    qP.style.cssText = 'color:var(--text);font-size:13px;line-height:1.5;margin-bottom:8px;';
+    qP.textContent = (i+1) + '. ' + s.q;
+    card.appendChild(qP);
+    if (s.status === 'correct' || s.status === 'revealed') {
+      if (s.status === 'correct') correctCount++;
+      const ansP = document.createElement('div');
+      const isCorrect = s.status === 'correct';
+      ansP.style.cssText = 'font-family:JetBrains Mono,monospace;font-size:13px;color:' + (isCorrect ? 'var(--success)' : 'var(--warn)') + ';';
+      ansP.textContent = (isCorrect ? '✓ ' : '→ ') + s.a;
+      card.appendChild(ansP);
+    } else {
+      const inp = document.createElement('input');
+      inp.type = 'text';
+      inp.className = 'trace-input';
+      inp.dataset.index = i;
+      inp.value = s.guess || '';
+      inp.placeholder = 'your code…';
+      inp.style.cssText = 'width:100%;background:var(--panel);border:1px solid var(--border);border-radius:6px;padding:7px 10px;font-family:JetBrains Mono,monospace;font-size:12.5px;color:var(--text);box-sizing:border-box;';
+      card.appendChild(inp);
+      if (s.attempts > 0) {
+        const tries = document.createElement('div');
+        const left = 3 - s.attempts;
+        tries.style.cssText = 'font-size:11px;color:var(--error);margin-top:5px;';
+        tries.textContent = 'Not quite — ' + left + ' ' + (left === 1 ? 'try' : 'tries') + ' left';
+        card.appendChild(tries);
+      }
+    }
+    stepsEl.appendChild(card);
+  });
+  const allDone = t.steps.every(s => s.status === 'correct' || s.status === 'revealed');
+  document.getElementById('trace-check-btn').style.display = allDone ? 'none' : '';
+  document.getElementById('trace-summary').textContent = correctCount + '/' + t.steps.length + ' correct' + (allDone ? ' — trace complete, now code it.' : '');
+}
+
+async function checkTrace() {
+  const qid = current.id;
+  const t = traceProgress[qid];
+  if (!t) return;
+  const answers = [];
+  document.querySelectorAll('#trace-steps .trace-input').forEach(inp => {
+    const i = parseInt(inp.dataset.index, 10);
+    const guess = inp.value.trim();
+    if (t.steps[i].status === 'open' && guess) {
+      t.steps[i].guess = guess;
+      answers.push({index: i, guess});
+    }
+  });
+  if (!answers.length) return;
+  const btn = document.getElementById('trace-check-btn');
+  const origLabel = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = 'Checking…';
+  try {
+    const res = await (await fetch('/api/trace-check', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({question_id: qid, answers})
+    })).json();
+    for (const r of (res.results || [])) {
+      const st = t.steps[r.index];
+      if (!st) continue;
+      if (r.correct) {
+        st.status = 'correct';
+      } else {
+        st.attempts += 1;
+        if (st.attempts >= 3) st.status = 'revealed';
+      }
+    }
+  } finally {
+    btn.disabled = false;
+    btn.textContent = origLabel;
+  }
+  renderTraceSteps(qid);
+}
+
+async function loadTrace(qid) {
+  if (traceProgress[qid]) { renderTraceSteps(qid); return; }
+  document.getElementById('trace-box').style.display = 'none';
+  const res = await (await fetch('/api/trace', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({question_id: qid, code: cm.getValue()})
+  })).json();
+  traceProgress[qid] = {
+    pattern: res.pattern || '',
+    skeleton: res.skeleton || '',
+    steps: (res.trace || []).map(s => ({q: s.q, a: s.a, status: 'open', attempts: 0, guess: ''}))
+  };
+  renderTraceSteps(qid);
+}
+
+async function loadConceptMapper(qid) {
+  const el = document.getElementById('concept-mapper');
+  const res = await (await fetch('/api/concept-map', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({question_id: qid})
+  })).json();
+  if (res.error) { el.style.display = 'none'; return; }
+  el.style.display = 'block';
+  const nodesEl = document.getElementById('concept-mapper-nodes');
+  const detailEl = document.getElementById('concept-mapper-detail');
+  const solved = isSolved(qid);
+  const activeCount = solved ? 5 : 3;
+  const visible = res.nodes.slice(0, activeCount);
+  nodesEl.innerHTML = visible.map((n, i) => {
+    const arrow = i < visible.length - 1 ? '<span class="cm-arrow">→</span>' : '';
+    return `<span class="cm-node active" data-idx="${i}">${n}</span>${arrow}`;
+  }).join('');
+  nodesEl.querySelectorAll('.cm-node').forEach(el => {
+    el.addEventListener('click', () => {
+      const idx = parseInt(el.dataset.idx, 10);
+      const prev = detailEl.dataset.activeIdx;
+      if (prev === String(idx)) { detailEl.style.display = 'none'; detailEl.dataset.activeIdx = ''; return; }
+      detailEl.dataset.activeIdx = idx;
+      const d = res.details[res.nodes[idx]];
+      if (!d) { detailEl.style.display = 'none'; return; }
+      detailEl.innerHTML = '';
+      const items = [
+        {label: 'Why', text: d.why},
+        {label: 'What if', text: d.what_if},
+        {label: 'Intuition', text: d.intuition},
+      ];
+      items.forEach(item => {
+        if (!item.text) return;
+        const row = document.createElement('div');
+        row.className = 'cm-detail-item';
+        row.innerHTML = `<span class="cm-detail-label">${item.label}:</span> <span class="cm-detail-text">${item.text}</span>`;
+        detailEl.appendChild(row);
+      });
+      detailEl.style.display = 'block';
+    });
+  });
+}
+
+function renderSample(q) {
+  const el = document.getElementById('sample');
+  el.innerHTML = '';
+  if (q.lang === 'sql' && q.sample_tables) {
+    el.style.display = 'block';
+    // Section: Schema & sample input
+    const schemaSec = document.createElement('div');
+    schemaSec.className = 'spec-section';
+    schemaSec.innerHTML = '<div class="spec-section-title">Schema &amp; sample input</div>';
+    const tablesWrap = document.createElement('div');
+    tablesWrap.className = 'spec-tables';
+    for (const [name, t] of Object.entries(q.sample_tables)) {
+      const block = document.createElement('div');
+      block.className = 'spec-table-block';
+      const tname = document.createElement('div');
+      tname.className = 'spec-tname';
+      tname.textContent = name;
+      block.appendChild(tname);
+      block.appendChild(makeTable(t.columns, t.rows));
+      tablesWrap.appendChild(block);
+    }
+    schemaSec.appendChild(tablesWrap);
+    el.appendChild(schemaSec);
+    // Section: Example result
+    if (q.sample_output) {
+      const exSec = document.createElement('div');
+      exSec.className = 'spec-section';
+      exSec.innerHTML = '<div class="spec-section-title">Example result</div>';
+      const card = document.createElement('div');
+      card.className = 'example-card';
+      const row = document.createElement('div');
+      row.className = 'example-row';
+      const out = document.createElement('div');
+      out.className = 'example-cell';
+      out.innerHTML = '<div class="example-label">returns</div>';
+      out.appendChild(makeTable(q.sample_output.columns, q.sample_output.rows));
+      row.appendChild(out);
+      card.appendChild(row);
+      exSec.appendChild(card);
+      el.appendChild(exSec);
+    }
+    addCaseCaption(el, q.num_cases);
+  } else if (q.sample_call) {
+    el.style.display = 'block';
+    const exSec = document.createElement('div');
+    exSec.className = 'spec-section';
+    exSec.innerHTML = '<div class="spec-section-title">Example</div>';
+    const card = document.createElement('div');
+    card.className = 'example-card';
+    const row = document.createElement('div');
+    row.className = 'example-row';
+    const inCell = document.createElement('div');
+    inCell.className = 'example-cell';
+    inCell.innerHTML = '<div class="example-label">call</div>';
+    const callCode = document.createElement('code');
+    callCode.textContent = q.sample_call;
+    inCell.appendChild(callCode);
+    const outCell = document.createElement('div');
+    outCell.className = 'example-cell';
+    outCell.innerHTML = '<div class="example-label">returns</div>';
+    const outCode = document.createElement('code');
+    outCode.textContent = (q.sample_output || '').trim();
+    outCell.appendChild(outCode);
+    row.appendChild(inCell);
+    row.appendChild(outCell);
+    card.appendChild(row);
+    exSec.appendChild(card);
+    el.appendChild(exSec);
+    addCaseCaption(el, q.num_cases);
+  } else {
+    el.style.display = 'none';
+  }
+}
+
+function addCaseCaption(el, numCases) {
+  if (!numCases || numCases < 1) return;
+  const cap = document.createElement('div');
+  cap.className = 'spec-caption';
+  const word = numCases === 1 ? 'test case' : 'test cases';
+  cap.innerHTML = `This example shows one sample. Your solution is verified against <b>${numCases} ${word}</b> — get them all right to pass.`;
+  el.appendChild(cap);
+}
+
+function renderQuestionContext(ctx) {
+  const box = document.getElementById('context-box');
+  if (!ctx || (!ctx.scenario && !ctx.why_asked && !(ctx.edge_cases || []).length)) {
+    box.style.display = 'none';
+    box.innerHTML = '';
+    return;
+  }
+  box.innerHTML = '';
+  if (ctx.scenario) {
+    const s = document.createElement('div');
+    s.className = 'ctx-scenario';
+    s.textContent = ctx.scenario;
+    box.appendChild(s);
+  }
+  if (ctx.why_asked) {
+    const w = document.createElement('div');
+    w.className = 'ctx-why';
+    w.innerHTML = `<span class="ctx-why-label">Why it's asked</span> ${ctx.why_asked}`;
+    box.appendChild(w);
+  }
+  if (ctx.edge_cases && ctx.edge_cases.length) {
+    const e = document.createElement('div');
+    e.className = 'ctx-edges';
+    e.innerHTML = '<span class="ctx-why-label">Watch for</span> ' +
+      ctx.edge_cases.map(x => `<span class="ctx-chip">${x}</span>`).join('');
+    box.appendChild(e);
+  }
+  box.style.display = 'block';
+}
+
+function addMsg(role, text) {
+  const log = document.getElementById('chatlog');
+  const d = document.createElement('div');
+  d.className = 'msg ' + (role === 'system' ? 'system' : role === 'user' ? 'me' : 'tutor');
+
+  if (role !== 'user' && role !== 'system') {
+    const avatar = document.createElement('span');
+    avatar.className = 'msg-avatar';
+    avatar.textContent = 'L↻';
+    d.appendChild(avatar);
+  }
+
+  const textSpan = document.createElement('span');
+  textSpan.className = 'msg-text';
+  textSpan.textContent = text;
+  d.appendChild(textSpan);
+
+  log.appendChild(d);
+  log.scrollTop = log.scrollHeight;
+  return d;
+}
+
+let debugSteps = [];
+let debugIdx = -1;
+let debugSource = [];
+
+async function startDebug() {
+  const btn = document.getElementById('debug-menu');
+  btn.disabled = true;
+  btn.innerHTML = '<svg class="icon" viewBox="0 0 24 24"><use href="#i-psy"/></svg>Debugging…';
+  const res = await (await fetch('/api/debug', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({question_id: current.id, code: cm.getValue()})
+  })).json();
+  btn.disabled = false;
+  btn.disabled = false;
+  btn.innerHTML = '<svg class="icon" viewBox="0 0 24 24"><use href="#i-psy"/></svg>Debug (step through)';
+  if (res.error) { showToast('Debug error: ' + res.error); return; }
+  debugSteps = res.steps || [];
+  debugSource = res.source || [];
+  if (!debugSteps.length) { showToast('No steps captured — check that your function is named solve() and has code in it.'); return; }
+  debugIdx = -1;
+  document.getElementById('debug-panel').style.display = '';
+  document.getElementById('results').innerHTML = '';
+  document.getElementById('results').className = '';
+  document.getElementById('run-btn').disabled = true;
+  document.getElementById('submit-btn').disabled = true;
+  renderDebugCode();
+  debugStep(1);
+}
+
+function renderDebugCode() {
+  const el = document.getElementById('debug-code');
+  el.innerHTML = debugSource.map((line, i) =>
+    `<div class="dl" data-line="${i + 1}"><span class="dl-num">${String(i + 1).padStart(2, ' ')}</span>${escapeHtml(line) || ' '}</div>`
+  ).join('');
+}
+
+function debugStep(dir) {
+  const newIdx = Math.max(0, Math.min(debugSteps.length - 1, debugIdx + dir));
+  if (newIdx === debugIdx) return;
+  debugIdx = newIdx;
+  const step = debugSteps[debugIdx];
+  const total = debugSteps.length;
+  document.getElementById('debug-counter').textContent = `Step ${debugIdx + 1} / ${total}`;
+  document.getElementById('debug-prev').disabled = debugIdx === 0;
+  document.getElementById('debug-next').disabled = debugIdx >= total - 1;
+  document.getElementById('debug-run-all').disabled = debugIdx >= total - 1;
+
+  document.querySelectorAll('#debug-code .dl').forEach(el => el.classList.remove('active'));
+  const lineEl = document.querySelector(`#debug-code .dl[data-line="${step.line}"]`);
+  if (lineEl) lineEl.classList.add('active');
+
+  const varsEl = document.getElementById('debug-vars-table');
+  const locals = step.locals || {};
+  const keys = Object.keys(locals);
+  if (!keys.length) {
+    varsEl.innerHTML = '<div class="dv-empty">(no local variables yet)</div>';
+  } else {
+    varsEl.innerHTML = keys.map(k =>
+      `<div class="dv-row"><span class="dv-name">${escapeHtml(k)}</span><span class="dv-val">= ${escapeHtml(locals[k])}</span></div>`
+    ).join('');
+  }
+}
+
+function debugRunAll() {
+  debugIdx = debugSteps.length - 1;
+  const step = debugSteps[debugIdx];
+  document.getElementById('debug-counter').textContent = `Step ${debugIdx + 1} / ${debugSteps.length}`;
+  document.getElementById('debug-prev').disabled = false;
+  document.getElementById('debug-next').disabled = true;
+  document.getElementById('debug-run-all').disabled = true;
+  document.querySelectorAll('#debug-code .dl').forEach(el => el.classList.remove('active'));
+  const lineEl = document.querySelector(`#debug-code .dl[data-line="${step.line}"]`);
+  if (lineEl) lineEl.classList.add('active');
+  const varsEl = document.getElementById('debug-vars-table');
+  const last = debugSteps[debugIdx];
+  const locals = last.locals || {};
+  const keys = Object.keys(locals);
+  varsEl.innerHTML = keys.length
+    ? keys.map(k => `<div class="dv-row"><span class="dv-name">${escapeHtml(k)}</span><span class="dv-val">= ${escapeHtml(locals[k])}</span></div>`).join('')
+    : '<div class="dv-empty">(no local variables)</div>';
+}
+
+function closeDebug() {
+  document.getElementById('debug-panel').style.display = 'none';
+  document.getElementById('run-btn').disabled = false;
+  document.getElementById('submit-btn').disabled = false;
+  debugSteps = [];
+  debugIdx = -1;
+}
+
+async function showDiff(qid) {
+  const overlay = document.getElementById('diff-overlay');
+  overlay.style.display = '';
+  document.getElementById('diff-user-lines').textContent = 'Loading…';
+  document.getElementById('diff-solution-lines').textContent = 'Loading…';
+  document.getElementById('diff-context-bar').textContent = '';
+  const res = await (await fetch('/api/diff', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({question_id: qid, code: cm.getValue()})
+  })).json();
+  if (res.error) { document.getElementById('diff-user-lines').textContent = 'Error: ' + res.error; return; }
+  const diff = res.diff || [];
+  let userHtml = '', solHtml = '', contextBar = null;
+  diff.forEach((entry, i) => {
+    const num = i + 1;
+    const uMod = entry.context ? ' diff-remove' : '';
+    const sMod = entry.context ? ' diff-add' : '';
+    userHtml += `<div class="diff-line${uMod}"><span class="diff-line-num">${num}</span><span class="diff-line-code">${escapeHtml(entry.user)}</span></div>`;
+    solHtml += `<div class="diff-line${sMod}"><span class="diff-line-num">${num}</span><span class="diff-line-code">${escapeHtml(entry.solution)}</span></div>`;
+    if (entry.context) {
+      if (!contextBar) contextBar = '';
+      contextBar += `<div class="diff-context-msg">💡 ${escapeHtml(entry.context)}</div>`;
+    }
+  });
+  document.getElementById('diff-user-lines').innerHTML = userHtml;
+  document.getElementById('diff-solution-lines').innerHTML = solHtml;
+  document.getElementById('diff-context-bar').innerHTML = contextBar || '<span style="color:var(--text-faint);">No significant differences found.</span>';
+}
+
+function closeDiff() {
+  document.getElementById('diff-overlay').style.display = 'none';
+}
+
+async function runSample() {
+  const res = await (await fetch('/api/run', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({question_id: current.id, code: cm.getValue()})
+  })).json();
+  const el = document.getElementById('results');
+  el.innerHTML = '';
+  el.className = (res.passed ? 'pass' : 'fail') + ' sample';
+
+  const header = document.createElement('div');
+  header.className = 'result-banner';
+  const icon = document.createElement('span');
+  icon.className = 'result-icon';
+  icon.textContent = res.passed ? '✓' : '✕';
+  const label = document.createElement('span');
+  label.textContent = res.passed
+    ? 'Sample matches'
+    : 'Sample doesn’t match' + (res.error ? ` — error: ${res.error}` : '');
+  header.appendChild(icon);
+  header.appendChild(label);
+  el.appendChild(header);
+
+  const body = document.createElement('div');
+  body.className = 'result-body';
+  if (current.lang === 'sql') {
+    body.appendChild(makeLabeled(res.passed ? 'output' : 'actual', makeTable(res.actual_columns, res.actual)));
+    if (!res.passed && !res.error) body.appendChild(makeLabeled('expected', makeTable(res.expected_columns, res.expected)));
+  } else {
+    const actualPre = document.createElement('pre'); actualPre.textContent = res.actual;
+    body.appendChild(makeLabeled(res.passed ? 'output' : 'your output', actualPre));
+    if (!res.passed && !res.error) {
+      const expectedPre = document.createElement('pre'); expectedPre.textContent = res.expected;
+      body.appendChild(makeLabeled('expected output', expectedPre));
+    }
+  }
+  el.appendChild(body);
+}
+
+async function submitCode() {
+  const res = await (await fetch('/api/submit', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({question_id: current.id, code: cm.getValue()})
+  })).json();
+  const el = document.getElementById('results');
+  el.innerHTML = '';
+  el.className = res.passed ? 'pass' : 'fail';
+
+  const header = document.createElement('div');
+  header.className = 'result-banner';
+  const icon = document.createElement('span');
+  icon.className = 'result-icon';
+  icon.textContent = res.passed ? '✓' : '✕';
+  const label = document.createElement('span');
+  label.textContent = res.passed
+    ? `PASS — ${res.total_cases}/${res.total_cases} cases`
+    : `FAIL on case ${res.case}/${res.total_cases}` + (res.error ? ` — error: ${res.error}` : '');
+  header.appendChild(icon);
+  header.appendChild(label);
+  el.appendChild(header);
+
+  const body = document.createElement('div');
+  body.className = 'result-body';
+  if (res.passed) {
+    if (current.lang === 'sql') {
+      body.appendChild(makeLabeled('output', makeTable(res.actual_columns, res.actual)));
+    } else {
+      const outPre = document.createElement('pre'); outPre.textContent = res.actual;
+      body.appendChild(makeLabeled('output', outPre));
+    }
+    markSolved(current.id);
+    stopTimer(current.id);
+    renderConceptBox(current, true);
+    document.getElementById('twist-menu').disabled = false;
+    if (current.lang === 'python') document.getElementById('dryrun-menu').disabled = false;
+    document.getElementById('debrief-row').style.display = 'flex';
+  } else if (!res.error) {
+    if (current.lang === 'sql') {
+      body.appendChild(makeLabeled('actual', makeTable(res.actual_columns, res.actual)));
+      body.appendChild(makeLabeled('expected', makeTable(res.expected_columns, res.expected)));
+    } else {
+      const actualPre = document.createElement('pre'); actualPre.textContent = res.actual;
+      const expectedPre = document.createElement('pre'); expectedPre.textContent = res.expected;
+      body.appendChild(makeLabeled('your output', actualPre));
+      body.appendChild(makeLabeled('expected output', expectedPre));
+    }
+    const diffBtn = document.createElement('button');
+    diffBtn.className = 'btn btn-ghost';
+    diffBtn.textContent = '📊 Show diff';
+    diffBtn.onclick = () => showDiff(current.id);
+    diffBtn.style.marginTop = '8px';
+    body.appendChild(diffBtn);
+  }
+  if (body.childNodes.length) el.appendChild(body);
+
+  lastRunSummary = el.textContent;
+  stuck = !res.passed;
+  nudgeSent = false;
+  if (res.passed && !reinforced) {
+    reinforced = true;
+    requestHint({question_id: current.id, code: cm.getValue(), actual: lastRunSummary, reinforce: true});
+    // Option C: hold the review until the candidate answers the recall question,
+    // then tailor it to what they said. Don't fire it unprompted.
+    pendingRecallReview = {qid: current.id, code: cm.getValue()};
+    document.getElementById('skip-review-btn').style.display = '';
+  }
+  resetIdleTimer();
+}
+
+async function requestHint(body) {
+  const placeholder = addMsg('tutor', 'thinking…');
+  const textEl = placeholder.querySelector('.msg-text');
+  try {
+    const r = await fetch('/api/hint', {
+      method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)
+    });
+    const res = await r.json();
+    if (!r.ok || res.error) {
+      placeholder.className += ' err';
+      textEl.textContent = 'error: ' + (res.error || r.status);
+    } else {
+      textEl.textContent = res.hint;
+    }
+  } catch (e) {
+    placeholder.className += ' err';
+    textEl.textContent = 'error: ' + e.message;
+  }
+}
+
+async function requestCoach(body) {
+  try {
+    const r = await fetch('/api/coach', {
+      method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)
+    });
+    const res = await r.json();
+    if (res.hint) showCoachPill(res.hint);
+  } catch (_) {}
+}
+
+let coachPillTimer = null;
+
+function showCoachPill(text) {
+  const existing = document.getElementById('coach-pill');
+  if (existing) existing.remove();
+  if (coachPillTimer) clearTimeout(coachPillTimer);
+  const pill = document.createElement('div');
+  pill.id = 'coach-pill';
+  pill.style.cssText = 'background:#fef3c7; border:1px solid #f59e0b; border-radius:8px; padding:6px 12px; margin:4px 0; font-size:12px; color:#92400e; display:flex; align-items:center; gap:6px; animation:fadeIn .3s;';
+  pill.innerHTML = '<span style="font-size:14px;">💡</span> <span>' + text + '</span>';
+  const input = document.getElementById('chatinput');
+  if (input) input.parentNode.insertBefore(pill, input);
+  coachPillTimer = setTimeout(() => { if (pill.parentNode) pill.remove(); }, 8000);
+}
+
+function startComparison(archetype) {
+  const chatlog = document.getElementById('chatlog');
+  const j = window.__lastJudge;
+  __compareData = {
+    label: current.archetypes[selectedArchetype]?.label || 'Standard',
+    chatHTML: chatlog.innerHTML,
+    band: j?.band || '',
+    score: j?.normalized_score || 0,
+    dimScores: (j?.dimensions || []).map(d => ({id: d.id, score: d.score})),
+  };
+  __compareMode = archetype;
+  selectedArchetype = archetype;
+  loadQuestion(current.id, true);
+}
+
+function applyComparisonMode() {
+  if (__compareMode) {
+    const html = document.getElementById('chatlog').innerHTML;
+    document.getElementById('chatlog').innerHTML = '';
+    const cmp = document.createElement('div');
+    cmp.style.cssText = 'display:flex; gap:12px;';
+    const left = document.createElement('div');
+    left.style.cssText = 'flex:1; border:1px solid #e5e7eb; border-radius:8px; padding:8px; overflow:auto; max-height:70vh;';
+    left.innerHTML = '<div style="font-size:11px; font-weight:600; color:#6b7280; margin-bottom:6px;">' + __compareData.label + '</div>';
+    left.innerHTML += '<div style="font-size:11px; color:#374151;">' + __compareData.chatHTML + '</div>';
+    const right = document.createElement('div');
+    right.style.cssText = 'flex:1; border:2px solid #c4b5fd; border-radius:8px; padding:8px; overflow:auto; max-height:70vh;';
+    right.innerHTML = '<div style="font-size:11px; font-weight:600; color:#6b7280; margin-bottom:6px;">' + (current.archetypes?.[__compareMode]?.label || __compareMode) + '</div>';
+    right.innerHTML += '<div style="font-size:11px; color:#374151;">' + html + '</div>';
+    cmp.appendChild(left);
+    cmp.appendChild(right);
+    document.getElementById('chatlog').appendChild(cmp);
+    __compareMode = null;
+  }
+}
+
+const BAND_LABELS = {strong_hire: 'Strong Hire', hire: 'Hire', borderline: 'Borderline', no_hire: 'No Hire', strong_no_hire: 'Strong No Hire'};
+const BAND_COLORS = {strong_hire: '#16a34a', hire: '#ca8a04', borderline: '#ea580c', no_hire: '#dc2626', strong_no_hire: '#991b1b'};
+
+function renderComparison() {
+  const log = document.getElementById('chatlog');
+  const html1 = __compareData.chatHTML;
+  const html2 = window.__compareData2.chatHTML;
+  const d1 = __compareData;
+  const d2 = window.__compareData2;
+  log.innerHTML = '';
+  const wrap = document.createElement('div');
+  wrap.style.cssText = 'display:flex; flex-direction:column; gap:16px;';
+
+  // Score comparison header
+  const header = document.createElement('div');
+  header.style.cssText = 'display:flex; gap:16px;';
+  const scoreCard = (data, color) => {
+    const c = document.createElement('div');
+    c.style.cssText = 'flex:1; border:2px solid ' + color + '; border-radius:8px; padding:10px;';
+    c.innerHTML = '<div style="font-weight:700; font-size:14px; margin-bottom:4px;">' + data.label + '</div>'
+      + '<div style="font-size:12px; color:' + (BAND_COLORS[data.band] || '#333') + '; font-weight:600;">' + (BAND_LABELS[data.band] || data.band) + ' — ' + data.score.toFixed(2) + '/5.0</div>';
+    return c;
+  };
+  header.appendChild(scoreCard(d1, '#e5e7eb'));
+  header.appendChild(scoreCard(d2, '#c4b5fd'));
+  wrap.appendChild(header);
+
+  // Dimension comparison
+  if (d1.dimScores?.length && d2.dimScores?.length) {
+    const dims = document.createElement('div');
+    dims.style.cssText = 'display:flex; gap:16px;';
+    const dimCol = (data, border) => {
+      const c = document.createElement('div');
+      c.style.cssText = 'flex:1; border:1px solid ' + border + '; border-radius:8px; padding:8px; font-size:12px;';
+      c.innerHTML = data.dimScores.map(d => '<div style="margin:2px 0;"><strong>' + d.id + ':</strong> ' + (d.score ?? '-') + '/5</div>').join('');
+      return c;
+    };
+    dims.appendChild(dimCol(d1, '#e5e7eb'));
+    dims.appendChild(dimCol(d2, '#c4b5fd'));
+    wrap.appendChild(dims);
+  }
+
+  // Transcript comparison
+  const trans = document.createElement('div');
+  trans.style.cssText = 'display:flex; gap:12px;';
+  const pane = (html, border) => {
+    const p = document.createElement('div');
+    p.style.cssText = 'flex:1; border:1px solid ' + border + '; border-radius:8px; padding:8px; overflow:auto; max-height:60vh; font-size:11px;';
+    p.innerHTML = html;
+    return p;
+  };
+  trans.appendChild(pane(html1, '#e5e7eb'));
+  trans.appendChild(pane(html2, '#c4b5fd'));
+  wrap.appendChild(trans);
+
+  log.appendChild(wrap);
+  __compareData = null;
+  window.__compareData2 = null;
+}
+
+// Calibration mode: compare the candidate's scored dimensions against a known-good
+// ("gold") transcript's expected ranges, so they see the gap dimension by dimension.
+function showCalibration(userJudge) {
+  fetch('/api/calibration', {method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({question_id: current.id})})
+    .then(r => r.ok ? r.json() : Promise.reject())
+    .then(data => renderCalibration(data, userJudge))
+    .catch(() => alert('No calibration transcript available for this scenario yet.'));
+}
+
+function renderCalibration(data, userJudge) {
+  const userDims = {};
+  (userJudge.dimensions || []).forEach(d => { userDims[d.id] = d.score; });
+  const allIds = Object.keys(data.dimensions);
+  const gold = data.golds[0]; // default to first gold; user can switch below
+
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed; inset:0; background:rgba(15,18,25,.55); z-index:50; display:flex; align-items:center; justify-content:center; padding:20px;';
+  const panel = document.createElement('div');
+  panel.style.cssText = 'background:#fff; border-radius:12px; max-width:760px; width:100%; max-height:88vh; overflow:auto; padding:18px 20px; font-size:13px; color:#111; box-shadow:0 20px 60px rgba(0,0,0,.3);';
+  document.body.appendChild(overlay);
+  overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+
+  function draw(g) {
+    const asserts = g.dimension_assertions || {};
+    const rows = allIds.map(id => {
+      const meta = data.dimensions[id] || {};
+      const userScore = userDims[id];
+      const a = asserts[id] || {};
+      const lo = a.min, hi = a.max;
+      let status = '', color = '#666';
+      if (userScore == null) { status = 'not scored'; color = '#999'; }
+      else if (lo != null && hi != null) {
+        if (userScore < lo) { status = 'below gold min (' + lo + ')'; color = '#dc2626'; }
+        else if (userScore > hi) { status = 'above gold max (' + hi + ')'; color = '#16a34a'; }
+        else { status = 'within gold range'; color = '#16a34a'; }
+      }
+      const bar = (lo != null && hi != null)
+        ? '<span style="display:inline-block; min-width:120px; height:8px; background:#eee; border-radius:4px; position:relative; vertical-align:middle;">'
+          + '<span style="position:absolute; left:' + ((lo-1)/4*100) + '%; width:' + ((hi-lo)/4*100) + '%; background:#c4b5fd; height:100%; border-radius:4px;"></span>'
+          + '<span style="position:absolute; left:' + ((userScore!=null?(userScore-1):0)/4*100) + '%; width:2px; background:' + color + '; height:14px; top:-3px;"></span></span>'
+        : '';
+      return '<div style="display:flex; align-items:center; gap:10px; padding:5px 0; border-bottom:1px solid #f0f0f0;">'
+        + '<div style="width:42px; font-weight:700;">' + id + '</div>'
+        + '<div style="flex:1;">' + (meta.name || '') + '<div style="color:' + color + '; font-size:11px;">' + (status || 'no gold target') + '</div></div>'
+        + '<div style="width:60px; text-align:right; font-weight:700;">' + (userScore != null ? userScore.toFixed(1) : '-') + '/5</div>'
+        + '<div style="width:130px;">' + bar + '</div></div>';
+    }).join('');
+
+    const rf = (g.red_flags_must_not_contain || []).map(f => '<span style="color:#dc2626;">must NOT contain: ' + f + '</span>').join(' · ');
+    panel.innerHTML =
+      '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">'
+      + '<div style="font-weight:700; font-size:16px;">🎯 Calibrate vs gold — ' + (g.band || 'gold') + '</div>'
+      + '<button id="cal-close" style="border:none; background:none; font-size:18px; cursor:pointer;">✕</button></div>'
+      + '<div style="color:#555; font-size:12px; margin-bottom:10px; background:#f7f5ff; border:1px solid #e9e3ff; border-radius:6px; padding:8px;">' + (g.note || '') + '</div>'
+      + '<div style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:10px;">' + data.golds.map((gg, i) =>
+          '<button data-i="' + i + '" class="cal-pick btn btn-ghost" style="font-size:12px; padding:4px 10px; border-radius:6px; ' + (gg === g ? 'border:2px solid #7c6cf6;' : '') + '">' + (gg.band || gg.file) + '</button>').join('') + '</div>'
+      + '<div style="font-weight:600; margin-bottom:4px;">Your score vs gold target (purple band = gold range, bar = you)</div>'
+      + rows
+      + (rf ? '<div style="margin-top:10px; font-size:11px;">' + rf + '</div>' : '')
+      + '<div style="margin-top:12px; font-size:11px; color:#777;">Gold ranges are from pre-scored reference transcripts. Use them to calibrate your read of the rubric, not as absolute pass marks.</div>';
+    panel.querySelector('#cal-close').onclick = () => overlay.remove();
+    panel.querySelectorAll('.cal-pick').forEach(b => b.onclick = () => draw(data.golds[+b.dataset.i]));
+  }
+  draw(gold);
+}
+
+function askHint() {
+  addMsg('system', 'Hint requested');
+  requestHint({question_id: current.id, code: cm.getValue(), actual: lastRunSummary, use_web: useWebAngle});
+  nudgeSent = true;
+  resetIdleTimer();
+}
+
+function askTwist() {
+  addMsg('system', 'Asked for a twist');
+  requestHint({question_id: current.id, code: cm.getValue(), actual: lastRunSummary, twist: true});
+  resetIdleTimer();
+}
+
+function askDryRun() {
+  addMsg('system', 'Asked for a dry run');
+  requestHint({question_id: current.id, code: cm.getValue(), actual: lastRunSummary, dry_run: true});
+  resetIdleTimer();
+}
+
+async function loadReview(qid, code, recallAnswer) {
+  const placeholder = addMsg('tutor', 'reviewing your solution…');
+  const textEl = placeholder.querySelector('.msg-text');
+  try {
+    const r = await fetch('/api/review', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({question_id: qid, code, recall_answer: recallAnswer || ''})
+    });
+    const res = await r.json();
+    if (!r.ok || res.error) {
+      placeholder.className += ' err';
+      textEl.textContent = 'error: ' + (res.error || r.status);
+    } else {
+      textEl.innerHTML = renderReviewCards(res.review_sections || {});
+    }
+  } catch (e) {
+    placeholder.className += ' err';
+    textEl.textContent = 'error: ' + e.message;
+  }
+}
+
+const REVIEW_CARD_META = {
+  recall: {icon: '🧠', title: 'Your recall', className: 'recall-card'},
+  readability: {icon: '✍️', title: 'Readability', className: ''},
+  edge_cases: {icon: '⚠️', title: 'Edge cases', className: ''},
+  followup: {icon: '🔁', title: 'Follow-up twist', className: ''},
+  alternate: {icon: '🔀', title: 'Alternate approach', className: ''},
+};
+
+function renderReviewCards(sections) {
+  const order = ['recall', 'readability', 'edge_cases', 'followup', 'alternate'];
+  const cards = order
+    .filter(k => sections[k] && String(sections[k]).trim())
+    .map(k => {
+      const m = REVIEW_CARD_META[k];
+      return `<div class="review-card ${m.className}">
+        <div class="review-card-title">${m.icon} ${m.title}</div>
+        <div class="review-card-body">${escapeHtml(sections[k])}</div>
+      </div>`;
+    });
+  if (!cards.length) return '🔍 (nothing notable to review)';
+  return `<div class="review-cards">${cards.join('')}</div>`;
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  }[c]));
+}
+
+function sendMessage() {
+  const box = document.getElementById('chatbox');
+  const text = box.value.trim();
+  if (!text) return;
+  box.value = '';
+  addMsg('user', text);
+  if (current.lang === 'design') {
+    requestInterview({question_id: current.id, message: text, requirements_only: clarifyMode});
+    armPacingNudge();
+  } else if (current.lang === 'decomposition') {
+    requestInterview({question_id: current.id, message: text});
+    // Fire co-pilot in parallel — no extra LLM cost, just pattern matching
+    setTimeout(() => requestCoach({question_id: current.id, message: text, turn: document.querySelectorAll('.msg-user').length}), 100);
+  } else {
+    requestHint({question_id: current.id, code: cm.getValue(), actual: lastRunSummary, message: text});
+    if (sqlClarifyMode) {
+      sqlClarifyAsked++;
+      renderSqlClarifyGate();
+    }
+  }
+  // Option C: the candidate just answered the recall question — now give the
+  // tailored review that references what they said, then clear the pending flag.
+  if (pendingRecallReview) {
+    const pr = pendingRecallReview;
+    pendingRecallReview = null;
+    document.getElementById('skip-review-btn').style.display = 'none';
+    loadReview(pr.qid, pr.code, text);
+  }
+  nudgeSent = true;
+  resetIdleTimer();
+}
+
+function skipToReview() {
+  if (!pendingRecallReview) return;
+  const pr = pendingRecallReview;
+  pendingRecallReview = null;
+  document.getElementById('skip-review-btn').style.display = 'none';
+  loadReview(pr.qid, pr.code, '');
+}
+
+function renderDebriefChecklist(textEl, missed, taxonomy, selfRated) {
+  const wrap = document.createElement('div');
+  wrap.className = 'debrief-checklist';
+  taxonomy.forEach(concept => {
+    const wasMissed = missed.includes(concept);
+    const selfFlagged = selfRated.includes(concept);
+    let icon, note;
+    if (wasMissed && selfFlagged) { icon = '🟡'; note = 'missed — you caught it'; }
+    else if (wasMissed && !selfFlagged) { icon = '❌'; note = 'missed — blind spot'; }
+    else if (!wasMissed && selfFlagged) { icon = '⚠️'; note = 'you flagged this but it was actually fine'; }
+    else { icon = '✅'; note = 'covered'; }
+    const row = document.createElement('div');
+    row.className = 'checklist-row';
+    row.textContent = `${icon} ${concept.replace(/_/g, ' ')} — ${note}`;
+    wrap.appendChild(row);
+  });
+  textEl.appendChild(wrap);
+}
+
+function renderCommunicationScore(textEl, score, note) {
+  if (!score) return;
+  const row = document.createElement('div');
+  row.className = 'checklist-row';
+  row.style.marginTop = '6px';
+  row.textContent = `🗣 Pacing & communication: ${score}/5 — ${note}`;
+  textEl.appendChild(row);
+}
+
+const VERDICT_ICONS = {'Strong Hire': '🟢', 'Hire': '🟡', 'No Hire': '🔴'};
+const RUBRIC_PHASE_COLORS = ['#3b82f6', '#8b5cf6', '#06b6d4', '#f97316', '#10b981', '#ec4899'];
+
+function renderRubricBreakdown(textEl, rubric, scores, verdict, retroQuestions) {
+  const wrap = document.createElement('div');
+  wrap.className = 'rubric-breakdown';
+  const phaseMaxes = rubric.phases.map(p => p.max);
+  let totalScore = 0, totalMax = 0;
+  rubric.phases.forEach((phase, i) => {
+    const score = scores[`phase${i+1}`];
+    if (score === undefined) return;
+    totalScore += score;
+    totalMax += phase.max;
+    const pct = Math.round(100 * score / phase.max);
+    const color = RUBRIC_PHASE_COLORS[i % RUBRIC_PHASE_COLORS.length];
+    const phaseDiv = document.createElement('div');
+    phaseDiv.className = 'rubric-phase';
+    phaseDiv.innerHTML = `
+      <div class="rubric-phase-header">
+        <span>${phase.name}</span>
+        <span>${score}/${phase.max} (${pct}%)</span>
+      </div>
+      <div class="rubric-bar-bg"><div class="rubric-bar-fill" style="width:${pct}%;background:${color};"></div></div>
+      <div class="rubric-phase-items" style="display:none;">
+        ${phase.items.map(item => {
+          let dotClass = 'na';
+          const itemPct = score / phase.max;
+          if (itemPct >= 0.8) dotClass = 'done';
+          else if (itemPct >= 0.4) dotClass = 'partial';
+          else dotClass = 'missed';
+          return `<div class="rubric-phase-item"><span class="item-dot ${dotClass}"></span>${item.desc}</div>`;
+        }).join('')}
+      </div>`;
+    phaseDiv.querySelector('.rubric-phase-header').onclick = () => {
+      const items = phaseDiv.querySelector('.rubric-phase-items');
+      items.style.display = items.style.display === 'none' ? '' : 'none';
+    };
+    wrap.appendChild(phaseDiv);
+  });
+  const totalPct = totalMax > 0 ? Math.round(100 * totalScore / totalMax) : 0;
+  const totalDiv = document.createElement('div');
+  totalDiv.className = 'rubric-total';
+  totalDiv.textContent = `Total: ${totalScore}/${totalMax} (${totalPct}%)`;
+  wrap.appendChild(totalDiv);
+  const verdictIcon = VERDICT_ICONS[verdict] || '';
+  const verdictDiv = document.createElement('div');
+  verdictDiv.className = 'rubric-verdict';
+  verdictDiv.textContent = `${verdictIcon} ${verdict}`;
+  wrap.appendChild(verdictDiv);
+  if (retroQuestions && retroQuestions.length) {
+    const retroDiv = document.createElement('div');
+    retroDiv.className = 'rubric-retro';
+    retroDiv.innerHTML = '<h4>Post-interview retro</h4>';
+    retroQuestions.forEach((r, i) => {
+      const row = document.createElement('div');
+      row.className = 'rubric-retro-item';
+      row.textContent = `${i+1}. ${r.q} — ${r.why}`;
+      retroDiv.appendChild(row);
+    });
+    wrap.appendChild(retroDiv);
+  }
+  textEl.appendChild(wrap);
+}
+
+function renderVerdict(textEl, verdict) {
+  if (!verdict) return;
+  const row = document.createElement('div');
+  row.className = 'checklist-row';
+  row.style.cssText = 'margin-top:6px; font-weight:600;';
+  row.textContent = `${VERDICT_ICONS[verdict] || ''} Read: ${verdict}`;
+  textEl.appendChild(row);
+}
+
+async function requestInterview(body) {
+  const placeholder = addMsg('tutor', 'thinking…');
+  const textEl = placeholder.querySelector('.msg-text');
+  try {
+    const r = await fetch('/api/interview', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({...body, diagram: clarifyMode ? '' : serializeCanvasForLLM(), persona: selectedPersona,
+                             archetype: selectedArchetype || undefined,
+                             adversarial: adversarialMode, flaws: adversarialFlaws, scaling: scalingMode || undefined,
+                             incident: incidentMode, incident_scenario: incidentScenario || undefined,
+                             decomposition: current && current.lang === 'decomposition' || undefined})
+    });
+    const res = await r.json();
+    if (!r.ok || res.error) {
+      placeholder.className += ' err';
+      textEl.textContent = 'error: ' + (res.error || r.status);
+    } else {
+      textEl.textContent = res.reply;
+      if (res.wrap_up && res.incident) {
+        const incidentEl = document.createElement('div');
+        incidentEl.className = 'debrief-checklist';
+        incidentEl.innerHTML = `
+          <div class="checklist-row">🔥 Incident score: ${res.incident_score || '?'}/5</div>
+          <div class="checklist-row">${res.triage_ok ? '✅' : '❌'} Triage: ${res.triage_ok ? 'checked blast radius / logs first' : 'did not triage properly'}</div>
+          <div class="checklist-row">${res.fix_choice_ok ? '✅' : '❌'} Fix: ${res.fix_choice_ok ? 'chose right fix (stabilize, not rebuild)' : 'fix choice was off'}</div>
+          <div class="checklist-row">${res.communication_ok ? '✅' : '❌'} Communication: ${res.communication_ok ? 'kept stakeholders informed' : 'did not communicate effectively'}</div>`;
+        textEl.appendChild(incidentEl);
+      }
+      if (res.wrap_up && res.decomposition) {
+        const j = res.judge;
+        window.__lastJudge = j;
+        if (j) {
+          // Red flags
+          if (j.red_flags && j.red_flags.length) {
+            j.red_flags.forEach(f => {
+              const el = document.createElement('div');
+              el.style.cssText = 'background:#fef2f2; border:1px solid #fca5a5; border-radius:6px; padding:8px 10px; margin-bottom:8px; color:#991b1b; font-size:13px; font-weight:600;';
+              const label = f.flag === 'rushed_to_solution' ? 'Rushed to solution' : f.flag;
+              el.textContent = '🚩 ' + label + (f.detail ? ': ' + f.detail : '');
+              textEl.appendChild(el);
+            });
+          }
+          // Band
+          const BAND_LABELS = {strong_hire: 'Strong Hire', hire: 'Hire', borderline: 'Borderline', no_hire: 'No Hire', strong_no_hire: 'Strong No Hire'};
+          const BAND_COLORS = {strong_hire: '#16a34a', hire: '#ca8a04', borderline: '#ea580c', no_hire: '#dc2626', strong_no_hire: '#991b1b'};
+          if (j.band) {
+            const bandEl = document.createElement('div');
+            bandEl.className = 'checklist-row';
+            bandEl.style.cssText = 'margin-top:6px; font-weight:700; font-size:15px; color:' + (BAND_COLORS[j.band] || '#333') + ';';
+            let capNote = j.band_capped_by_disqualifier ? ' (capped by disqualifier)' : '';
+            bandEl.textContent = (BAND_LABELS[j.band] || j.band) + capNote + ' — ' + (j.normalized_score ? j.normalized_score.toFixed(2) : '?') + '/5.0';
+            textEl.appendChild(bandEl);
+            if (j.low_coverage) {
+              const wEl = document.createElement('div');
+              wEl.style.cssText = 'color:#888; font-size:12px; margin-top:2px;';
+              wEl.textContent = '⚠ Low coverage — fewer than 5 dimensions were scorable. Score is advisory.';
+              textEl.appendChild(wEl);
+            }
+          }
+          // Dimensions
+          if (j.dimensions && j.dimensions.length) {
+            const dimWrap = document.createElement('div');
+            dimWrap.className = 'debrief-checklist';
+            dimWrap.innerHTML = '<div style="font-weight:600; margin-bottom:4px;">Judge Rubric</div>';
+            j.dimensions.forEach(d => {
+              const sc = d.score != null ? d.score + '/5' : 'N/A';
+              const wt = ' (×' + d.weight + ')';
+              const rt = d.response_type ? ' [' + d.response_type + ']' : '';
+              const bg = d.opportunity_present ? '' : 'background:#f5f5f5;';
+              const row = document.createElement('div');
+              row.className = 'checklist-row';
+              row.style.cssText = bg + 'margin:2px 0;';
+              row.innerHTML = '<span><strong>' + d.id + '</strong> ' + d.name + wt + ': ' + sc + rt + '</span>';
+              // Evidence toggle
+              if (d.evidence && d.evidence.length) {
+                const evBtn = document.createElement('span');
+                evBtn.style.cssText = 'color:#666; cursor:pointer; font-size:11px; margin-left:6px;';
+                evBtn.textContent = '📋';
+                evBtn.onclick = () => {
+                  const evDiv = row.querySelector('.ev-detail');
+                  if (evDiv) { evDiv.style.display = evDiv.style.display === 'none' ? '' : 'none'; return; }
+                  const ed = document.createElement('div');
+                  ed.className = 'ev-detail';
+                  ed.style.cssText = 'font-size:11px; color:#555; margin:4px 0 0 12px; padding:4px 8px; background:#f9f9f9; border-radius:4px;';
+                  ed.innerHTML = d.evidence.map(e => '<div style="margin:2px 0"><em>[t' + e.turn + ' ' + e.type + ']</em> "' + e.quote + '"</div>').join('');
+                  row.appendChild(ed);
+                };
+                row.appendChild(evBtn);
+              }
+              dimWrap.appendChild(row);
+            });
+            textEl.appendChild(dimWrap);
+          }
+          // Coaching
+          if (j.coaching) {
+            const coachWrap = document.createElement('div');
+            coachWrap.style.cssText = 'margin-top:10px; padding:8px 10px; background:#f0f7ff; border:1px solid #bfdbfe; border-radius:6px;';
+            coachWrap.innerHTML = '<div style="font-weight:600; margin-bottom:4px;">📝 Coaching</div>';
+            if (j.coaching.summary) {
+              const sum = document.createElement('div');
+              sum.style.cssText = 'font-size:13px; margin-bottom:6px;';
+              sum.textContent = j.coaching.summary;
+              coachWrap.appendChild(sum);
+            }
+            if (j.coaching.per_dimension && j.coaching.per_dimension.length) {
+              j.coaching.per_dimension.forEach(pd => {
+                const row = document.createElement('div');
+                row.style.cssText = 'font-size:12px; margin:2px 0;';
+                row.innerHTML = '<strong>' + pd.dimension_id + ':</strong> ' + pd.note;
+                coachWrap.appendChild(row);
+              });
+            }
+            if (j.coaching.strongest_moment) {
+              const s = document.createElement('div');
+              s.style.cssText = 'font-size:12px; margin-top:4px; color:#166534;';
+              s.innerHTML = '⭐ <strong>Strongest:</strong> turn ' + j.coaching.strongest_moment.turn + ' — ' + j.coaching.strongest_moment.note;
+              coachWrap.appendChild(s);
+            }
+            if (j.coaching.costliest_moment) {
+              const c = document.createElement('div');
+              c.style.cssText = 'font-size:12px; margin-top:2px; color:#991b1b;';
+              c.innerHTML = '💸 <strong>Costliest:</strong> turn ' + j.coaching.costliest_moment.turn + ' — ' + j.coaching.costliest_moment.note;
+              coachWrap.appendChild(c);
+            }
+            textEl.appendChild(coachWrap);
+          }
+        }
+        // Compare with another archetype
+        if (current.archetypes && !__compareMode) {
+          const otherKeys = Object.keys(current.archetypes).filter(k => k !== selectedArchetype);
+          if (otherKeys.length) {
+            const cmpWrap = document.createElement('div');
+            cmpWrap.style.cssText = 'margin-top:10px; padding:8px 10px; background:#f5f3ff; border:1px solid #c4b5fd; border-radius:6px;';
+            cmpWrap.innerHTML = '<div style="font-size:12px; font-weight:600; margin-bottom:4px;">🔄 Compare with a different persona:</div>';
+            otherKeys.forEach(key => {
+              const btn = document.createElement('button');
+              btn.className = 'btn btn-ghost';
+              btn.textContent = current.archetypes[key].label || key;
+              btn.style.cssText = 'font-size:12px; padding:4px 10px; border-radius:6px; margin:2px 4px;';
+              btn.onclick = () => startComparison(key);
+              cmpWrap.appendChild(btn);
+            });
+            textEl.appendChild(cmpWrap);
+          }
+        }
+      }
+      if (res.wrap_up && res.concept_taxonomy && !res.decomposition) {
+        renderDebriefChecklist(textEl, res.missed_concepts || [], res.concept_taxonomy, res.self_rated || []);
+        renderCommunicationScore(textEl, res.communication_score, res.communication_note);
+        renderVerdict(textEl, res.verdict);
+        if (res.rubric && res.rubric_scores) {
+          renderRubricBreakdown(textEl, res.rubric, res.rubric_scores, res.verdict, res.retro_questions);
+        }
+        if (res.max_tier_reached) {
+          const tierRow = document.createElement('div');
+          tierRow.className = 'checklist-row';
+          tierRow.style.cssText = 'margin-top:6px;';
+          tierRow.textContent = `↗ Scaling tier reached: ${res.max_tier_reached}/6`;
+          textEl.appendChild(tierRow);
+        }
+        document.getElementById('refdesign-btn').style.display = '';
+        document.getElementById('staffcomp-btn').style.display = '';
+        fetch('/api/takeaways', {
+          method: 'POST', headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({question_id: current.id, missed_concepts: res.missed_concepts || [], rubric_scores: res.rubric_scores || {}})
+        }).then(r => r.json()).then(t => renderTakeaways(t.takeaways)).catch(() => {});
+      }
+      // Download report button for any wrap_up
+      if (res.wrap_up) {
+        const dlBtn = document.createElement('button');
+        dlBtn.className = 'btn btn-ghost';
+        dlBtn.textContent = '📥 Download Report';
+        dlBtn.style.cssText = 'font-size:13px; margin-top:10px; padding:6px 14px; border-radius:6px;';
+        dlBtn.onclick = () => {
+          const body = {question_id: current.id};
+          if (res.decomposition) body.decomposition = true;
+          fetch('/api/export', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)})
+            .then(r => r.ok ? r.text() : Promise.reject())
+            .then(md => {
+              const blob = new Blob([md], {type: 'text/markdown'});
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a'); a.href = url; a.download = (current.id || 'report') + '.md'; a.click();
+              URL.revokeObjectURL(url);
+            }).catch(() => alert('Export failed — session may have expired.'));
+        };
+        textEl.appendChild(dlBtn);
+        // Calibrate vs gold — only for decomposition sessions with a judge result
+        if (res.decomposition && res.judge && res.judge.dimensions) {
+          const calBtn = document.createElement('button');
+          calBtn.className = 'btn btn-ghost';
+          calBtn.textContent = '🎯 Calibrate vs gold';
+          calBtn.style.cssText = 'font-size:13px; margin-top:10px; margin-left:6px; padding:6px 14px; border-radius:6px;';
+          calBtn.onclick = () => showCalibration(res.judge);
+          textEl.appendChild(calBtn);
+        }
+      }
+      // Comparison mode: show side-by-side after second session wrap-up
+      if (res.wrap_up && res.decomposition && __compareData) {
+        window.__compareData2 = {
+          label: current.archetypes?.[selectedArchetype]?.label || selectedArchetype || 'Standard',
+          chatHTML: document.getElementById('chatlog').innerHTML,
+          band: res.judge?.band || '',
+          score: res.judge?.normalized_score || 0,
+          dimScores: (res.judge?.dimensions || []).map(d => ({id: d.id, score: d.score})),
+        };
+        setTimeout(renderComparison, 100);
+      }
+      speakTutor(res.reply);
+      extractChips(res.reply);
+      if (res.wrap_up) clearPacingNudge(); else armPacingNudge();
+    }
+  } catch (e) {
+    placeholder.className += ' err';
+    textEl.textContent = 'error: ' + e.message;
+  }
+}
+
+function startInterview(id) {
+  requestInterview({question_id: id, start: true});
+}
+
+const PERSONA_OPTIONS = [
+  ['', 'Standard'],
+  ['skeptical', '🧐 Skeptical'],
+  ['friendly', '🙂 Friendly'],
+  ['silent', '🤐 Silent'],
+];
+
+const ADVERSARIAL_PERSONA_OPTIONS = [
+  ['', 'Standard'],
+  ['friendly', '🙂 Friendly coach'],
+  ['skeptical', '🧐 Skeptical'],
+  ['bar_raiser', '🔥 Bar raiser'],
+];
+
+function renderPersonaPicker(promptText, options, onStart) {
+  const placeholder = addMsg('tutor', promptText);
+  const textEl = placeholder.querySelector('.msg-text');
+  const row = document.createElement('div');
+  row.style.cssText = 'display:flex; flex-wrap:wrap; gap:6px; margin-top:8px;';
+  options.forEach(([key, text]) => {
+    const btn = document.createElement('button');
+    btn.className = 'btn btn-ghost';
+    btn.textContent = text;
+    btn.onclick = () => {
+      selectedPersona = key;
+      placeholder.remove();
+      onStart();
+    };
+    row.appendChild(btn);
+  });
+  textEl.appendChild(row);
+}
+
+function wrapUpInterview() {
+  clearPacingNudge();
+  stopFrameworkMode();
+  const panel = document.getElementById('selfrate-panel');
+  if (current && current.lang === 'decomposition') {
+    panel.style.display = 'none';
+    document.getElementById('wrapup-btn').style.display = 'none';
+    addMsg('system', 'Decomposition wrap-up requested');
+    requestInterview({question_id: current.id, wrap_up: true, decomposition: true});
+    resetIdleTimer();
+    return;
+  }
+  const opts = document.getElementById('selfrate-options');
+  opts.innerHTML = '';
+  const taxonomy = CONCEPT_TAXONOMIES[(current && current.track) || 'data'];
+  taxonomy.forEach(concept => {
+    const label = document.createElement('label');
+    label.style.cssText = 'display:block; font-size:12.5px; margin:3px 0; cursor:pointer;';
+    const cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.value = concept;
+    cb.style.marginRight = '6px';
+    label.appendChild(cb);
+    label.appendChild(document.createTextNode(concept.replace(/_/g, ' ')));
+    opts.appendChild(label);
+  });
+  panel.style.display = '';
+  document.getElementById('wrapup-btn').style.display = 'none';
+}
+
+function submitSelfRating() {
+  const selfRated = Array.from(document.querySelectorAll('#selfrate-options input:checked')).map(cb => cb.value);
+  document.getElementById('selfrate-panel').style.display = 'none';
+  addMsg('system', selfRated.length ? `Self-rated missed: ${selfRated.join(', ')}` : 'Self-rated: nothing missed');
+  requestInterview({question_id: current.id, wrap_up: true, self_rated: selfRated});
+  resetIdleTimer();
+}
+
+async function showReferenceDesign() {
+  const btn = document.getElementById('refdesign-btn');
+  btn.disabled = true;
+  const placeholder = addMsg('tutor', 'thinking…');
+  const textEl = placeholder.querySelector('.msg-text');
+  try {
+    const r = await fetch('/api/reference-design', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({question_id: current.id})
+    });
+    const res = await r.json();
+    if (!r.ok || res.error) {
+      placeholder.className += ' err';
+      textEl.textContent = 'error: ' + (res.error || r.status);
+    } else {
+      textEl.textContent = '📐 Reference design:';
+      const ul = document.createElement('ul');
+      ul.style.cssText = 'margin:6px 0 0; padding-left:18px;';
+      (res.bullets || []).forEach(b => {
+        const li = document.createElement('li');
+        li.textContent = b;
+        ul.appendChild(li);
+      });
+      textEl.appendChild(ul);
+      if ((res.diagram || []).length) {
+        const diagBtn = document.createElement('button');
+        diagBtn.className = 'btn btn-ghost';
+        diagBtn.style.marginTop = '4px';
+        diagBtn.textContent = '🗺 View as diagram';
+        diagBtn.onclick = () => viewReferenceDiagram(res.diagram);
+        textEl.appendChild(diagBtn);
+      }
+      btn.style.display = 'none';
+    }
+  } catch (e) {
+    placeholder.className += ' err';
+    textEl.textContent = 'error: ' + e.message;
+  }
+  btn.disabled = false;
+}
+
+// ponytail: reuses the box/arrow schema already fed to the LLM every turn (serializeCanvasForLLM),
+// just parsed back in reverse, so renderCanvas() needs no changes to draw it.
+let savedShapesBeforeDiagram = null;
+
+function parseDiagramLines(lines) {
+  const boxes = [], arrows = [];
+  (lines || []).forEach(line => {
+    let m = line.match(/^Box:\s*(.+?)(?:\s*\[(\w+)\])?$/);
+    if (m) { boxes.push({label: m[1].trim(), layer: (m[2] || '').toLowerCase()}); return; }
+    m = line.match(/^Arrow:\s*(.+?)\s*->\s*(.+?)(?:\s*\[(.+?)\])?$/);
+    if (m) arrows.push({from: m[1].trim(), to: m[2].trim(), label: m[3] || ''});
+  });
+  const layerOrder = ['source', 'processing', 'storage', 'consumer', ''];
+  const cols = {};
+  layerOrder.forEach(l => cols[l] = []);
+  boxes.forEach(b => (cols[b.layer] || cols['']).push(b));
+  const colW = 190, boxW = 160, rowH = 80;
+  const idByLabel = {};
+  const out = [];
+  let colIdx = 0;
+  layerOrder.forEach(layer => {
+    cols[layer].forEach((b, i) => {
+      const id = newShapeId();
+      idByLabel[b.label] = id;
+      out.push({id, type: 'box', label: b.label, x: 30 + colIdx * colW, y: 30 + i * rowH, w: boxW, h: 50, layer: b.layer});
+    });
+    if (cols[layer].length) colIdx++;
+  });
+  arrows.forEach(a => {
+    const fromId = idByLabel[a.from], toId = idByLabel[a.to];
+    if (fromId && toId) out.push({id: newShapeId(), type: 'arrow', fromId, toId, label: a.label});
+  });
+  return out;
+}
+
+function viewReferenceDiagram(lines) {
+  if (savedShapesBeforeDiagram === null) savedShapesBeforeDiagram = JSON.parse(JSON.stringify(shapes));
+  shapes = parseDiagramLines(lines);
+  selectedShapeId = null;
+  document.getElementById('design-canvas-card').style.display = 'flex';
+  renderCanvas();
+  document.getElementById('diagram-restore-btn').style.display = '';
+}
+
+function restoreOwnDiagram() {
+  if (savedShapesBeforeDiagram === null) return;
+  shapes = savedShapesBeforeDiagram;
+  savedShapesBeforeDiagram = null;
+  selectedShapeId = null;
+  renderCanvas();
+  document.getElementById('diagram-restore-btn').style.display = 'none';
+}
+
+function startClarifyDrill() {
+  clarifyMode = true;
+  stopFrameworkMode();
+  document.getElementById('design-canvas-card').style.display = 'none';
+  document.getElementById('wrapup-btn').style.display = 'none';
+  document.getElementById('clarify-btn').style.display = 'none';
+  document.getElementById('end-drill-btn').style.display = '';
+  addMsg('system', 'Clarify-only drill started');
+  requestInterview({question_id: current.id, requirements_only: true, start: true});
+  resetIdleTimer();
+}
+
+async function startAdversarialMode() {
+  clearReqChips();
+  stopFrameworkMode();
+  const btn = document.getElementById('adversarial-btn');
+  btn.disabled = true;
+  btn.textContent = 'Loading flawed design…';
+  try {
+    const r = await fetch('/api/adversarial-design', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({question_id: current.id})
+    });
+    const res = await r.json();
+    if (!r.ok || res.error) {
+      btn.disabled = false;
+      btn.textContent = '🧨 Break this design';
+      addMsg('tutor', 'error: ' + (res.error || r.status));
+      return;
+    }
+    adversarialMode = true;
+    adversarialFlaws = res.flaws || [];
+    shapes = parseDiagramLines(res.diagram);
+    selectedShapeId = null;
+    renderCanvas();
+    document.getElementById('chatlog').innerHTML = '';
+    document.getElementById('clarify-btn').style.display = 'none';
+    document.getElementById('adversarial-btn').style.display = 'none';
+    selectedPersona = '';
+    renderPersonaPicker('Pick interviewer intensity for this drill:', ADVERSARIAL_PERSONA_OPTIONS, () => {
+      addMsg('system', 'Adversarial drill started');
+      requestInterview({question_id: current.id, start: true});
+      resetIdleTimer();
+    });
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '🧨 Break this design';
+  }
+}
+
+async function startScalingMode() {
+  clearReqChips();
+  stopFrameworkMode();
+  scalingMode = true;
+  document.getElementById('chatlog').innerHTML = '';
+  shapes = [];
+  selectedShapeId = null;
+  renderCanvas();
+  document.getElementById('clarify-btn').style.display = 'none';
+  document.getElementById('adversarial-btn').style.display = 'none';
+  document.getElementById('scaling-btn').style.display = 'none';
+  selectedPersona = '';
+  renderPersonaPicker('Pick interviewer temperament:', PERSONA_OPTIONS, () => {
+    addMsg('system', 'Scaling-pressure drill started — starting at 1K req/day');
+    requestInterview({question_id: current.id, scaling: true, start: true});
+    resetIdleTimer();
+  });
+}
+
+async function startIncidentMode() {
+  clearReqChips();
+  stopFrameworkMode();
+  const btn = document.getElementById('incident-btn');
+  btn.disabled = true;
+  btn.textContent = 'Generating failure scenario…';
+  try {
+    const r = await fetch('/api/incident-scenario', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({question_id: current.id})
+    });
+    const res = await r.json();
+    if (!r.ok || res.error) {
+      addMsg('tutor', 'error: ' + (res.error || r.status));
+      btn.disabled = false;
+      btn.textContent = '🔥 3am stress test';
+      return;
+    }
+    incidentMode = true;
+    incidentScenario = res.scenario || '';
+    document.getElementById('chatlog').innerHTML = '';
+    document.getElementById('design-canvas-card').style.display = 'none';
+    document.getElementById('clarify-btn').style.display = 'none';
+    document.getElementById('adversarial-btn').style.display = 'none';
+    document.getElementById('incident-btn').style.display = 'none';
+    document.getElementById('scaling-btn').style.display = 'none';
+    document.getElementById('framework-btn').style.display = 'none';
+    document.getElementById('refdesign-btn').style.display = 'none';
+    document.getElementById('staffcomp-btn').style.display = 'none';
+    addMsg('system', '🔥 3am stress test started — you\'ve been paged');
+    requestInterview({question_id: current.id, incident: true, start: true});
+    resetIdleTimer();
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '🔥 3am stress test';
+  }
+}
+
+async function showStaffComparison() {
+  const btn = document.getElementById('staffcomp-btn');
+  btn.disabled = true;
+  const placeholder = addMsg('tutor', 'thinking…');
+  const textEl = placeholder.querySelector('.msg-text');
+  try {
+    const r = await fetch('/api/staff-comparison', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        question_id: current.id,
+        adversarial: adversarialMode ? '1' : '0',
+        scaling: scalingMode ? '1' : '0',
+        incident: incidentMode ? '1' : '0'
+      })
+    });
+    const res = await r.json();
+    if (!r.ok || res.error) {
+      placeholder.className += ' err';
+      textEl.textContent = 'error: ' + (res.error || r.status);
+    } else {
+      textEl.textContent = '👤 Staff engineer comparison:';
+      const comparisons = res.comparisons || [];
+      if (!comparisons.length) {
+        textEl.textContent = '👤 No clear deltas found — your answers were close to Staff-level on this one.';
+      } else {
+        const container = document.createElement('div');
+        container.style.cssText = 'margin:6px 0 0; display:flex; flex-direction:column; gap:10px;';
+        comparisons.forEach((c, i) => {
+          const card = document.createElement('div');
+          card.style.cssText = 'border:1px solid var(--border); border-radius:6px; padding:8px; background:var(--card-2);';
+          card.innerHTML = `
+            <div style="font-size:11px; font-weight:600; margin-bottom:4px;">${i+1}. ${c.delta}</div>
+            <div style="font-size:11px; color:var(--text-dim); margin-bottom:3px;"><span style="color:#ef4444;">You said:</span> ${c.moment}</div>
+            <div style="font-size:11px; color:var(--text-dim); margin-bottom:3px;"><span style="color:#22c55e;">Staff says:</span> ${c.staff_says}</div>
+            <div style="font-size:10px; color:var(--text-dim); font-style:italic;">${c.why_it_matters}</div>`;
+          container.appendChild(card);
+        });
+        textEl.appendChild(container);
+      }
+      btn.style.display = 'none';
+    }
+  } catch (e) {
+    placeholder.className += ' err';
+    textEl.textContent = 'error: ' + e.message;
+  }
+  btn.disabled = false;
+}
+
+function endClarifyDrill() {
+  addMsg('system', 'Clarify-only drill ended');
+  requestInterview({question_id: current.id, requirements_only: true, end_drill: true});
+  clarifyMode = false;
+  document.getElementById('design-canvas-card').style.display = 'flex';
+  document.getElementById('wrapup-btn').style.display = '';
+  document.getElementById('clarify-btn').style.display = '';
+  document.getElementById('end-drill-btn').style.display = 'none';
+  resetIdleTimer();
+}
+
+// ponytail: reuses parseDiagramLines (already built for reference-design + adversarial-mode)
+// to redraw each snapshot — no new diagram rendering code needed.
+async function startReplay() {
+  const isDecomp = current && current.lang === 'decomposition';
+  const r = await fetch(`/api/interview-history?question_id=${encodeURIComponent(current.id)}&adversarial=${adversarialMode ? '1' : '0'}&requirements_only=${clarifyMode ? '1' : '0'}&incident=${incidentMode ? '1' : '0'}&decomposition=${isDecomp ? '1' : '0'}`);
+  const res = await r.json();
+  replayTurns = res.turns || [];
+  if (!replayTurns.length) {
+    addMsg('tutor', 'Nothing to replay yet — have a few exchanges first.');
+    return;
+  }
+  const cr = await fetch(`/api/replay-comments?question_id=${encodeURIComponent(current.id)}&adversarial=${adversarialMode ? '1' : '0'}&requirements_only=${clarifyMode ? '1' : '0'}&incident=${incidentMode ? '1' : '0'}&decomposition=${isDecomp ? '1' : '0'}`);
+  replayComments = (await cr.json()).comments || [];
+  window.speechSynthesis && window.speechSynthesis.cancel();
+  clearPacingNudge();
+  savedChatHTMLBeforeReplay = document.getElementById('chatlog').innerHTML;
+  savedShapesBeforeReplay = JSON.parse(JSON.stringify(shapes));
+  ['chatinput', 'wrapup-btn', 'clarify-btn', 'adversarial-btn', 'incident-btn', 'scaling-btn', 'framework-btn', 'refdesign-btn', 'staffcomp-btn', 'replay-btn', 'end-drill-btn'].forEach(id => {
+    const el = document.getElementById(id);
+    el.dataset.replayPrevDisplay = el.style.display;
+    el.style.display = 'none';
+  });
+  const bar = document.getElementById('replay-bar');
+  bar.style.display = 'flex';
+  const slider = document.getElementById('replay-slider');
+  slider.max = replayTurns.length - 1;
+  slider.value = replayTurns.length - 1;
+  scrubReplay(replayTurns.length - 1);
+}
+
+function scrubReplay(idx) {
+  idx = Number(idx);
+  document.getElementById('replay-turn-label').textContent = `${idx + 1} / ${replayTurns.length}`;
+  const log = document.getElementById('chatlog');
+  log.innerHTML = '';
+  for (let i = 0; i <= idx; i++) addMsg(replayTurns[i].role === 'user' ? 'user' : 'tutor', replayTurns[i].text);
+  log.scrollTop = log.scrollHeight;
+  shapes = parseDiagramLines((replayTurns[idx].diagram || '').split('\n'));
+  selectedShapeId = null;
+  renderCanvas();
+  renderReplayComments(idx);
+}
+
+function escapeHtml(s) {
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+async function startMockLoop() {
+  const res = await (await fetch('/api/mock-loop/start')).json();
+  if (!res.ids || !res.ids.length) { showToast('Not enough questions across categories to start a mock interview.'); return; }
+  mockLoop = {ids: res.ids, stage: 0};
+  document.getElementById('mock-loop-bar').style.display = 'flex';
+  updateMockLoopLabel();
+  loadQuestion(mockLoop.ids[0]);
+}
+
+function updateMockLoopLabel() {
+  document.getElementById('mock-loop-label').textContent = `🔁 Mock interview — stage ${mockLoop.stage + 1} / ${mockLoop.ids.length}`;
+  document.getElementById('mock-loop-next').textContent = mockLoop.stage === mockLoop.ids.length - 1 ? 'Finish →' : 'Next stage →';
+}
+
+function mockLoopNext() {
+  if (!mockLoop) return;
+  if (mockLoop.stage < mockLoop.ids.length - 1) {
+    mockLoop.stage++;
+    updateMockLoopLabel();
+    loadQuestion(mockLoop.ids[mockLoop.stage]);
+  } else {
+    finishMockLoop();
+  }
+}
+
+function exitMockLoop() {
+  document.getElementById('mock-loop-bar').style.display = 'none';
+  mockLoop = null;
+}
+
+async function finishMockLoop() {
+  const ids = mockLoop.ids;
+  document.getElementById('mock-loop-bar').style.display = 'none';
+  mockLoop = null;
+  const res = await (await fetch('/api/mock-loop/report?ids=' + ids.join(','))).json();
+  renderMockReport(res.report || []);
+}
+
+function renderMockReport(report) {
+  const rows = report.map(r => {
+    const ev = r.last_event;
+    let detail = 'No attempt logged for this stage.';
+    if (ev) {
+      if (ev.event === 'submit') detail = ev.passed ? '✓ passed' : '✗ not passing yet';
+      else if (ev.event === 'tradeoff') detail = ev.ok ? '✓ solid tradeoff call' : '✗ missed key points';
+      else if (ev.event === 'design_debrief') {
+        const missed = ev.missed_concepts || [];
+        detail = missed.length
+          ? `${missed.length} concept(s) to revisit: ${missed.map(c => c.replace(/_/g, ' ')).join(', ')}`
+          : '✓ covered the key concepts';
+      }
+    }
+    return `<div style="padding:8px 0; border-bottom:1px solid var(--border-soft);">
+      <div style="font-weight:600; font-size:13px;">${escapeHtml(r.title)} <span style="color:var(--text-faint); font-weight:400;">(${escapeHtml(r.lang)})</span></div>
+      <div style="font-size:12.5px; color:var(--text-dim); margin-top:2px;">${escapeHtml(detail)}</div>
+    </div>`;
+  }).join('');
+  const overlay = document.createElement('div');
+  overlay.className = 'confirm-overlay';
+  overlay.innerHTML = `<div class="confirm-box" style="max-width:420px;">
+    <div class="confirm-msg" style="font-weight:600;">🔁 Mock interview report</div>
+    <div>${rows || '<div style="color:var(--text-faint); font-size:13px;">No stages to report.</div>'}</div>
+    <div class="confirm-actions" style="margin-top:14px;"><button class="btn btn-primary" id="mock-report-close">Close</button></div>
+  </div>`;
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+  overlay.querySelector('#mock-report-close').onclick = () => overlay.remove();
+  document.body.appendChild(overlay);
+}
+
+function renderReplayComments(idx) {
+  document.getElementById('replay-comments').style.display = '';
+  const list = document.getElementById('replay-comments-list');
+  const here = replayComments.filter(c => c.turn_idx === idx);
+  list.innerHTML = here.length
+    ? here.map(c => `<div><b>${escapeHtml(c.author)}</b> <span style="color:var(--text-faint);">on turn ${idx + 1}:</span> ${escapeHtml(c.text)}</div>`).join('')
+    : '<div style="color:var(--text-faint);">No comments on this turn yet.</div>';
+}
+
+async function postReplayComment() {
+  const textEl = document.getElementById('replay-comment-text');
+  const text = textEl.value.trim();
+  if (!text) return;
+  const author = document.getElementById('replay-comment-author').value.trim();
+  const idx = Number(document.getElementById('replay-slider').value);
+  const res = await (await fetch('/api/replay-comment', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      question_id: current.id, adversarial: adversarialMode ? '1' : '0', requirements_only: clarifyMode ? '1' : '0', incident: incidentMode ? '1' : '0',
+      turn_idx: idx, author, text
+    })
+  })).json();
+  if (res.error) { showToast('Could not post comment: ' + res.error); return; }
+  replayComments.push(res.comment);
+  textEl.value = '';
+  renderReplayComments(idx);
+}
+
+function exitReplay() {
+  document.getElementById('replay-bar').style.display = 'none';
+  document.getElementById('replay-comments').style.display = 'none';
+  ['chatinput', 'wrapup-btn', 'clarify-btn', 'adversarial-btn', 'incident-btn', 'scaling-btn', 'framework-btn', 'refdesign-btn', 'staffcomp-btn', 'replay-btn', 'end-drill-btn'].forEach(id => {
+    const el = document.getElementById(id);
+    el.style.display = el.dataset.replayPrevDisplay || '';
+  });
+  if (savedChatHTMLBeforeReplay !== null) document.getElementById('chatlog').innerHTML = savedChatHTMLBeforeReplay;
+  if (savedShapesBeforeReplay !== null) shapes = savedShapesBeforeReplay;
+  savedChatHTMLBeforeReplay = null;
+  savedShapesBeforeReplay = null;
+  selectedShapeId = null;
+  renderCanvas();
+  if (document.getElementById('wrapup-btn').style.display !== 'none') armPacingNudge();
+}
+
+function copyReplayLink() {
+  const params = new URLSearchParams({
+    q: current.id,
+    replay: '1',
+    adversarial: adversarialMode ? '1' : '0',
+    requirements_only: clarifyMode ? '1' : '0',
+    incident: incidentMode ? '1' : '0',
+  });
+  const url = `${location.origin}${location.pathname}?${params.toString()}`;
+  navigator.clipboard.writeText(url).then(
+    () => showToast('Replay link copied — anyone with it can watch this session.'),
+    () => showToast('Could not copy link: ' + url)
+  );
+}
+
+function isDesignQuestion() {
+  return !!current && current.lang === 'design';
+}
+
+// ponytail: ambient TTS so the candidate doesn't have to glance off the whiteboard to read replies
+let _ttsAudio = null;
+
+function speakTutor(text) {
+  if (!ttsEnabled || !text) return;
+  if (_ttsAudio) { _ttsAudio.pause(); _ttsAudio = null; }
+  const clean = text.replace(/[*_`#]/g, '').replace(/```[\s\S]*?```/g, '');
+  fetch('/api/tts', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({text: clean})
+  })
+    .then(r => { if (!r.ok) throw Error(); return r.blob(); })
+    .then(blob => {
+      const url = URL.createObjectURL(blob);
+      const audio = new Audio(url);
+      _ttsAudio = audio;
+      audio.onended = () => { URL.revokeObjectURL(url); _ttsAudio = null; };
+      audio.play().catch(() => {});
+    })
+    .catch(() => {});
+}
+
+function toggleTTS() {
+  ttsEnabled = !ttsEnabled;
+  document.getElementById('tts-toggle-btn').textContent = ttsEnabled ? '🔊' : '🔇';
+  if (!ttsEnabled) window.speechSynthesis && window.speechSynthesis.cancel();
+}
+
+function toggleChatCollapse() {
+  const panel = document.getElementById('chatpanel');
+  const btn = document.getElementById('chat-collapse-btn');
+  if (panel.classList.contains('collapsed')) {
+    panel.classList.remove('collapsed');
+    panel.style.width = panel.dataset.prevWidth || '360px';
+    btn.textContent = '»';
+    btn.title = 'Collapse chat, focus canvas';
+  } else {
+    panel.dataset.prevWidth = panel.style.width || '360px';
+    panel.classList.add('collapsed');
+    btn.textContent = '«';
+    btn.title = 'Expand chat';
+  }
+}
+
+// ponytail: naive "sentences with a number in them" heuristic, not an LLM call —
+// upgrade to a classified extraction if it starts missing real constraints.
+function extractChips(text) {
+  const sentences = text.match(/[^.?!]*\d[^.?!]*[.?!]/g) || [];
+  const strip = document.getElementById('req-chips');
+  sentences.forEach(s => {
+    const clean = s.trim();
+    if (!clean || designChips.some(c => c.toLowerCase() === clean.toLowerCase())) return;
+    designChips.push(clean);
+    if (designChips.length > 10) designChips.shift();
+    const chip = document.createElement('div');
+    chip.className = 'req-chip';
+    chip.textContent = clean;
+    chip.title = clean;
+    strip.appendChild(chip);
+    while (strip.children.length > 10) strip.removeChild(strip.firstChild);
+  });
+}
+
+function clearReqChips() {
+  designChips = [];
+  document.getElementById('req-chips').innerHTML = '';
+}
+
+function armPacingNudge() {
+  clearTimeout(pacingTimer);
+  document.getElementById('pacing-hud').style.display = 'none';
+  if (!isDesignQuestion() || clarifyMode) return;
+  pacingTimer = setTimeout(() => {
+    document.getElementById('pacing-hud').textContent = '🕑 Quiet for a bit — try narrating your thinking out loud.';
+    document.getElementById('pacing-hud').style.display = '';
+  }, 45000);
+}
+
+function clearPacingNudge() {
+  clearTimeout(pacingTimer);
+  document.getElementById('pacing-hud').style.display = 'none';
+}
+
+// ponytail: coach-only checkpoints, not an enforced timer — nudges phase transitions via
+// system messages, never blocks input or force-submits anything.
+const FRAMEWORK_PHASES = [
+  ['Requirements', 5 * 60], ['Scale estimate', 5 * 60], ['High-level design', 15 * 60],
+  ['Deep dive', 15 * 60], ['Wrap-up', 5 * 60],
+];
+let frameworkMode = false;
+let frameworkPhaseIdx = 0;
+let frameworkPhaseEndsAt = 0;
+let frameworkTicker = null;
+
+function toggleFrameworkMode() {
+  if (frameworkMode) { stopFrameworkMode(); return; }
+  frameworkMode = true;
+  frameworkPhaseIdx = 0;
+  frameworkPhaseEndsAt = Date.now() + FRAMEWORK_PHASES[0][1] * 1000;
+  document.getElementById('framework-btn').textContent = '⏱ Framework mode (on)';
+  addMsg('system', `Framework mode on — ${FRAMEWORK_PHASES.map(p => p[0]).join(' → ')}`);
+  frameworkTicker = setInterval(frameworkTick, 1000);
+  frameworkTick();
+}
+
+function stopFrameworkMode() {
+  frameworkMode = false;
+  clearInterval(frameworkTicker);
+  frameworkTicker = null;
+  document.getElementById('framework-hud').style.display = 'none';
+  const btn = document.getElementById('framework-btn');
+  if (btn) btn.textContent = '⏱ Framework mode';
+}
+
+function frameworkTick() {
+  const remaining = Math.round((frameworkPhaseEndsAt - Date.now()) / 1000);
+  if (remaining <= 0) {
+    frameworkPhaseIdx++;
+    if (frameworkPhaseIdx >= FRAMEWORK_PHASES.length) {
+      addMsg('system', "⏱ Time's up — wrap up when ready");
+      stopFrameworkMode();
+      return;
+    }
+    addMsg('system', `⏱ ${FRAMEWORK_PHASES[frameworkPhaseIdx - 1][0]} done — move to ${FRAMEWORK_PHASES[frameworkPhaseIdx][0]}`);
+    frameworkPhaseEndsAt = Date.now() + FRAMEWORK_PHASES[frameworkPhaseIdx][1] * 1000;
+  }
+  const [name] = FRAMEWORK_PHASES[frameworkPhaseIdx];
+  const mm = String(Math.floor(Math.max(0, remaining) / 60)).padStart(2, '0');
+  const ss = String(Math.max(0, remaining) % 60).padStart(2, '0');
+  const hud = document.getElementById('framework-hud');
+  hud.textContent = `⏱ ${name} — ${mm}:${ss}`;
+  hud.style.display = '';
+}
+
+const tutorFab = document.createElement('div');
+tutorFab.id = 'tutor-fab';
+tutorFab.title = 'Ask the tutor';
+tutorFab.innerHTML = '<svg class="fab-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="12" x2="18" y2="12"></line><polyline points="12 6 18 12 12 18"></polyline></svg><span id="fab-badge"></span>';
+document.body.appendChild(tutorFab);
+
+const fabBubble = document.createElement('div');
+fabBubble.id = 'fab-bubble';
+document.body.appendChild(fabBubble);
+
+function positionFab() {
+  const panelLeft = document.getElementById('chatpanel').getBoundingClientRect().left;
+  tutorFab.style.right = (window.innerWidth - panelLeft + 12) + 'px';
+}
+positionFab();
+window.addEventListener('resize', positionFab);
+
+function fabSay(text, ms) {
+  fabBubble.textContent = text;
+  const r = tutorFab.getBoundingClientRect();
+  fabBubble.style.left = Math.max(8, r.left - 80) + 'px';
+  fabBubble.style.top = Math.max(8, r.top - 38) + 'px';
+  fabBubble.classList.add('show');
+  clearTimeout(fabSay._t);
+  fabSay._t = setTimeout(() => fabBubble.classList.remove('show'), ms || 2200);
+}
+
+function fabAlert(text) {
+  tutorFab.classList.add('alert');
+  fabSay(text, 5000);
+}
+
+tutorFab.addEventListener('click', () => {
+  tutorFab.classList.remove('alert');
+  if (!current) { fabSay('Pick a question first!', 2000); return; }
+  fabSay('One sec — let me look…', 1400);
+  askHint();
+});
+
+const resizer = document.getElementById('resizer');
+const chatpanel = document.getElementById('chatpanel');
+let resizing = false;
+
+resizer.addEventListener('mousedown', () => {
+  resizing = true;
+  resizer.classList.add('dragging');
+  document.body.style.userSelect = 'none';
+  document.body.style.cursor = 'col-resize';
+});
+
+window.addEventListener('mousemove', (e) => {
+  if (!resizing) return;
+  const newWidth = window.innerWidth - e.clientX;
+  chatpanel.style.width = Math.min(640, Math.max(240, newWidth)) + 'px';
+  positionFab();
+});
+
+window.addEventListener('mouseup', () => {
+  if (!resizing) return;
+  resizing = false;
+  resizer.classList.remove('dragging');
+  document.body.style.userSelect = '';
+  document.body.style.cursor = '';
+});
+
+const sidebarResizer = document.getElementById('sidebar-resizer');
+const sidebar = document.getElementById('sidebar');
+let sidebarResizing = false;
+
+sidebarResizer.addEventListener('mousedown', () => {
+  sidebarResizing = true;
+  sidebarResizer.classList.add('dragging');
+  document.body.style.userSelect = 'none';
+  document.body.style.cursor = 'col-resize';
+});
+
+window.addEventListener('mousemove', (e) => {
+  if (!sidebarResizing) return;
+  const newWidth = e.clientX - sidebar.getBoundingClientRect().left;
+  sidebar.style.width = Math.min(420, Math.max(160, newWidth)) + 'px';
+});
+
+window.addEventListener('mouseup', () => {
+  if (!sidebarResizing) return;
+  sidebarResizing = false;
+  sidebarResizer.classList.remove('dragging');
+  document.body.style.userSelect = '';
+  document.body.style.cursor = '';
+});
+
+loadList();
+loadDeadline();
+refreshStreak();
+
+function refreshStreak() {
+  fetch('/api/streak').then(r => r.json()).then(s => {
+    document.getElementById('streak-count').textContent = s.streak || 0;
+  }).catch(() => {});
+}
+
+document.getElementById('q-search').addEventListener('input', applySidebarFilter);
+
+/* ── auth overlay logic ── */
+let authMode = 'login'; // 'login' | 'signup'
+const authOverlay = document.getElementById('auth-overlay');
+const authTitle = document.getElementById('auth-title');
+const authError = document.getElementById('auth-error');
+const authSubmitBtn = document.getElementById('auth-submit');
+const authToggleText = document.getElementById('auth-toggle-text');
+const authToggleLink = document.getElementById('auth-toggle-link');
+const authEmail = document.getElementById('auth-email');
+const authPassword = document.getElementById('auth-password');
+
+function authToggle() {
+  authMode = authMode === 'login' ? 'signup' : 'login';
+  authError.classList.remove('show');
+  if (authMode === 'signup') {
+    authTitle.textContent = 'Create account';
+    authSubmitBtn.textContent = 'Sign up';
+    authToggleText.textContent = 'Have an account?';
+    authToggleLink.textContent = 'Log in';
+  } else {
+    authTitle.textContent = 'Welcome back';
+    authSubmitBtn.textContent = 'Log in';
+    authToggleText.textContent = 'No account?';
+    authToggleLink.textContent = 'Sign up';
+  }
+  authEmail.focus();
+}
+
+function authShowError(msg) {
+  authError.textContent = msg;
+  authError.classList.add('show');
+}
+
+async function authSubmit() {
+  const email = authEmail.value.trim();
+  const password = authPassword.value;
+  if (!email || !password) { authShowError('Email and password required.'); return; }
+  authSubmitBtn.disabled = true;
+  authError.classList.remove('show');
+  try {
+    const endpoint = authMode === 'signup' ? '/api/signup' : '/api/login';
+    const r = await fetch(endpoint, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({email, password}),
+    });
+    const data = await r.json();
+    if (r.status === 404) {
+      authShowError('Sign-up is not enabled yet.');
+      return;
+    }
+    if (!r.ok || data.error) {
+      authShowError(data.error || 'Something went wrong.');
+      return;
+    }
+    if (data.access_token) {
+      localStorage.setItem('loop_token', data.access_token);
+    }
+    hideAuthOverlay();
+  } catch (e) {
+    authShowError('Network error — try again.');
+  } finally {
+    authSubmitBtn.disabled = false;
+  }
+}
+
+async function testLogin(fresh) {
+  authSubmitBtn.disabled = true;
+  authError.classList.remove('show');
+  try {
+    const r = await fetch('/api/test-login' + (fresh ? '?fresh=1' : ''), {method: 'POST'});
+    const data = await r.json();
+    if (!r.ok || data.error) { authShowError(data.error || 'Test login failed.'); authSubmitBtn.disabled = false; return; }
+    if (data.access_token) localStorage.setItem('loop_token', data.access_token);
+    hideAuthOverlay();
+    if (data.fresh) setTimeout(() => location.reload(), 500);
+  } catch (e) { authShowError('Network error — try again.'); authSubmitBtn.disabled = false; }
+}
+
+// Enter key submits
+document.getElementById('auth-password').addEventListener('keydown', e => { if (e.key === 'Enter') authSubmit(); });
+document.getElementById('auth-email').addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('auth-password').focus(); });
+
+// Overlay is hidden by default (CSS). Only SHOW it when auth is genuinely required —
+// this prevents the login screen from flashing on every page load.
+function showAuthOverlay() {
+  authOverlay.classList.remove('hidden');
+  authOverlay.classList.add('show');
+  authOverlay.style.display = 'flex';
+  authEmail.focus();
+}
+
+function hideAuthOverlay() {
+  authOverlay.classList.remove('show');
+  authOverlay.classList.add('hidden');
+  authOverlay.style.display = 'none';
+}
+
+(async function checkAuth() {
+  try {
+    const r = await fetch('/api/me');
+    const data = await r.json();
+    if (data.mode === 'legacy') return; // legacy: never show overlay
+  } catch { /* Supabase unreachable — fall through to token check */ }
+
+  const token = localStorage.getItem('loop_token');
+  if (!token) { showAuthOverlay(); return; }
+  try {
+    const r2 = await fetch('/api/me', { headers: {'Authorization': 'Bearer ' + token} });
+    const data2 = await r2.json();
+    if (data2.user_id) {
+      // valid session — keep overlay hidden
+    } else {
+      localStorage.removeItem('loop_token');
+      showAuthOverlay();
+    }
+  } catch { showAuthOverlay(); }
+})();
+
+async function loadDeadline() {
+  const r = await fetch('/api/deadline');
+  const d = await r.json();
+  renderDeadlineWidget(d.deadline);
+}
+
+function renderDeadlineWidget(deadline) {
+  const el = document.getElementById('deadline-widget');
+  el.dataset.deadline = deadline || '';
+  if (!deadline) { el.textContent = '🗓 Set interview date'; return; }
+  const days = Math.ceil((new Date(deadline + 'T00:00:00') - new Date()) / 86400000);
+  el.textContent = days > 0 ? `🗓 Interview in ${days}d — reviews compressed` : '🗓 Interview date passed';
+}
+
+async function setInterviewDeadline() {
+  const input = prompt('Interview date (YYYY-MM-DD), blank to clear:', document.getElementById('deadline-widget').dataset.deadline || '');
+  if (input === null) return;
+  const r = await fetch('/api/deadline', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({deadline: input.trim()})});
+  const d = await r.json();
+  renderDeadlineWidget(d.deadline);
+}

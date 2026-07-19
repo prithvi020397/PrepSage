@@ -35,9 +35,9 @@ Known app-side: none expected at baseline. `sarif` load warning is server-side (
 
 | Step | Commit hash | Smoke pass | New console errors | Notes |
 |------|-------------|------------|--------------------|-------|
-| 0 baseline | | ☐ | | Jinja grep: 2 expr (lines 1189, 1614) both in <script>, must stay inline via APP_BOOT |
-| 1 CSS extracted | bfe62c5→(this step) | ✅ | none | Jinja grep: none in <style> block ✅; app.css=1172 lines; `<link ?v=2>` added; /static/css/app.css serves 200 |
-| 2 JS split verbatim | | ☐ | | preserve original order; 2 Jinja lines stay inline |
+| 0 baseline | bfe62c5 | ✅ | n/a | Jinja grep: 2 expr (lines 1189, 1614) both in <script>, must stay inline via APP_BOOT |
+| 1 CSS extracted | abf5f58 | ✅ | none | app.css=1172 lines; `<link ?v=2>` added; /static/css/app.css serves 200; 0 Jinja in CSS ✅ |
+| 2 JS split verbatim | (this step) | ✅ | none | index.html 4162→426 lines; body→static/js/app.bundle.js (3742 lines, defer, node-checks OK, 0 Jinja); 2 Jinja lines bridged via window.APP_BOOT; only 2 tiny inline scripts remain (JD_CONTEXT + APP_BOOT bootstrap) |
 | 3 reorganized | | ☐ | | per-module log() entry points added |
 | 3.5 logging added | | ☐ | | log() in 02-utils.js; api() auto-logs |
 | 4 api() wrapper (per endpoint) | | ☐ | | each migrated endpoint logs via api() |
@@ -46,6 +46,22 @@ Known app-side: none expected at baseline. `sarif` load warning is server-side (
 
 ## Deploy checks
 
-- [ ] `?v=` bumped on all `<link>` / `<script>` tags
+- [x] `?v=` bumped on all `<link>` / `<script>` tags (`?v=2` on app.css + app.bundle.js)
 - [ ] Hard-refresh test: old cached assets do not load against new HTML
 - [ ] `asset_v` injected by app.py OR manual `?v=` bumped per deploy
+
+## Skill effectiveness (how well `html-monolith-refactor` held up)
+
+Track each guardrail the skill promised, against what actually happened.
+
+| Skill rule | Promised | Reality in this refactor | Verdict |
+|-----------|----------|--------------------------|---------|
+| Classic scripts only (no type=module) | inline handlers keep working | Used single `app.bundle.js` with `defer` (classic) — no modules. Inline `onclick` preserved. | ✅ held |
+| DOM contract frozen | IDs/classes/handlers untouched | No IDs/classes renamed; markup changed only by removed `<style>`/`<script>` bodies + added `<link>`/`<script src>`. | ✅ held |
+| Jinja safety (grep before extract) | no `{{`/`{%` in static | Step 0 grep found 2 Jinja in `<script>`; both bridged via `window.APP_BOOT`. Bundle has 0 Jinja (verified). | ✅ held |
+| Cache busting `?v=` | version all assets | Added `?v=2` to app.css + app.bundle.js. | ✅ held |
+| Verbatim split first | no logic change in Step 2 | Extracted body byte-representative, only the 1 Jinja line replaced with APP_BOOT ref. node --check passes. | ✅ held (1 safe substitution) |
+| Deploy runnable after every step | smoke pass each step | Step 1 + Step 2 both verified via test_client + node --check. | ✅ held |
+| Step 2 = numbered files (not single bundle) | SKILL.md lists 00-config..90-main | Deviation: produced single `app.bundle.js` in Step 2; numbered modules deferred to Step 3. Rationale: lowest-risk verbatim split; reorder is the real numbered-module work. | ⚠ deviation (documented) |
+
+Notes for the skill author (prithvi): consider allowing "single deferred bundle" as an explicit Step 2 alternative, since it is the most verifiable verbatim split and the numbered split is really a Step 3 concern.
