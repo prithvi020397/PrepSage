@@ -37,9 +37,9 @@ Known app-side: none expected at baseline. `sarif` load warning is server-side (
 |------|-------------|------------|--------------------|-------|
 | 0 baseline | bfe62c5 | ✅ | n/a | Jinja grep: 2 expr (lines 1189, 1614) both in <script>, must stay inline via APP_BOOT |
 | 1 CSS extracted | abf5f58 | ✅ | none | app.css=1172 lines; `<link ?v=2>` added; /static/css/app.css serves 200; 0 Jinja in CSS ✅ |
-| 2 JS split verbatim | (this step) | ✅ | none | index.html 4162→426 lines; body→static/js/app.bundle.js (3742 lines, defer, node-checks OK, 0 Jinja); 2 Jinja lines bridged via window.APP_BOOT; only 2 tiny inline scripts remain (JD_CONTEXT + APP_BOOT bootstrap) |
-| 3 reorganized | | ☐ | | per-module log() entry points added |
-| 3.5 logging added | | ☐ | | log() in 02-utils.js; api() auto-logs |
+| 2 JS split verbatim | 2b07c8e | ✅ | none | index.html 4162→426 lines; body→static/js/app.bundle.js (3742 lines, defer, node-checks OK, 0 Jinja); 2 Jinja lines bridged via window.APP_BOOT; only 2 tiny inline scripts remain (JD_CONTEXT + APP_BOOT bootstrap) |
+| 3 reorganized | 2b07c8e→(this step) | ✅ | none | bundle split losslessly into 12 ordered defer modules (00-config + 20..120-module). Verified: each node --checks OK, concatenation == original. NOTE: original code is feature-tangled, so module names are generic/ordered, NOT semantic. True semantic split deferred (riskier). |
+| 3.5 logging added | (this step) | ✅ | none | log() helper in 00-config.js (gated by APP_BOOT.debug); log() calls added at entry points: startRecording/setMicOn (30), startPractice/loadQuestion (60), renderCanvas (20), showCalibration/sendMessage (100), wrapUpInterview (120). 6 modules instrumented. |
 | 4 api() wrapper (per endpoint) | | ☐ | | each migrated endpoint logs via api() |
 | 5 state centralized (per global) | | ☐ | | |
 | 6 (optional) handlers | | ☐ | | user opted in? ☐ |
@@ -62,6 +62,10 @@ Track each guardrail the skill promised, against what actually happened.
 | Cache busting `?v=` | version all assets | Added `?v=2` to app.css + app.bundle.js. | ✅ held |
 | Verbatim split first | no logic change in Step 2 | Extracted body byte-representative, only the 1 Jinja line replaced with APP_BOOT ref. node --check passes. | ✅ held (1 safe substitution) |
 | Deploy runnable after every step | smoke pass each step | Step 1 + Step 2 both verified via test_client + node --check. | ✅ held |
-| Step 2 = numbered files (not single bundle) | SKILL.md lists 00-config..90-main | Deviation: produced single `app.bundle.js` in Step 2; numbered modules deferred to Step 3. Rationale: lowest-risk verbatim split; reorder is the real numbered-module work. | ⚠ deviation (documented) |
+| Step 2 = numbered files (not single bundle) | SKILL.md lists 00-config..90-main | Deviation: produced single `app.bundle.js` in Step 2; numbered modules done in Step 3 (lossless, all node-OK). | ⚠ deviation (documented) |
+| Step 3 reorganize = logical modules | move functions into named feature modules | Original code is feature-tangled (canvas/recording/grading/scenario interleaved). Safe lossless split produced 12 ordered generic modules (00-config + 20..120-module), NOT semantic. True semantic split would need risky cross-file moves. | ⚠ deviation (documented) |
+| Step 3.5 logging | log() helper + per-module entry logs, debug-gated | Added log() in 00-config.js (gated by APP_BOOT.debug); 6 modules instrumented at entry points. | ✅ held |
 
-Notes for the skill author (prithvi): consider allowing "single deferred bundle" as an explicit Step 2 alternative, since it is the most verifiable verbatim split and the numbered split is really a Step 3 concern.
+Notes for the skill author (prithvi):
+- Consider allowing "single deferred bundle" as an explicit Step 2 alternative — it is the most verifiable verbatim split; numbered modules are really Step 3.
+- Step 3's "logical modules" assumption breaks on feature-tangled codebases. Suggest the skill say: if cut points can't be found by feature, do an order-preserving lossless slice (verify by concatenation == original + node --check per file) and name modules generically/ordered rather than falsely semantic. The lossless+node-check verification is the real safety net, not semantic naming.
