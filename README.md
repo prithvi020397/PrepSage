@@ -85,6 +85,14 @@ python3 app.py
 
 The app starts at `http://127.0.0.1:5050` with debug/auto-reload enabled.
 
+For local development without real API keys, use legacy mode (LLM/transcription
+no-op gracefully):
+
+```bash
+LEGACY_MODE=1 OPENROUTER_API_KEY=sk-dummy DEEPGRAM_API_KEY=dummy \
+  SUPABASE_URL=http://localhost SUPABASE_KEY=k python3 app.py
+```
+
 ### First run / onboarding
 
 On a fresh install (no `progress.json`) visiting `/` redirects to `/onboarding` — set your interview
@@ -104,22 +112,55 @@ The repo includes a `Procfile` and `render.yaml` for [Render](https://render.com
 `OPENROUTER_API_KEY` as an environment variable in the Render dashboard (it's marked `sync: false` so
 it's never stored in the repo). `gunicorn app:app` is the start command.
 
+> **Concurrency:** the app ships with `workers 1`. Module-level runtime state
+> (the in-memory dicts and per-user JSON files) is **not** concurrency-safe, so
+> do not raise the worker count — doing so causes data races / lost writes. A
+> multi-worker deployment requires the optional persistence upgrade (see
+> `flask-monolith-refactor` skill Phase 6), which is out of scope by default.
+
 ## Project structure
 
+The backend was restructured (verbatim, behavior-preserving) from a single
+`app.py` into a small package. `app.py` is now a thin entrypoint that sets up
+logging, re-exports the extracted helpers/services, and registers the route
+blueprints. All 71 routes are preserved with identical URL rules.
+
 ```
-app.py                      Flask routes + logic: tutor prompts, grading, spaced repetition, mock loop
-precompute.py               One-off generator that fills traces.json / concept_maps.json /
-                            solutions.json / question_contexts.json from questions.json (run once)
-firecrawl_layer.py          Optional Firecrawl-backed "fresh angle" hybrid (live web framing for
-                            hints/curveballs). Silently disabled without FIRECRAWL_API_KEY.
-test_scoring.py             unittest suite for backend scoring (hire_verdict, rubric parsing, etc.)
+app.py                      Thin entrypoint: logging setup, re-exports, blueprint registration
+core/                      Pure, side-effect-free helpers (no Flask, no module state)
+  constants.py             Taxonomy, patterns, concept normalization, war-story + rubric data
+  questions.py             Question framing: taxonomy_for, war_stories_for, persona_for, topic_for
+  concepts.py              Concept normalization + translation lookups
+services/                  Side-effectful collaborators
+  llm.py                   chat_content() + JSON-extract wrapper (LLM client calls)
+  extraction.py            JD/resume text extraction + OCR + fallback chains
+  execution.py             run_sql_case / run_python_case / get_sample_tables
+  grading.py               run_judge, _repair_truncated_json, hire_verdict, judge transcript
+  persistence.py           Atomic JSON writes, save_* helpers, current_user_id
+routes/                    Flask Blueprints, grouped by domain (verbatim route bodies)
+  pages.py                 /, /dashboard, /onboarding, /practice, /taxonomy, /favicon.ico
+  auth.py                  signup/login/me/reset/start-over
+  documents.py             JD/resume upload + parse + gap/role-readiness analysis
+  analytics.py             /api/deadline, /api/streak, /api/takeaways, /api/review
+  practice.py              questions, run, submit, mock loop, hints, curveballs, traces
+  interview.py             interview session, transcribe, TTS, calibration, tradeoffs, replay
+precompute.py              One-off generator that fills traces.json / concept_maps.json /
+                           solutions.json / question_contexts.json from questions.json (run once)
+firecrawl_layer.py         Optional Firecrawl-backed "fresh angle" hybrid (live web framing for
+                           hints/curveballs). Silently disabled without FIRECRAWL_API_KEY.
+tests/                     pytest suite (see Testing below)
+  test_scoring.py          unittest suite for backend scoring (hire_verdict, rubric parsing, etc.)
+  test_features.py         Feature/endpoint tests (calibration, routes, etc.)
+  test_backend_characterization.py   Pins fragile fixes: topic_for schemas, _repair_truncated_json,
+                                     hire_verdict bands, is_solved/is_due/schedule_review
+  test_concept_normalization.py      Concept normalization edge cases
 templates/
-  index.html                Practice UI: editor, tutor chat, design canvas, Command Center
-  dashboard.html            Progress dashboard: mastery map, weak areas, streak, postmortem journal
-  onboarding.html           First-run setup (deadline + strengths/weaknesses)
-static/                     Static assets (currently unused — assets load from CDN)
+  index.html               Practice UI: editor, tutor chat, design canvas, Command Center
+  dashboard.html           Progress dashboard: mastery map, weak areas, streak, postmortem journal
+  onboarding.html          First-run setup (deadline + strengths/weaknesses)
+static/                    Static assets (CSS + JS modules; see frontend refactor notes)
 questions.json             Question bank (5 tracks) — ships with the repo
-traces.json                 Per-question worked traces (precomputed)
+traces.json                Per-question worked traces (precomputed)
 concept_maps.json          Per-question concept maps (precomputed)
 solutions.json             Reference solutions (precomputed)
 question_contexts.json     Realistic scenario framing per question (precomputed)
@@ -128,6 +169,12 @@ progress.json              Per-user spaced-repetition schedule + solved state (r
 chats.json                 Per-user tutor transcripts (runtime, gitignored)
 replay_comments.json        Per-user replay annotations (runtime, gitignored)
 ```
+
+> **Adding a route:** put it in the matching `routes/*.py` blueprint and
+> decorate with `@bp.route(...)`. Each route function imports the full app
+> namespace lazily at request time (`import app as _app; globals().update(...)`)
+> — no call-site import surgery needed. Register the blueprint in `app.py` only
+> if you add a new file.
 
 ## Architecture notes
 
@@ -168,7 +215,13 @@ Env: `FIRECRAWL_API_KEY` (required to use it), `FIRECRAWL_ENABLED=false` (hard-d
 
 ## Testing
 
-- **Backend scoring:** `python3 -m unittest test_scoring` (run before touching grading logic).
+- **Full suite (pytest):** `python3 -m pytest` — 63 tests covering scoring,
+  features, concept normalization, and characterization pins of the fragile
+  fixes (run this before any backend change).
+- **Backend scoring (unittest):** `python3 -m unittest test_scoring` (run before
+  touching grading logic).
+- **Local dev mode:** set `LEGACY_MODE=1` with dummy keys to boot without real
+  API credentials (transcription/LLM will no-op gracefully).
 - **Manual UI checklist:** see [TESTING_GUIDE.md](TESTING_GUIDE.md) — there is no automated UI suite
   by design. Walk the relevant section before opening a PR.
 
