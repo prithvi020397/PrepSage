@@ -4251,6 +4251,48 @@ def build_judge_transcript(transcript_turns):
     return judge_transcript
 
 
+def _repair_truncated_json(raw):
+    """Best-effort repair of a JSON string the model cut off mid-output.
+
+    Re-balances braces/brackets and strips a dangling trailing comma so a
+    truncated judge reply can still be parsed instead of failing the whole
+    scoring pass. Returns the repaired string; callers should expect a possible
+    further JSONDecodeError if the content is too corrupt to salvage.
+    """
+    s = raw.rstrip()
+    # close any unterminated string by appending a quote
+    if s.count('"') % 2 == 1:
+        s += '"'
+    # re-balance with a depth-aware stack so closers are emitted in LIFO order
+    # (handles a truncated innermost object, not just net counts).
+    stack = []
+    in_str = False
+    esc = False
+    for ch in s:
+        if esc:
+            esc = False
+            continue
+        if ch == '\\':
+            esc = True
+            continue
+        if ch == '"':
+            in_str = not in_str
+            continue
+        if in_str:
+            continue
+        if ch == '{' or ch == '[':
+            stack.append(ch)
+        elif ch == '}' or ch == ']':
+            if stack:
+                stack.pop()
+    while stack:
+        opener = stack.pop()
+        s += '}' if opener == '{' else ']'
+    # drop a trailing comma left before a closing bracket/brace
+    s = re.sub(r",\s*([}\]])", r"\1", s)
+    return s
+
+
 def run_judge(scenario_json, transcript_turns, session_id, scenario_id):
     """Call the judge model (separate from the client simulation) to score a
     completed decomposition session.
@@ -4294,7 +4336,7 @@ def run_judge(scenario_json, transcript_turns, session_id, scenario_id):
             model=MODEL,
             messages=[{"role": "system", "content": system},
                       {"role": "user", "content": "Score this session. Output JSON only."}],
-            max_tokens=1500,
+            max_tokens=4096,
             temperature=0,
             extra_body={"reasoning": {"enabled": False}},
         )
@@ -4306,7 +4348,14 @@ def run_judge(scenario_json, transcript_turns, session_id, scenario_id):
                 raw = raw.rstrip()[:-3].strip()
         if "{" in raw and "}" in raw:
             raw = raw[raw.index("{"):raw.rindex("}") + 1]
-        result = json.loads(raw)
+        # ponytail: the judge reply can be long (full scenario echo + coaching).
+        # If the model still truncated mid-JSON, try to repair common breakages
+        # (trailing comma, unterminated string/array/object) before giving up.
+        try:
+            result = json.loads(raw)
+        except json.JSONDecodeError:
+            repaired = _repair_truncated_json(raw)
+            result = json.loads(repaired)
     except Exception as e:
         return {"session_id": session_id, "scenario_id": scenario_id,
                 "insufficient_session": True, "band": None,
