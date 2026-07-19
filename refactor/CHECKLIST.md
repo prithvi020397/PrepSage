@@ -36,7 +36,7 @@ Known app-side: none expected at baseline. `sarif` load warning is server-side (
 | Step | Commit hash | Smoke pass | New console errors | Notes |
 |------|-------------|------------|--------------------|-------|
 | 0 baseline | | ☐ | | Jinja grep: 2 expr (lines 1189, 1614) both in <script>, must stay inline via APP_BOOT |
-| 1 CSS extracted | | ☐ | | Jinja grep result: none in <style> block ✅ |
+| 1 CSS extracted | bfe62c5→(this step) | ✅ | none | Jinja grep: none in <style> block ✅; app.css=1172 lines; `<link ?v=2>` added; /static/css/app.css serves 200 |
 | 2 JS split verbatim | | ☐ | | preserve original order; 2 Jinja lines stay inline |
 | 3 reorganized | | ☐ | | per-module log() entry points added |
 | 3.5 logging added | | ☐ | | log() in 02-utils.js; api() auto-logs |
