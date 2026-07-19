@@ -438,6 +438,7 @@ async function loadQuestion(id) {
     return;
   }
 
+  document.querySelectorAll('.archetype-picker').forEach(p => p.remove());
   if (isDecomposition) {
     document.getElementById('trace-box').style.display = 'none';
     document.getElementById('debrief-row').style.display = 'none';
