@@ -2,6 +2,7 @@ import difflib
 import glob
 import json
 import logging
+import logging.handlers
 import os
 import random
 import re
@@ -31,8 +32,22 @@ except Exception:
 load_dotenv()
 
 app = Flask(__name__)
-logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
+
+# Phase 0 — failure observability. Module logger writes to stderr AND a
+# size-capped rotating file so production failures are debuggable. Format
+# includes module:lineno so every log line shows where it fired.
+_LOG_FMT = "%(asctime)s [%(levelname)s] %(name)s %(module)s:%(lineno)d %(message)s"
+logging.basicConfig(level=logging.INFO, format=_LOG_FMT)
 log = logging.getLogger("theloop")
+_log_fh = logging.handlers.RotatingFileHandler(
+    "theloop.log", maxBytes=5 * 1024 * 1024, backupCount=5, encoding="utf-8"
+)
+_log_fh.setLevel(logging.DEBUG)
+_log_fh.setFormatter(logging.Formatter(_LOG_FMT))
+log.addHandler(_log_fh)
+log.setLevel(logging.DEBUG)
+# Don't double-log to stderr via the root basicConfig handler.
+log.propagate = False
 
 @app.before_request
 def _req_start():
@@ -659,6 +674,7 @@ def api_signup():
     try:
         res = c.auth.sign_up({"email": email, "password": password})
     except Exception as e:
+        log.exception("api_signup: unhandled exception")
         return jsonify({"error": f"signup failed: {e}"}), 500
     if getattr(res, "error", None):
         return jsonify({"error": str(res.error)}), 400
@@ -702,6 +718,7 @@ def api_login():
     try:
         res = c.auth.sign_in_with_password({"email": email, "password": password})
     except Exception as e:
+        log.exception("api_login: unhandled exception")
         return jsonify({"error": f"login failed: {e}"}), 500
     if getattr(res, "error", None):
         return jsonify({"error": str(res.error)}), 401
@@ -764,6 +781,7 @@ def api_test_login():
                 except Exception:
                     pass
         except Exception as e:
+            log.exception("api_test_login: unhandled exception")
             return jsonify({"error": f"test signup failed: {e}"}), 500
     if not session:
         return jsonify({"error": "could not authenticate"}), 500
@@ -1449,7 +1467,8 @@ def _call_json_extract(prompt, max_tokens=1800):
                 return raw2
         return None
     except Exception as e:
-        print(f"[_call_json_extract] LLM error: {type(e).__name__}: {e}", flush=True)
+        log.exception("_clean: unhandled exception")
+        log.debug("[_call_json_extract] LLM error: %s: %s", type(e).__name__, e)
         return None
 
 
@@ -1731,11 +1750,11 @@ def _extraction_fallback_chain(extract_fn, fallback_fn, text, label):
     data = extract_fn(text)
     if data:
         return data, "llm"
-    print(f"[{label}] LLM extraction failed — using fallback", flush=True)
+    log.debug("[%s] LLM extraction failed — using fallback", label)
     fb = fallback_fn(text)
     if fb:
         return fb, "fallback"
-    print(f"[{label}] Fallback also failed — returning None", flush=True)
+    log.debug("[%s] Fallback also failed — returning None", label)
     return None, "none"
 
 
@@ -2053,6 +2072,7 @@ Respond ONLY with JSON — no markdown, no commentary:
             "specificity": specificity,
         })
     except Exception as e:
+        log.exception("talk_about: unhandled exception")
         return jsonify({"error": str(e)}), 502
 
 
@@ -3142,6 +3162,7 @@ Respond ONLY with the code, no markdown fences, no commentary."""
                             break
                 SOLUTION_CACHE[q["id"]] = solution.strip()
             except Exception as e:
+                log.exception("diff: unhandled exception")
                 return jsonify({"error": str(e)}), 502
 
     solution = SOLUTION_CACHE[q["id"]]
@@ -3296,6 +3317,7 @@ Respond ONLY strict JSON, no markdown fences, no commentary:
         result = json.loads(raw)
         return jsonify({"code": result.get("code", ""), "bug_note": result.get("bug_note", "")})
     except Exception as e:
+        log.exception("spot_bug: unhandled exception")
         return jsonify({"error": str(e)}), 502
 
 
@@ -3394,6 +3416,7 @@ Respond ONLY strict JSON, no markdown fences:
             for b in bugs:
                 b["found"] = False
         except Exception as e:
+            log.exception("reverse: unhandled exception")
             return jsonify({"error": str(e)}), 502
 
         opening_prompt = f"""You are a candidate who wrote this code for an interview problem. The interviewer just asked you to walk through it. Reply in character (1-2 sentences), slightly nervous, not seeing what's wrong.
@@ -3495,6 +3518,7 @@ Respond ONLY strict JSON, no markdown fences, no commentary:
         CURVEBALLS[q["id"]] = twist
         return jsonify({"twist": twist})
     except Exception as e:
+        log.exception("curveball: unhandled exception")
         return jsonify({"error": str(e)}), 502
 
 
@@ -4993,6 +5017,7 @@ def transcribe_audio():
         )
         return jsonify({"transcript": transcript})
     except Exception as e:
+        log.exception("transcribe_audio: unhandled exception")
         return jsonify({"error": f"Transcription failed: {str(e)}"}), 500
 
 
@@ -5018,6 +5043,7 @@ def text_to_speech():
         resp.raise_for_status()
         return resp.content, 200, {"Content-Type": "audio/mpeg"}
     except Exception as e:
+        log.exception("text_to_speech: unhandled exception")
         return jsonify({"error": f"TTS failed: {str(e)}"}), 500
 
 
@@ -5209,6 +5235,7 @@ Respond ONLY strict JSON, no markdown fences, no commentary:
         result = json.loads(raw)
         return jsonify({"bullets": result.get("bullets", []), "diagram": result.get("diagram", [])})
     except Exception as e:
+        log.exception("reference_design: unhandled exception")
         return jsonify({"error": str(e)}), 502
 
 
@@ -5249,6 +5276,7 @@ Respond ONLY strict JSON, no markdown fences, no commentary:
         flaws = [f for f in result.get("flaws", []) if f.get("concept") in taxonomy_for(q)]
         return jsonify({"diagram": result.get("diagram", []), "flaws": flaws})
     except Exception as e:
+        log.exception("adversarial_design: unhandled exception")
         return jsonify({"error": str(e)}), 502
 
 
@@ -5290,6 +5318,7 @@ Respond ONLY strict JSON, no markdown fences:
                         "misleading_clue": result.get("misleading_clue", ""),
                         "key_actions": result.get("key_actions", [])})
     except Exception as e:
+        log.exception("incident_scenario: unhandled exception")
         return jsonify({"error": str(e)}), 502
 
 
@@ -5340,6 +5369,7 @@ Respond ONLY strict JSON, no markdown fences:
         result = json.loads(raw)
         return jsonify({"comparisons": result.get("comparisons", [])})
     except Exception as e:
+        log.exception("staff_comparison: unhandled exception")
         return jsonify({"error": str(e)}), 502
 
 
@@ -5388,6 +5418,7 @@ Respond ONLY strict JSON, no markdown fences, no commentary:
         TRADEOFF_ROLLS[q["id"]] = {"title": title, "prompt": new_prompt, "key_points": key_points}
         return jsonify({"title": title, "prompt": new_prompt})
     except Exception as e:
+        log.exception("tradeoff_regenerate: unhandled exception")
         return jsonify({"error": str(e)}), 502
 
 
@@ -5578,6 +5609,7 @@ def transcribe():
             model="whisper-1", file=(audio.filename or "note.webm", audio.read(), audio.mimetype or "audio/webm"),
         )
     except Exception as e:
+        log.exception("transcribe: unhandled exception")
         return jsonify({"error": str(e)}), 502
     return jsonify({"text": result.text})
 
@@ -5681,6 +5713,7 @@ Keep each value to 1-2 sentences, plain text, no headers, no "great job" preambl
             sections["recall"] = recall
         return jsonify({"review_sections": sections})
     except Exception as e:
+        log.exception("review: unhandled exception")
         return jsonify({"error": str(e)}), 502
 
 

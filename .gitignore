@@ -14,3 +14,7 @@ sample_rubric_from_internet/
 .venv/
 
 graphify-out/
+
+# refactor logging output
+theloop.log
+theloop.log.*

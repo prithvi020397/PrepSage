@@ -1,0 +1,11 @@
+### /api/questions [200]
+[{"difficulty":"Medium","due":false,"id":"sql-1","lang":"sql","solved":false,"title":"Second highest salary"},{"difficulty":"Easy","due":false,"id":"sql-2","lang":"sql","solved":false,"title":"Duplicate emails"},{"difficulty":null,"due":false,"id":"sql-3","lang":"sql","solved":false,"title":"Running total"},{"difficulty":"Easy","due":false,"id":"py-1","lang":"python","solved":false,"title":"Two Su
+
+### /api/start [200]
+{"id":"py-1","reason":"weak_area"}
+
+
+### /api/streak [200]
+{"last_active":"2026-07-18","streak":1,"today_count":7}
+
+
