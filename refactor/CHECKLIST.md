@@ -41,8 +41,8 @@ Known app-side: none expected at baseline. `sarif` load warning is server-side (
 | 3 reorganized | 2b07c8e→(this step) | ✅ | none | bundle split losslessly into 12 ordered defer modules (00-config + 20..120-module). Verified: each node --checks OK, concatenation == original. NOTE: original code is feature-tangled, so module names are generic/ordered, NOT semantic. True semantic split deferred (riskier). |
 | 3.5 logging added | (this step) | ✅ | none | log() helper in 00-config.js (gated by APP_BOOT.debug); log() calls added at entry points: startRecording/setMicOn (30), startPractice/loadQuestion (60), renderCanvas (20), showCalibration/sendMessage (100), wrapUpInterview (120). 6 modules instrumented. |
 | 4 api() wrapper (per endpoint) | (this step) | ✅ | none | api(path,opts) added to 00-config.js (auto-logs method/path/status/ms, gated by debug). All 51 fetch() call sites migrated to api() in one pass (deviation from "one-per-commit" — mechanical, behavior-preserving). ?v bumped 3→4 on JS. node --check all OK. |
-| 5 state centralized (per global) | | ☐ | | |
-| 6 (optional) handlers | | ☐ | | user opted in? ☐ |
+| 5 state centralized (per global) | (this step) | ✅ | none | 28 mutable globals → App.state (00-config.js) with Object.defineProperty aliases; old names still work (verified). const globals (CONCEPT_TAXONOMIES, IDLE_NUDGE_MS) + cm left as-is. No re-declarations elsewhere. node OK, 43 pytest pass. |
+| 6 (optional) handlers | | ⏸ | | deferred — user not opted in; inline onclick working fine |
 
 ## Deploy checks
 

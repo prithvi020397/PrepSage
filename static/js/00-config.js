@@ -17,36 +17,50 @@ async function api(path, opts) {
 let cm = CodeMirror.fromTextArea(document.getElementById('editor'), {theme: 'material-darker', lineNumbers: true});
 requestAnimationFrame(() => cm.refresh());
 new ResizeObserver(() => cm.refresh()).observe(document.getElementById('editor-card'));
-let current = null;
-let clarifyMode = false;
-let selectedPersona = '';
-let selectedArchetype = '';
-let __compareData = null; // {label, chatHTML, band, score, dimScores}
-let adversarialMode = false;
-let adversarialFlaws = [];
-let scalingMode = false;
-let incidentMode = false;
-let incidentScenario = '';
-let replayTurns = [];
-let replayComments = [];
-let mockLoop = null; // {ids: [...], stage: 0} — null when no loop is active
-let savedChatHTMLBeforeReplay = null;
-let savedShapesBeforeReplay = null;
-let ttsEnabled = true;
-let designChips = [];
-let pacingTimer = null;
-let lastRunSummary = '';
-let __compareMode = null;
+
+// Step 5: centralize magic globals into a single App.state source of truth.
+// Old global names are kept alive via getters/setters (aliases) so every
+// existing reference across modules keeps working until migrated.
+window.App = window.App || {};
+App.state = {
+  current: null,
+  clarifyMode: false,
+  selectedPersona: '',
+  selectedArchetype: '',
+  __compareData: null, // {label, chatHTML, band, score, dimScores}
+  adversarialMode: false,
+  adversarialFlaws: [],
+  scalingMode: false,
+  incidentMode: false,
+  incidentScenario: '',
+  replayTurns: [],
+  replayComments: [],
+  mockLoop: null, // {ids: [...], stage: 0} — null when no loop is active
+  savedChatHTMLBeforeReplay: null,
+  savedShapesBeforeReplay: null,
+  ttsEnabled: true,
+  designChips: [],
+  pacingTimer: null,
+  lastRunSummary: '',
+  __compareMode: null,
+  idleTimer: null,
+  stuck: false,
+  nudgeSent: false,
+  reinforced: false,
+  pendingRecallReview: null,
+  stateCache: {}, // qid -> {code, chatHTML, resultsHTML, resultsClass, lastRunSummary, stuck, nudgeSent, reinforced, shapes}
+  timers: {}, // qid -> {elapsed, running}
+  timerInterval: null,
+};
+["current","clarifyMode","selectedPersona","selectedArchetype","__compareData","adversarialMode","adversarialFlaws","scalingMode","incidentMode","incidentScenario","replayTurns","replayComments","mockLoop","savedChatHTMLBeforeReplay","savedShapesBeforeReplay","ttsEnabled","designChips","pacingTimer","lastRunSummary","__compareMode","idleTimer","stuck","nudgeSent","reinforced","pendingRecallReview","stateCache","timers","timerInterval"].forEach(function (k) {
+  Object.defineProperty(window, k, {
+    get: function () { return App.state[k]; },
+    set: function (v) { App.state[k] = v; },
+    configurable: true,
+  });
+});
 const CONCEPT_TAXONOMIES = (window.APP_BOOT && window.APP_BOOT.concept_taxonomies) || [];
 
 const IDLE_NUDGE_MS = 45000;
-let idleTimer = null;
-let stuck = false;
-let nudgeSent = false;
-let reinforced = false;
-let pendingRecallReview = null;
-let stateCache = {}; // qid -> {code, chatHTML, resultsHTML, resultsClass, lastRunSummary, stuck, nudgeSent, reinforced, shapes}
-let timers = {}; // qid -> {elapsed, running}
-let timerInterval = null;
 
 // ---- design canvas (system design questions) ----
