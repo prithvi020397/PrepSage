@@ -124,21 +124,6 @@ if os.environ.get("LEGACY_MODE", "").lower() in ("1", "true", "yes"):
     sb = None
 
 
-def chat_content(resp):
-    """Safely pull text out of an OpenAI chat-completions response.
-
-    The model intermittently returns an empty `content` (None), which used to crash every
-    route that did `resp.choices[0].message.content.strip()` with a 502 + leaked exception
-    ('NoneType' object has no attribute 'strip'). Centralizing this means each route can just
-    check `if not text:` and return a clean retry error instead of 500ing. Returns the stripped
-    string, or None if the response was empty/malformed.
-    """
-    try:
-        text = resp.choices[0].message.content
-    except (AttributeError, IndexError, TypeError):
-        return None
-    return text.strip() if text else None
-
 QUESTIONS = {q["id"]: q for q in json.load(open("questions.json"))}
 
 # ponytail: LLM-derived mapping of question -> gap concepts it builds, produced offline by
@@ -200,35 +185,6 @@ PRECOMPUTED_CONTEXTS = json.load(open("question_contexts.json")) if os.path.exis
 # ponytail: static keyword map, not an LLM call — topic tagging doesn't need to cost anything.
 
 
-
-
-def _atomic_json(path, data):
-    """Write JSON atomically: write to temp file, then rename. Prevents corruption on crash."""
-    tmp = path + ".tmp"
-    with open(tmp, "w") as f:
-        json.dump(data, f)
-    os.replace(tmp, path)
-
-
-def save_progress():
-    _atomic_json(PROGRESS_FILE, PROGRESS)
-
-
-# ---------------------------------------------------------------------------
-# Supabase multi-user auth (optional). When SUPABASE_ENABLED is False these
-# endpoints return 404 and the rest of the app runs in legacy single-user mode.
-# When enabled, they issue Supabase Auth JWTs and resolve the caller's id.
-# ---------------------------------------------------------------------------
-def current_user_id():
-    """Return the Supabase auth user id for the current request, or None.
-
-    None means: Supabase is off, or no valid bearer token — callers should
-    fall back to the legacy global PROGRESS/HISTORY/CHATS state.
-    """
-    if not SUPABASE_ENABLED or sb is None:
-        return None
-    from flask import request as _req
-    return sb.get_user_id_from_request(_req)
 
 
 LEGACY_FAKE_TOKEN = "legacy-local-mode"
@@ -435,18 +391,6 @@ def log_history(entry):
     _atomic_json(HISTORY_FILE, HISTORY)
 
 
-def save_chats():
-    _atomic_json(CHATS_FILE, CHATS)
-
-
-def save_judges():
-    _atomic_json(JUDGES_FILE, JUDGES)
-
-
-def save_replay_comments():
-    _atomic_json(REPLAY_COMMENTS_FILE, REPLAY_COMMENTS)
-
-
 def _gen_question_context(q):
     """Fallback rich-framing generator — only used if a question is missing from the
     precomputed question_contexts.json. Mirrors gen_question_context in precompute.py."""
@@ -471,52 +415,6 @@ Respond ONLY strict JSON:
                 "edge_cases": [str(e).strip() for e in (result.get("edge_cases") or []) if str(e).strip()][:2]}
     except Exception:
         return {"scenario": "", "why_asked": "", "edge_cases": []}
-
-
-def split_wrap_up_reply(reply, taxonomy=CONCEPT_TAXONOMY):
-    """Split an interview wrap-up reply into (prose, missed_concepts, rushed_to_design,
-    communication_score, communication_note, rubric_scores) — the trailing ```json fence is a grading
-    artifact and never shown to the candidate."""
-    if "```json" not in reply:
-        return reply.strip(), [], False, None, "", {}
-    prose, _, tail = reply.partition("```json")
-    try:
-        raw = tail.split("```")[0]
-        parsed = json.loads(raw)
-        concepts = [c for c in parsed.get("missed_concepts", []) if c in taxonomy]
-        rushed = bool(parsed.get("rushed_to_design"))
-        score = parsed.get("communication_score")
-        score = int(score) if isinstance(score, (int, float)) and 1 <= score <= 5 else None
-        note = parsed.get("communication_note") or ""
-        rubric_scores = parsed.get("rubric_scores") or {}
-    except Exception:
-        concepts, rushed, score, note, rubric_scores = [], False, None, "", {}
-    return prose.strip(), concepts, rushed, score, note, rubric_scores
-
-
-def hire_verdict(missed_concepts, rushed_to_design, communication_score, rubric_scores=None):
-    """Cheap point-based read, not a real calibrated rubric — reuses the signals the
-    debrief already computes to surface a directional strong hire / hire / no hire."""
-    if rubric_scores:
-        phase_maxes = [8, 10, 6, 8, 6, 6]
-        total = sum(rubric_scores.get(f"phase{i+1}", 0) for i in range(6))
-        total_max = sum(phase_maxes)
-        pct = total / total_max
-        if pct >= 0.85:
-            return "Strong Hire"
-        if pct >= 0.60:
-            return "Hire"
-        return "No Hire"
-    points = -len(missed_concepts)
-    if rushed_to_design:
-        points -= 2
-    if communication_score is not None:
-        points += communication_score - 3
-    if points >= 0:
-        return "Strong Hire"
-    if points >= -3:
-        return "Hire"
-    return "No Hire"
 
 
 def recurring_missed_concepts():
@@ -845,55 +743,6 @@ def _compute_claim_validation():
     }
 
 
-def run_sql_case(schema_sql, code):
-    conn = sqlite3.connect(":memory:")
-    conn.executescript(schema_sql)
-    try:
-        cur = conn.execute(code)
-        cols = [d[0] for d in cur.description] if cur.description else []
-        rows = [list(r) for r in cur.fetchall()]
-    except sqlite3.Error as e:
-        return None, None, str(e)
-    return cols, rows, None
-
-
-def get_sample_tables(schema_sql):
-    conn = sqlite3.connect(":memory:")
-    conn.executescript(schema_sql)
-    tables = [r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")]
-    out = {}
-    for t in tables:
-        cur = conn.execute(f"SELECT * FROM {t}")
-        out[t] = {"columns": [d[0] for d in cur.description], "rows": [list(r) for r in cur.fetchall()]}
-    return out
-
-
-def run_python_case(harness, code):
-    # ponytail: security gate — never execute code that could damage the host.
-    # Candidate code is scanned for process-spawn / eval / fs-destruction before
-    # it ever reaches the interpreter. A BLOCK finding short-circuits execution.
-    blocker = has_blocker(code)
-    if blocker:
-        return None, (
-            f"Security scan blocked execution: {blocker.message} "
-            f"(line {blocker.line}). This looks like it could harm the host machine, "
-            f"not solve the interview problem. Rewrite using plain algorithm code."
-        )
-    full_code = code + "\n\n" + harness
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
-        f.write(full_code)
-        path = f.name
-    try:
-        result = subprocess.run(["python3", path], capture_output=True, text=True, timeout=5)
-    except subprocess.TimeoutExpired:
-        return None, "Timed out (5s) — check for an infinite loop."
-    finally:
-        os.unlink(path)
-    if result.returncode != 0:
-        return None, result.stderr.strip()
-    return result.stdout, None
-
-
 @app.route("/")
 def index():
     # Show onboarding for new users (no progress, no deadline set)
@@ -962,199 +811,6 @@ def save_onboarding():
     return jsonify({"ok": True})
 
 
-def _ocr_with_stirling(file_bytes, filename):
-    """Fallback OCR via a self-hosted Stirling-PDF instance (default http://localhost:8080).
-    Activates only when STIRLING_PDF_URL is set (or default local instance is reachable) and
-    pdfplumber returned no text (e.g. a scanned/image PDF). Returns extracted text or None.
-    Fails silently — caller keeps using whatever it already had."""
-    base = os.environ.get("STIRLING_PDF_URL", "http://localhost:8080").rstrip("/")
-    if not base:
-        return None
-    try:
-        resp = urllib.request.urlopen(
-            f"{base}/api/v1/convert/pdf/ocr",
-            data=file_bytes, timeout=60,
-            headers={"Content-Type": "application/pdf"},
-        )
-        out = resp.read()
-        # OCR endpoint returns a PDF; re-run pdfplumber on it to get text
-        if pdfplumber and out:
-            with pdfplumber.open(BytesIO(out)) as pdf:
-                text = "\n".join(page.extract_text() or "" for page in pdf.pages)
-            return text or None
-    except Exception:
-        return None
-    return None
-
-
-def _extract_text_from_resume(file_bytes, filename):
-    """Extract plain text from a PDF or DOCX file. Falls back to Stirling-PDF OCR
-    for scanned/image PDFs that pdfplumber can't read."""
-    lower = filename.lower()
-    if lower.endswith(".pdf") and pdfplumber:
-        with pdfplumber.open(BytesIO(file_bytes)) as pdf:
-            text = "\n".join(page.extract_text() or "" for page in pdf.pages)
-        # empty => likely a scanned PDF; try OCR before giving up
-        if not text.strip() and os.environ.get("STIRLING_PDF_URL", "http://localhost:8080"):
-            ocr = _ocr_with_stirling(file_bytes, filename)
-            if ocr:
-                return ocr
-        return text
-    elif lower.endswith((".docx", ".doc")) and docx:
-        doc = docx.Document(BytesIO(file_bytes))
-        return "\n".join(p.text for p in doc.paragraphs)
-    elif lower.endswith(".txt"):
-        return file_bytes.decode("utf-8", errors="replace")
-    return None
-
-
-def _call_json_extract(prompt, max_tokens=1800):
-    """Call the LLM for a JSON-only extraction, with a truncation-safe retry.
-    If the first response is cut off (finish_reason 'length'), retries once with a
-    larger cap. Returns the cleaned response text, or None if both attempts fail."""
-    def _clean(raw):
-        if not raw:
-            return None
-        raw = re.sub(r"^```[a-zA-Z]*\n?", "", raw.strip())
-        raw = re.sub(r"\n?```$", "", raw).strip()
-        if "{" not in raw or "}" not in raw:
-            return None
-        return raw
-
-    try:
-        resp = client.chat.completions.create(
-            model=MODEL,
-            messages=[{"role": "user", "content": prompt}],
-            max_tokens=max_tokens,
-            temperature=0.1,
-            extra_body={"reasoning": {"enabled": False}},
-        )
-        raw = _clean(chat_content(resp))
-        if raw:
-            return raw
-        # truncated or empty — retry once with a larger cap if it was length-limited
-        if getattr(resp.choices[0], "finish_reason", None) == "length":
-            resp2 = client.chat.completions.create(
-                model=MODEL,
-                messages=[{"role": "user", "content": prompt}],
-                max_tokens=max_tokens * 2,
-                temperature=0.1,
-                extra_body={"reasoning": {"enabled": False}},
-            )
-            raw2 = _clean(chat_content(resp2))
-            if raw2:
-                return raw2
-        return None
-    except Exception as e:
-        log.exception("_clean: unhandled exception")
-        log.debug("[_call_json_extract] LLM error: %s: %s", type(e).__name__, e)
-        return None
-
-
-def _clean_pdf_artifacts(text):
-    """Strip PostScript character names (cid:xxx), ligature codes, and Unicode garbage
-    that leak from PDF text extraction (e.g. '(cid:136)' for ⚠️)."""
-    text = re.sub(r"\(cid:\d+\)", "", text)
-    text = re.sub(r"\(cid\d+\)", "", text)
-    text = re.sub(r"\(U\+[0-9A-Fa-f]{4,6}\)", "", text)
-    text = re.sub(r"\(0x[0-9A-Fa-f]{2,4}\)", "", text)
-    return text
-
-
-_NON_TECH_SKILL_BLACKLIST = {
-    "sam", "designed", "power", "questease", "programming", "compliance",
-    "automated", "computer", "bachelor", "master", "university", "college",
-    "school", "institute", "team", "leader", "leadership", "communication",
-    "collaboration", "problem", "solving", "analytical", "detail", "oriented",
-    "self", "motivated", "experience", "years", "year", "role", "position",
-    "technologies", "tools", "systems", "solutions", "services", "platform",
-    "platforms", "infrastructure", "environment", "environments",
-    "development", "management", "operations", "production", "process",
-    "processes", "projects", "project", "product", "products", "business",
-    "stakeholders", "clients", "customers", "requirements", "specifications",
-    "documentation", "standards", "methodologies", "approach", "data",
-}
-
-
-def _is_technical_skill(name):
-    """Check if a skill name looks like a genuine technical skill, not a random word."""
-    n = name.lower().strip()
-    if len(n) <= 2:
-        return False
-    if n in _NON_TECH_SKILL_BLACKLIST:
-        return False
-    return True
-
-
-def _extract_skills_from_resume(text):
-    """Use LLM to extract structured skills, projects, and domain from resume text.
-    Returns rich data including depth signals, project specificity, and skill context."""
-    prompt = f"""Analyze this resume like a technical interviewer would. Extract structured information. Respond ONLY with a JSON object — no markdown, no commentary.
-
-Resume text (truncated):
-{text[:4000]}
-
-Return exactly this JSON shape:
-{{
-  "target_role": "inferred target role e.g. 'data engineer', 'backend engineer', 'ML engineer' — be specific",
-  "years_experience": "estimated years or null",
-  "skills": [
-    {{
-      "name": "skill name — ONLY extract TECHNICAL skills: programming languages, frameworks, tools, platforms, databases, cloud services, libraries. IGNORE: soft skills, university names, company names, locations, personal names, degree names, generic terms like 'Engineering' or 'Bachelor'.",
-      "depth": "deep | moderate | shallow — based on how it was used (built production system = deep, listed in skills section only = shallow)",
-      "context": "where/how it was used (e.g. 'used in AdTech pipeline for 3B daily events') — be specific"
-    }}
-  ],
-  "projects": [
-    {{
-      "name": "project name",
-      "description": "what it does — be specific about scale, impact, technical choices",
-      "tech": ["technologies used"],
-      "specificity": "high | low — are the numbers/concrete details provided or is it vague?"
-    }}
-  ],
-  "domains": ["application domains e.g. 'ad tech', 'healthcare', 'payments', 'distributed systems'"],
-  "strongest_skills": ["top 3-5 technical skills based on depth and context"],
-  "weakest_signals": ["skills with no project context — likely shallow"]
-}}
-
-Note: do NOT include interview questions/probes — those are generated on demand later.
-Be strict about depth: "familiar with X" or just listing X = shallow. "Built Y using X processing Z events/day" = deep.
-CRITICAL: ONLY extract genuine technical skills. Do not include company names, person names, university names, cities, or generic English words.
-DO NOT extract these as skills: Sam, Designed, Power, Programming, Compliance, Automated, Computer, Data, Engineer, Team, Business, Systems, Solutions, Platforms, Infrastructure, Environment, Development, Management, Operations, Production, Process, Projects, Products, Services, Solutions.
-DO extract these as skills: Apache Spark, Python, SQL, Docker, Kubernetes, Snowflake, dbt, Airflow, Terraform, AWS, GCP, Azure, Git, React, Node.js, Java, Scala, Go, Rust, MongoDB, PostgreSQL, Kafka, Spark Streaming."""
-
-    raw = _call_json_extract(prompt, max_tokens=1800)
-    if not raw:
-        return None
-    try:
-        obj = json.loads(raw[raw.index("{"):raw.rindex("}") + 1])
-        skills = obj.get("skills", [])
-        filtered = []
-        for s in skills:
-            name = s.get("name", "") if isinstance(s, dict) else str(s)
-            if _is_technical_skill(name):
-                filtered.append(s)
-        projects = []
-        for p in obj.get("projects", []):
-            if isinstance(p, dict):
-                p["name"] = _clean_pdf_artifacts(p.get("name", ""))
-                p["description"] = _clean_pdf_artifacts(p.get("description", ""))
-            projects.append(p)
-        domains = [_clean_pdf_artifacts(d) for d in obj.get("domains", [])]
-        return {
-            "skills": filtered,
-            "projects": projects,
-            "domains": domains,
-            "years_experience": obj.get("years_experience"),
-            "target_role": obj.get("target_role"),
-            "strongest_skills": obj.get("strongest_skills", []),
-            "weakest_signals": obj.get("weakest_signals", []),
-        }
-    except Exception:
-        return None
-
-
 def _stamp_taxonomy(data):
     """Tag an extraction with the taxonomy version that produced it.
     Called at creation time so we can detect stale mappings later without
@@ -1184,157 +840,6 @@ JD_CONCEPT_TRANSLATIONS = {
     "iceberg": "storage_format", "delta lake": "storage_format", "parquet": "storage_format",
     "hive": "storage_format", "kubernetes": "container_orchestration", "docker": "containers",
 }
-
-
-def _extract_concepts_from_jd(text):
-    """Use LLM to extract the JD at the CONCEPT level, not the tool-keyword level.
-    Returns concepts (mapped to our taxonomy where possible), required capabilities,
-    and the raw tool keywords (for the translation sidebar)."""
-    concept_list = ", ".join(CONCEPT_TAXONOMY)
-    prompt = f"""You are analyzing a job description for a technical interview coach. Extract what the role ACTUALLY requires at the CONCEPT level — not the literal tool names.
-
-Job description (truncated):
-{text[:4000]}
-
-Our coaching taxonomy of data-engineering concepts (use these exact keys where they fit):
-{concept_list}
-
-Return ONLY this JSON — no markdown, no commentary:
-{{
-  "role_title": "the job title, be specific",
-  "seniority": "junior | mid | senior | staff | principal",
-  "domain": "the application domain (e.g. 'real-time recommendation', 'payments', 'adtech', 'healthcare')",
-  "concepts_required": [
-    {{
-      "concept": "a concept key from the taxonomy above if it fits, else a short concept phrase (e.g. 'streaming_paradigm', 'batch_vs_stream_choice', 'partitioning_hot_key_skew', 'cloud_platform', 'ic_across_teams')",
-      "evidence": "the JD phrase that implies this concept",
-      "importance": "must_have | nice_to_have"
-    }}
-  ],
-  "capabilities_required": [
-    "broader capabilities the role needs that aren't single taxonomy concepts, e.g. 'design a real-time system from scratch', 'own a data platform end to end', 'translate batch experience to streaming' — 3 to 6 items"
-  ],
-  "tool_keywords": ["literal tools/services named in the JD, e.g. 'Kafka', 'AWS', 'Flink', 'Terraform' — preserved for the translation sidebar"],
-  "signal_framing": "1-2 sentences on what kind of candidate this JD is really looking for (beyond the bullet list)"
-}}
-
-Critical: if the JD says 'Kafka' or 'Flink', the concept is 'streaming_paradigm' (not 'Kafka'). If it says 'AWS' or 'GCP', the concept is 'cloud_platform'. Batch tools (Spark, PySpark) map to 'batch_paradigm'. Think in paradigms and concepts, not brand names."""
-
-    raw = _call_json_extract(prompt, max_tokens=1500)
-    if not raw:
-        return None
-    try:
-        obj = json.loads(raw[raw.index("{"):raw.rindex("}") + 1])
-        return {
-            "role_title": obj.get("role_title", ""),
-            "seniority": obj.get("seniority", ""),
-            "domain": obj.get("domain", ""),
-            "concepts_required": obj.get("concepts_required", []),
-            "capabilities_required": obj.get("capabilities_required", []),
-            "tool_keywords": obj.get("tool_keywords", []),
-            "signal_framing": obj.get("signal_framing", ""),
-        }
-    except Exception:
-        return None
-
-
-def _fallback_extract_jd(text):
-    """Basic regex-based JD extraction when the LLM is unavailable.
-    Extracts role title, tool keywords, and concept-level guesses from raw text."""
-    title = ""
-    lines = [l.strip() for l in text.split("\n") if l.strip()]
-    for l in lines[:15]:
-        l_clean = l.strip()
-        if l_clean and len(l_clean) < 120 and not l_clean.startswith(("http", "About", "Job", "Location", "Salary", "Type", "Posted")):
-            # likely a job title — first substantive short line
-            if any(w in l_clean.lower() for w in ("engineer", "scientist", "architect", "developer", "manager", "intern", "analyst")):
-                title = l_clean
-                break
-            elif "|" not in l_clean and "@" not in l_clean:
-                title = l_clean
-                break
-    known_tools = set(JD_CONCEPT_TRANSLATIONS.keys())
-    tool_keywords = []
-    text_lower = text.lower()
-    for tool in sorted(known_tools, key=len, reverse=True):
-        if tool in text_lower and tool not in tool_keywords:
-            tool_keywords.append(tool)
-    concept_matches = {}
-    for tool, concept in JD_CONCEPT_TRANSLATIONS.items():
-        if tool in text_lower:
-            concept_matches.setdefault(concept, []).append(tool)
-    concepts_required = []
-    for concept, tools in concept_matches.items():
-        concepts_required.append({
-            "concept": concept,
-            "evidence": f"Mentions: {', '.join(tools[:3])}",
-            "importance": "must_have",
-        })
-    return {
-        "role_title": title or "Unknown Role",
-        "seniority": "mid",
-        "domain": "",
-        "concepts_required": concepts_required,
-        "capabilities_required": [],
-        "tool_keywords": tool_keywords[:20],
-        "signal_framing": "Extracted by fallback (no LLM available). Concepts are based on tool-name matching — less precise than AI extraction.",
-    }
-
-
-def _fallback_extract_resume(text):
-    """Basic regex-based resume extraction when the LLM is unavailable.
-    Extracts skill candidates, project-like paragraphs, and domain guesses."""
-    lines = [l.strip() for l in text.split("\n") if l.strip()]
-    # collect capitalized terms as skill candidates
-    words = re.findall(r'\b[A-Z][a-z++#.]{1,}\b', text)
-    skip = {"The", "This", "That", "With", "From", "They", "What", "When", "Where",
-            "Also", "Have", "Has", "Had", "Our", "Your", "You", "We", "I", "It", "Its",
-            "Not", "All", "Each", "Every", "Some", "Most", "Few", "Many", "Much",
-            "More", "Less", "And", "But", "Or", "For", "Nor", "Yet", "So", "Both",
-            "Either", "Neither", "January", "February", "March", "April", "May", "June",
-            "July", "August", "September", "October", "November", "December",
-            "Email", "Phone", "Address", "City", "State"}
-    skill_set = set()
-    for w in words:
-        wl = w.lower()
-        if w in skip or len(w) < 3:
-            continue
-        if wl in skill_set:
-            continue
-        skill_set.add(wl)
-    skills = [{"name": s.title(), "depth": "moderate", "context": ""} for s in list(skill_set)[:30]]
-    projects = []
-    for l in lines[10:40]:
-        if len(l) > 60 and any(c in l for c in (".", ":", "—")):
-            projects.append({
-                "name": l.split("—")[0].split(":")[0].strip()[:60] or "Project",
-                "description": l[:150],
-                "tech": [],
-                "specificity": "low",
-            })
-    return {
-        "target_role": "Unknown",
-        "years_experience": None,
-        "skills": skills,
-        "projects": projects[:5],
-        "domains": [],
-        "strongest_skills": [s["name"] for s in skills[:5]],
-        "weakest_signals": [],
-    }
-
-
-def _extraction_fallback_chain(extract_fn, fallback_fn, text, label):
-    """Try LLM extraction first, fall back to deterministic extraction on failure.
-    Returns (data: dict | None, method: str)."""
-    data = extract_fn(text)
-    if data:
-        return data, "llm"
-    log.debug("[%s] LLM extraction failed — using fallback", label)
-    fb = fallback_fn(text)
-    if fb:
-        return fb, "fallback"
-    log.debug("[%s] Fallback also failed — returning None", label)
-    return None, "none"
 
 
 @app.route("/api/upload-jd", methods=["POST"])
@@ -3679,165 +3184,6 @@ if os.path.isdir(_CALIB_DIR):
         except Exception:
             pass
 
-def build_judge_transcript(transcript_turns):
-    """Convert raw chat turns ({role, content, turn?}) into the judge-facing
-    transcript. Candidate turns that carry a whiteboard diagram get a structured
-    `whiteboard` field so D2 (architecture) and D4 (ML formulation) can be scored
-    from what was actually drawn, not just what was said."""
-    judge_transcript = []
-    for t in transcript_turns:
-        role = "candidate" if t["role"] == "user" else "client"
-        content = t["content"]
-        turn = {"turn": t.get("turn", len(judge_transcript)),
-                "role": role, "text": content[:2000]}
-        if role == "candidate":
-            wm = WHITEBOARD_WRAP_RE.match(content)
-            if wm:
-                diagram = wm.group(1).strip()
-                if diagram:
-                    turn["whiteboard"] = diagram
-        judge_transcript.append(turn)
-    return judge_transcript
-
-
-def _repair_truncated_json(raw):
-    """Best-effort repair of a JSON string the model cut off mid-output.
-
-    Re-balances braces/brackets and strips a dangling trailing comma so a
-    truncated judge reply can still be parsed instead of failing the whole
-    scoring pass. Returns the repaired string; callers should expect a possible
-    further JSONDecodeError if the content is too corrupt to salvage.
-    """
-    s = raw.rstrip()
-    # close any unterminated string by appending a quote
-    if s.count('"') % 2 == 1:
-        s += '"'
-    # re-balance with a depth-aware stack so closers are emitted in LIFO order
-    # (handles a truncated innermost object, not just net counts).
-    stack = []
-    in_str = False
-    esc = False
-    for ch in s:
-        if esc:
-            esc = False
-            continue
-        if ch == '\\':
-            esc = True
-            continue
-        if ch == '"':
-            in_str = not in_str
-            continue
-        if in_str:
-            continue
-        if ch == '{' or ch == '[':
-            stack.append(ch)
-        elif ch == '}' or ch == ']':
-            if stack:
-                stack.pop()
-    while stack:
-        opener = stack.pop()
-        s += '}' if opener == '{' else ']'
-    # drop a trailing comma left before a closing bracket/brace
-    s = re.sub(r",\s*([}\]])", r"\1", s)
-    return s
-
-
-def run_judge(scenario_json, transcript_turns, session_id, scenario_id):
-    """Call the judge model (separate from the client simulation) to score a
-    completed decomposition session.
-
-    Parameters
-    ----------
-    scenario_json : dict
-        The full questions.json entry (persona + triggers + rubric for v2,
-        or just id/title/prompt for v1).
-    transcript_turns : list[dict]
-        Ordered turns with 'role' and 'text' keys.
-    session_id : str
-    scenario_id : str
-
-    Returns
-    -------
-    dict
-        Judge output conforming to judge_output_schema.json.
-    """
-    if not JUDGE_SYSTEM_PROMPT or not JUDGE_OUTPUT_SCHEMA:
-        return {"session_id": session_id, "scenario_id": scenario_id,
-                "insufficient_session": True, "band": None,
-                "normalized_score": None, "weighted_total": None,
-                "weights_used": None, "low_coverage": True,
-                "trigger_log": [], "dimensions": [], "disqualifiers": [],
-                "band_capped_by_disqualifier": False, "red_flags": [],
-                "coaching": {"summary": "Judge not configured.", "per_dimension": [],
-                             "strongest_moment": {"turn": 0, "note": ""},
-                             "costliest_moment": {"turn": 0, "note": ""}}}
-
-    # Build transcript JSON for the judge (only user/assistant turns that have text)
-    judge_transcript = build_judge_transcript(transcript_turns)
-
-    system = (JUDGE_SYSTEM_PROMPT
-              .replace("{scenario_json}", json.dumps(scenario_json, indent=2))
-              .replace("{transcript_json}", json.dumps(judge_transcript, indent=2))
-              .replace("{output_schema}", json.dumps(JUDGE_OUTPUT_SCHEMA, indent=2)))
-
-    try:
-        resp = client.chat.completions.create(
-            model=MODEL,
-            messages=[{"role": "system", "content": system},
-                      {"role": "user", "content": "Score this session. Output JSON only."}],
-            max_tokens=4096,
-            temperature=0,
-            extra_body={"reasoning": {"enabled": False}},
-        )
-        raw = resp.choices[0].message.content.strip()
-        # Strip markdown fences if present
-        if raw.startswith("```"):
-            raw = raw.split("\n", 1)[1] if "\n" in raw else raw[3:]
-            if raw.rstrip().endswith("```"):
-                raw = raw.rstrip()[:-3].strip()
-        if "{" in raw and "}" in raw:
-            raw = raw[raw.index("{"):raw.rindex("}") + 1]
-        # ponytail: the judge reply can be long (full scenario echo + coaching).
-        # If the model still truncated mid-JSON, try to repair common breakages
-        # (trailing comma, unterminated string/array/object) before giving up.
-        try:
-            result = json.loads(raw)
-        except json.JSONDecodeError:
-            repaired = _repair_truncated_json(raw)
-            result = json.loads(repaired)
-    except Exception as e:
-        return {"session_id": session_id, "scenario_id": scenario_id,
-                "insufficient_session": True, "band": None,
-                "normalized_score": None, "weighted_total": None,
-                "weights_used": None, "low_coverage": True,
-                "trigger_log": [], "dimensions": [], "disqualifiers": [],
-                "band_capped_by_disqualifier": False, "red_flags": [],
-                "_judge_error": str(e),
-                "coaching": {"summary": f"Judge error: {e}", "per_dimension": [],
-                             "strongest_moment": {"turn": 0, "note": ""},
-                             "costliest_moment": {"turn": 0, "note": ""}}}
-
-    result.setdefault("session_id", session_id)
-    result.setdefault("scenario_id", scenario_id)
-    result.setdefault("insufficient_session", False)
-    result.setdefault("trigger_log", [])
-    result.setdefault("dimensions", [])
-    result.setdefault("disqualifiers", [])
-    result.setdefault("weighted_total", None)
-    result.setdefault("weights_used", None)
-    result.setdefault("normalized_score", None)
-    result.setdefault("band", None)
-    result.setdefault("band_capped_by_disqualifier", False)
-    result.setdefault("low_coverage", False)
-    result.setdefault("red_flags", [])
-    result.setdefault("coaching", {"summary": "", "per_dimension": [],
-                                    "strongest_moment": {"turn": 0, "note": ""},
-                                    "costliest_moment": {"turn": 0, "note": ""}})
-    return result
-
-
-# Standard judge rubric used for v1 questions (no per-scenario rubric).
-# Judge will score only `always_scorable` dimensions when triggers are empty.
 JUDGE_RUBRIC = {
     "dimensions": [
         {"id": "D1", "name": "Constraint discovery & clarification", "weight": 1.5, "always_scorable": True},
@@ -4509,7 +3855,6 @@ def coach():
     return jsonify({"hint": None})
 
 
-WHITEBOARD_WRAP_RE = re.compile(r"^\[Candidate's current whiteboard\]\n(.*?)\n\n\[Candidate says\]\n(.*)$", re.S)
 
 
 @app.route("/api/interview-history")
@@ -5158,3 +4503,27 @@ def _parse_review_sections(raw):
 if __name__ == "__main__":
     app.run(debug=True, port=5050)
 
+
+
+
+# ---------------------------------------------------------------------------
+# Phase 4 refactor — services extracted to services/ (verbatim; behavior unchanged).
+# Re-exported here so existing call sites keep working without edits.
+# Imported at the END of the module so all app-level globals the services
+# depend on (client, MODEL, PROGRESS, JUDGE_* etc.) are already defined.
+# ---------------------------------------------------------------------------
+from services.llm import chat_content, _call_json_extract  # noqa: E402,F401
+from services.extraction import (  # noqa: E402,F401
+    _ocr_with_stirling, _extract_text_from_resume, _clean_pdf_artifacts,
+    _is_technical_skill, _extract_skills_from_resume, _extract_concepts_from_jd,
+    _fallback_extract_jd, _fallback_extract_resume, _extraction_fallback_chain,
+)
+from services.execution import run_sql_case, get_sample_tables, run_python_case  # noqa: E402,F401
+from services.grading import (  # noqa: E402,F401
+    _repair_truncated_json, run_judge, build_judge_transcript,
+    split_wrap_up_reply, hire_verdict, WHITEBOARD_WRAP_RE,
+)
+from services.persistence import (  # noqa: E402,F401
+    _atomic_json, save_progress, save_chats, save_judges,
+    save_replay_comments, current_user_id,
+)
