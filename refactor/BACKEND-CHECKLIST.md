@@ -30,7 +30,7 @@ phase N is ✅.
 | Phase | Commit hash | Tests green | url_map unchanged | curl diff clean | Notes |
 |-------|-------------|-------------|-------------------|-----------------|-------|
 | 0 logging | (local, not pushed) | ☑ 43 passed | ☑ 72 rules match | ☑ (no route/behavior change) | RotatingFileHandler(5MB×5) + stderr; log.exception in 18 LLM/parse/auth except blocks; print()→log.debug for 3 debug dumps; after_request already logged method/path/status/ms |
-| 1 duplicate routes | | ☐ | ☐ | ☐ | dupes found: |
+| 1 duplicate routes | (local, not pushed) | ☑ 44 passed | ☑ 72 rules match | ☑ | Removed Whisper `transcribe()` dup at L5600; kept Deepgram `transcribe_audio` (returns `transcript`, matches frontend). Added test_route_inventory asserting exactly one `/api/transcribe`. NOTE: this was a live bug — Flask served the last-registered (Whisper) route, which returns `text` + needs OPENAI_API_KEY (unset in cloud), so transcription was effectively broken in production. |
 | 2 characterization tests | | ☐ | ☐ | ☐ | new tests: |
 | 3 core/ extracted | | ☐ | ☐ | ☐ | |
 | 4 services/ extracted | | ☐ | ☐ | ☐ | |

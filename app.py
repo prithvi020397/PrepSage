@@ -5597,23 +5597,6 @@ def streak():
     })
 
 
-@app.route("/api/transcribe", methods=["POST"])
-def transcribe():
-    if whisper_client is None:
-        return jsonify({"error": "OPENAI_API_KEY not configured on the server"}), 500
-    audio = request.files.get("audio")
-    if not audio:
-        return jsonify({"error": "no audio uploaded"}), 400
-    try:
-        result = whisper_client.audio.transcriptions.create(
-            model="whisper-1", file=(audio.filename or "note.webm", audio.read(), audio.mimetype or "audio/webm"),
-        )
-    except Exception as e:
-        log.exception("transcribe: unhandled exception")
-        return jsonify({"error": str(e)}), 502
-    return jsonify({"text": result.text})
-
-
 @app.route("/api/takeaways", methods=["POST"])
 def takeaways():
     """Phase 2: distill a finished question/debrief into exactly 3 prioritized takeaways so

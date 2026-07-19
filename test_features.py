@@ -93,5 +93,11 @@ class TestWhiteboardSignal(unittest.TestCase):
         self.assertLessEqual(len(out[0]["text"]), 2000)
 
 
+class TestRouteInventory(unittest.TestCase):
+    def test_transcribe_route_unique(self):
+        matches = [r for r in app.url_map.iter_rules() if r.rule == "/api/transcribe"]
+        self.assertEqual(len(matches), 1, "duplicate /api/transcribe route must be removed")
+
+
 if __name__ == "__main__":
     unittest.main()
