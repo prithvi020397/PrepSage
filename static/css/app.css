@@ -1173,9 +1173,10 @@
       width: 100%; flex: 0 0 auto; max-height: 38vh;
       border-right: none; border-bottom: 1px solid var(--border);
     }
-    #main { flex-direction: column; overflow-y: auto; padding: 14px; gap: 12px; }
-    #main-left { flex: 0 0 auto; min-width: 0; width: 100%; max-height: none; }
-    #main-right { flex: 0 0 auto; min-width: 0; width: 100%; }
+    #main { display: block; overflow: visible; padding: 14px; }
+    #auth-banner { width: 100%; box-sizing: border-box; margin: 0 0 12px; }
+    #main-left { display: block; width: 100%; min-width: 0; max-height: none; margin-bottom: 12px; }
+    #main-right { display: block; width: 100%; min-width: 0; }
     #sidebar-resizer, #main .resizer { display: none !important; }
     .CodeMirror { height: auto; min-height: 220px; }
   }

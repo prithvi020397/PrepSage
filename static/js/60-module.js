@@ -191,8 +191,14 @@ function applySidebarFilter() {
     let total = 0;
     let next = h.nextElementSibling;
     while (next && !next.classList.contains('q-section-header')) {
+      // skip non-question siblings (e.g. the browse hint appended after the last section)
+      const titleEl = next.querySelector('.q-title');
+      if (!titleEl || !next.classList.contains('q-item')) {
+        next = next.nextElementSibling;
+        continue;
+      }
       total++;
-      const match = !term || next.querySelector('.q-title').textContent.toLowerCase().includes(term);
+      const match = !term || titleEl.textContent.toLowerCase().includes(term);
       next.style.display = (match && (!collapsed || term)) ? '' : 'none';
       if (match) visible++;
       next = next.nextElementSibling;

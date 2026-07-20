@@ -39,16 +39,21 @@ def get_client():
 def get_client_with_token(access_token, refresh_token=None):
     """Return a Supabase client authenticated as the given user.
 
-    For RLS-compliant queries: table operations use the user's JWT so
-    policies like auth.uid() = user_id pass. Falls back to the anon client
-    if token is None.
+    For RLS-compliant queries we apply ONLY the access token via
+    ``postgrest.auth(token)`` (supabase-py v2). This is the correct way to set
+    the bearer token for row-level-security policies (auth.uid() = user_id) and
+    does NOT require a refresh token, avoiding the crash that set_session(token, "")
+    can throw when refresh is empty. Falls back to the anon client if token is None.
     """
     if not SUPABASE_ENABLED:
         return None
     c = get_client()
     if c and access_token:
         try:
-            c.auth.set_session(access_token, refresh_token or "")
+            if hasattr(c, "postgrest") and hasattr(c.postgrest, "auth"):
+                c.postgrest.auth(access_token)
+            elif refresh_token:
+                c.auth.set_session(access_token, refresh_token)
         except Exception:
             pass
     return c
@@ -96,10 +101,17 @@ def load_progress(user_id, token=None):
                 return _read_json(PROGRESS_FILE, {})
             out = {}
             for row in (res.data or []):
-                qid = row.pop("qid")
+                qid = row.pop("qid", None)
                 row.pop("user_id", None)
                 row.pop("updated_at", None)
-                out[qid] = row
+                if qid == "__meta__":
+                    # underscore-prefixed app metadata (_jd, _resume, _deadline, ...)
+                    meta = row.get("meta") or {}
+                    for k, v in meta.items():
+                        out[k] = v
+                    continue
+                if qid and not qid.startswith("_"):
+                    out[qid] = row
             return out
     return _read_json(PROGRESS_FILE, {})
 
@@ -112,10 +124,14 @@ def save_progress(user_id, progress, token=None):
     if SUPABASE_ENABLED and user_id:
         c = get_client_with_token(token) if token else get_client()
         if c:
-            rows = [
+            # Split per-question progress from underscore-prefixed app metadata.
+            meta = {k: v for k, v in progress.items() if k.startswith("_")}
+            question_rows = [
                 {"user_id": user_id, "qid": qid, **state}
                 for qid, state in progress.items()
+                if not str(qid).startswith("_")
             ]
+            rows = question_rows + [{"user_id": user_id, "qid": "__meta__", "meta": meta}]
             try:
                 for row in rows:
                     c.table("progress").upsert(row).execute()

@@ -14,10 +14,12 @@ create table if not exists public.progress (
   pattern   text,
   skeleton  jsonb,
   concept_map jsonb,
+  meta jsonb not null default '{}'::jsonb,
   updated_at timestamptz default now(),
   primary key (user_id, qid)
 );
 alter table public.progress enable row level security;
+alter table public.progress add column if not exists meta jsonb not null default '{}'::jsonb;
 drop policy if exists progress_owner on public.progress;
 create policy progress_owner on public.progress
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);

@@ -68,16 +68,19 @@ from core.concepts import (  # noqa: F401
 # and the existing save_*() helpers still write those as a fallback.
 @app.before_request
 def _req_start():
+    global PROGRESS, CHATS, JUDGES, REPLAY_COMMENTS
     g._t0 = time.time()
     if request.path.startswith("/static") or request.path in ("/health", "/ping"):
         return
     if not SUPABASE_ENABLED or sb is None:
         return
-    uid = sb.get_user_id_from_request(request)
+    try:
+        uid = sb.get_user_id_from_request(request)
+    except Exception:
+        uid = None
     if not uid:
         # No authenticated user: serve the shared legacy file-based state so a
         # previous authenticated user's data doesn't leak into this request.
-        global PROGRESS, CHATS, JUDGES, REPLAY_COMMENTS
         PROGRESS = _read_state(PROGRESS_FILE, {})
         CHATS = _read_state(CHATS_FILE, {})
         JUDGES = _read_state(JUDGES_FILE, {})
@@ -85,15 +88,25 @@ def _req_start():
         g._supabase_user = None
         g._supabase_loaded = False
         return
+    # Authenticated: load this user's state for the request. Any Supabase error
+    # must NEVER 500 the request — fall back to legacy file state instead.
     auth = request.headers.get("Authorization", "")
     token = auth[len("Bearer "):] if auth.startswith("Bearer ") else None
     g._supabase_user = uid
     g._supabase_token = token
     g._supabase_loaded = True
-    PROGRESS = sb.load_progress(uid, token)
-    CHATS = sb.load_chats(uid, token)
-    JUDGES = sb.load_judges(uid, token)
-    REPLAY_COMMENTS = sb.load_replay_comments(uid, token)
+    try:
+        PROGRESS = sb.load_progress(uid, token)
+        CHATS = sb.load_chats(uid, token)
+        JUDGES = sb.load_judges(uid, token)
+        REPLAY_COMMENTS = sb.load_replay_comments(uid, token)
+    except Exception:
+        log.exception("before_request: Supabase load failed for %s; using legacy state", uid)
+        PROGRESS = _read_state(PROGRESS_FILE, {})
+        CHATS = _read_state(CHATS_FILE, {})
+        JUDGES = _read_state(JUDGES_FILE, {})
+        REPLAY_COMMENTS = _read_state(REPLAY_COMMENTS_FILE, {})
+        g._supabase_loaded = False
 
 @app.after_request
 def _req_log(resp):
