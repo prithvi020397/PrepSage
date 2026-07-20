@@ -155,8 +155,10 @@ What's happening: {q['prompt']}
         resume_note = ""
         resume = PROGRESS.get("_resume")
         if resume and data.get("start"):
-            domains = resume.get("domains", [])[:3]
-            skills = resume.get("skills", [])[:4]
+            domains_raw = resume.get("domains", [])[:3]
+            skills_raw = resume.get("skills", [])[:4]
+            domains = [d.get("name") if isinstance(d, dict) else d for d in domains_raw]
+            skills = [sk.get("name") if isinstance(sk, dict) else sk for sk in skills_raw]
             if domains or skills:
                 resume_note = (
                     f"\n\nCandidate's background: domains = {', '.join(domains)}; skills = {', '.join(skills)}. "
@@ -861,8 +863,10 @@ def tradeoff_regenerate():
     resume = PROGRESS.get("_resume")
     resume_hint = ""
     if resume:
-        skills = resume.get("skills", [])[:5]
-        domains = resume.get("domains", [])[:3]
+        skills_raw = resume.get("skills", [])[:5]
+        domains_raw = resume.get("domains", [])[:3]
+        skills = [sk.get("name") if isinstance(sk, dict) else sk for sk in skills_raw]
+        domains = [dm.get("name") if isinstance(dm, dict) else dm for dm in domains_raw]
         if skills or domains:
             resume_hint = f"\nThe candidate's background: skills = {', '.join(skills)}; domains = {', '.join(domains)}. Ground the scenario in their domain when possible."
 

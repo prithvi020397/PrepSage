@@ -398,7 +398,7 @@ Candidate profile:
 - Target role: {target_role}
 - Strongest skills (from resume): {', '.join(strongest) if strongest else 'unknown'}
 - Skills needing validation (shallow/no context): {', '.join(weakest) if weakest else 'unknown'}
-- Resume domains: {', '.join(resume.get('domains', [])[:5])}
+- Resume domains: {', '.join(d.get('name') if isinstance(d, dict) else d for d in resume.get('domains', [])[:5])}
 
 Current practice performance:
 {practice_summary}
