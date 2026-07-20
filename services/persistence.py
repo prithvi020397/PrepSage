@@ -4,7 +4,8 @@
 import json
 import os
 def _atomic_json(path, data):
-    from app import PROGRESS_FILE, PROGRESS, CHATS, JUDGES, REPLAY_COMMENTS, CHATS_FILE, JUDGES_FILE, REPLAY_COMMENTS_FILE, SUPABASE_ENABLED, sb  # lazy: breaks app<->service import cycle
+    import app as _app  # lazy: full app namespace (request-time)
+    globals().update({k: v for k, v in vars(_app).items() if not k.startswith('__')})
     """Write JSON atomically: write to temp file, then rename. Prevents corruption on crash."""
     tmp = path + ".tmp"
     with open(tmp, "w") as f:
@@ -14,7 +15,8 @@ def _atomic_json(path, data):
 
 
 def save_progress():
-    from app import PROGRESS_FILE, PROGRESS, CHATS, JUDGES, REPLAY_COMMENTS, CHATS_FILE, JUDGES_FILE, REPLAY_COMMENTS_FILE, SUPABASE_ENABLED, sb  # lazy: breaks app<->service import cycle
+    import app as _app  # lazy: full app namespace (request-time)
+    globals().update({k: v for k, v in vars(_app).items() if not k.startswith('__')})
     _atomic_json(PROGRESS_FILE, PROGRESS)
 
 
@@ -25,25 +27,29 @@ def save_progress():
 # ---------------------------------------------------------------------------
 
 def save_chats():
-    from app import PROGRESS_FILE, PROGRESS, CHATS, JUDGES, REPLAY_COMMENTS, CHATS_FILE, JUDGES_FILE, REPLAY_COMMENTS_FILE, SUPABASE_ENABLED, sb  # lazy: breaks app<->service import cycle
+    import app as _app  # lazy: full app namespace (request-time)
+    globals().update({k: v for k, v in vars(_app).items() if not k.startswith('__')})
     _atomic_json(CHATS_FILE, CHATS)
 
 
 
 def save_judges():
-    from app import PROGRESS_FILE, PROGRESS, CHATS, JUDGES, REPLAY_COMMENTS, CHATS_FILE, JUDGES_FILE, REPLAY_COMMENTS_FILE, SUPABASE_ENABLED, sb  # lazy: breaks app<->service import cycle
+    import app as _app  # lazy: full app namespace (request-time)
+    globals().update({k: v for k, v in vars(_app).items() if not k.startswith('__')})
     _atomic_json(JUDGES_FILE, JUDGES)
 
 
 
 def save_replay_comments():
-    from app import PROGRESS_FILE, PROGRESS, CHATS, JUDGES, REPLAY_COMMENTS, CHATS_FILE, JUDGES_FILE, REPLAY_COMMENTS_FILE, SUPABASE_ENABLED, sb  # lazy: breaks app<->service import cycle
+    import app as _app  # lazy: full app namespace (request-time)
+    globals().update({k: v for k, v in vars(_app).items() if not k.startswith('__')})
     _atomic_json(REPLAY_COMMENTS_FILE, REPLAY_COMMENTS)
 
 
 
 def current_user_id():
-    from app import PROGRESS_FILE, PROGRESS, CHATS, JUDGES, REPLAY_COMMENTS, CHATS_FILE, JUDGES_FILE, REPLAY_COMMENTS_FILE, SUPABASE_ENABLED, sb  # lazy: breaks app<->service import cycle
+    import app as _app  # lazy: full app namespace (request-time)
+    globals().update({k: v for k, v in vars(_app).items() if not k.startswith('__')})
     """Return the Supabase auth user id for the current request, or None.
 
     None means: Supabase is off, or no valid bearer token — callers should

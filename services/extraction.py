@@ -7,7 +7,8 @@ from services.llm import _call_json_extract
 
 
 def _ocr_with_stirling(file_bytes, filename):
-    from app import client, MODEL, log, pdfplumber, docx  # lazy: breaks app<->service import cycle
+    import app as _app  # lazy: full app namespace (request-time)
+    globals().update({k: v for k, v in vars(_app).items() if not k.startswith('__')})
     """Fallback OCR via a self-hosted Stirling-PDF instance (default http://localhost:8080).
     Activates only when STIRLING_PDF_URL is set (or default local instance is reachable) and
     pdfplumber returned no text (e.g. a scanned/image PDF). Returns extracted text or None.
@@ -34,7 +35,8 @@ def _ocr_with_stirling(file_bytes, filename):
 
 
 def _extract_text_from_resume(file_bytes, filename):
-    from app import client, MODEL, log, pdfplumber, docx  # lazy: breaks app<->service import cycle
+    import app as _app  # lazy: full app namespace (request-time)
+    globals().update({k: v for k, v in vars(_app).items() if not k.startswith('__')})
     """Extract plain text from a PDF or DOCX file. Falls back to Stirling-PDF OCR
     for scanned/image PDFs that pdfplumber can't read."""
     lower = filename.lower()
@@ -57,7 +59,8 @@ def _extract_text_from_resume(file_bytes, filename):
 
 
 def _clean_pdf_artifacts(text):
-    from app import client, MODEL, log, pdfplumber, docx  # lazy: breaks app<->service import cycle
+    import app as _app  # lazy: full app namespace (request-time)
+    globals().update({k: v for k, v in vars(_app).items() if not k.startswith('__')})
     """Strip PostScript character names (cid:xxx), ligature codes, and Unicode garbage
     that leak from PDF text extraction (e.g. '(cid:136)' for ⚠️)."""
     text = re.sub(r"\(cid:\d+\)", "", text)
@@ -84,7 +87,8 @@ _NON_TECH_SKILL_BLACKLIST = {
 
 
 def _is_technical_skill(name):
-    from app import client, MODEL, log, pdfplumber, docx  # lazy: breaks app<->service import cycle
+    import app as _app  # lazy: full app namespace (request-time)
+    globals().update({k: v for k, v in vars(_app).items() if not k.startswith('__')})
     """Check if a skill name looks like a genuine technical skill, not a random word."""
     n = name.lower().strip()
     if len(n) <= 2:
@@ -96,7 +100,8 @@ def _is_technical_skill(name):
 
 
 def _extract_skills_from_resume(text):
-    from app import client, MODEL, log, pdfplumber, docx  # lazy: breaks app<->service import cycle
+    import app as _app  # lazy: full app namespace (request-time)
+    globals().update({k: v for k, v in vars(_app).items() if not k.startswith('__')})
     """Use LLM to extract structured skills, projects, and domain from resume text.
     Returns rich data including depth signals, project specificity, and skill context."""
     prompt = f"""Analyze this resume like a technical interviewer would. Extract structured information. Respond ONLY with a JSON object — no markdown, no commentary.
@@ -167,7 +172,8 @@ DO extract these as skills: Apache Spark, Python, SQL, Docker, Kubernetes, Snowf
 
 
 def _extract_concepts_from_jd(text):
-    from app import client, MODEL, log, pdfplumber, docx  # lazy: breaks app<->service import cycle
+    import app as _app  # lazy: full app namespace (request-time)
+    globals().update({k: v for k, v in vars(_app).items() if not k.startswith('__')})
     """Use LLM to extract the JD at the CONCEPT level, not the tool-keyword level.
     Returns concepts (mapped to our taxonomy where possible), required capabilities,
     and the raw tool keywords (for the translation sidebar)."""
@@ -221,7 +227,8 @@ Critical: if the JD says 'Kafka' or 'Flink', the concept is 'streaming_paradigm'
 
 
 def _fallback_extract_jd(text):
-    from app import client, MODEL, log, pdfplumber, docx  # lazy: breaks app<->service import cycle
+    import app as _app  # lazy: full app namespace (request-time)
+    globals().update({k: v for k, v in vars(_app).items() if not k.startswith('__')})
     """Basic regex-based JD extraction when the LLM is unavailable.
     Extracts role title, tool keywords, and concept-level guesses from raw text."""
     title = ""
@@ -266,7 +273,8 @@ def _fallback_extract_jd(text):
 
 
 def _fallback_extract_resume(text):
-    from app import client, MODEL, log, pdfplumber, docx  # lazy: breaks app<->service import cycle
+    import app as _app  # lazy: full app namespace (request-time)
+    globals().update({k: v for k, v in vars(_app).items() if not k.startswith('__')})
     """Basic regex-based resume extraction when the LLM is unavailable.
     Extracts skill candidates, project-like paragraphs, and domain guesses."""
     lines = [l.strip() for l in text.split("\n") if l.strip()]
@@ -310,7 +318,8 @@ def _fallback_extract_resume(text):
 
 
 def _extraction_fallback_chain(extract_fn, fallback_fn, text, label):
-    from app import client, MODEL, log, pdfplumber, docx  # lazy: breaks app<->service import cycle
+    import app as _app  # lazy: full app namespace (request-time)
+    globals().update({k: v for k, v in vars(_app).items() if not k.startswith('__')})
     """Try LLM extraction first, fall back to deterministic extraction on failure.
     Returns (data: dict | None, method: str)."""
     data = extract_fn(text)

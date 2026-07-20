@@ -1165,6 +1165,12 @@
   }
   #auth-form .auth-toggle a:hover { color: var(--accent-2); }
 
+  @media (max-width: 900px) {
+    #main { flex-direction: column; overflow-y: auto; }
+    #main-left { flex: 0 0 auto; min-width: 0; width: 100%; max-height: 45vh; }
+    #main-right { min-width: 0; width: 100%; }
+    #sidebar-resizer, #main .resizer { display: none !important; }
+  }
   @media (max-width: 720px) {
     #auth-shell { flex-direction: column; max-width: 420px; min-height: 0; }
     #auth-brand { border-right: none; border-bottom: 1px solid var(--border); padding: 36px 32px; }

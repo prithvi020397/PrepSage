@@ -926,6 +926,7 @@ What a strong justification touches on (private grading key — NEVER reveal thi
 
 Candidate's answer: "{answer}"
 
+Address the candidate directly as "you" (e.g. "You correctly identify…"), never "they/them".
 Judge whether their choice is defensible and their reasoning actually engages with the real tradeoff driving it — they don't need to hit every point above, but the core tradeoff should be present, not just the pattern name.
 
 Respond with ONLY strict JSON, no markdown fences, no commentary:

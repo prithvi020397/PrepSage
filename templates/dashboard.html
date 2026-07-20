@@ -482,7 +482,7 @@
         </div>
       </div>
       <div class="hero-cta-row">
-        <a class="hero-cta" href="/?q={% if role_readiness.framed_practice %}{{ role_readiness.framed_practice[0].id }}{% elif role_readiness.real_gaps %}{{ total_questions }}{% else %}{{ total_questions }}{% endif %}" onclick="return gateStart(event)">
+        <a class="hero-cta" href="/practice?q={% if role_readiness.framed_practice %}{{ role_readiness.framed_practice[0].id }}{% elif role_readiness.real_gaps %}{{ total_questions }}{% else %}{{ total_questions }}{% endif %}" onclick="return gateStart(event)">
           Solve your first real gap &rarr;
         </a>
         <span class="hero-secondary">or <a href="/?mode=mock" onclick="return gateStart(event)">start a 20-min mock loop</a></span>
@@ -723,7 +723,7 @@
       <div class="sub" style="margin:10px 0 6px; color:var(--warn); font-weight:600;">🎯 Real gaps — where to focus</div>
       {% for g in role_readiness.real_gaps %}
       <div class="gap-row">
-        <div class="gap-label">{{ (g.raw or g.concept).replace('_',' ') }}<span class="why">?<span class="tp"><div class="tp-label">Why is this a gap?</div>JD requires this concept{% if g.evidence %}: <em>{{ g.evidence[:120] }}</em>{% endif %}. Not found in your resume.</span></span></div>
+        <div class="gap-label">{{ (g.raw or g.concept).replace('_',' ') }}<span class="why">?<span class="tp"><div class="tp-label">Why is this a gap?</div><strong>{{ (g.raw or g.concept).replace('_',' ') }}</strong> is a gap: JD requires this concept{% if g.evidence %} — <em>{{ g.evidence[:120] }}</em>{% endif %}. Not found in your resume.</span></span></div>
         <div style="font-size:12px; color:var(--text-dim); flex:1;">{{ g.evidence }}</div>
         <span class="gap-count" style="color: var(--error); width:auto; margin-right:8px;">{{ 'must-have' if g.importance == 'must_have' else 'nice' }}</span>
         <button class="confirm-btn" onclick="confirmConcept(this, '{{ g.concept }}')">✓ I've done this</button>
@@ -756,7 +756,7 @@
       <div class="sub" style="margin:12px 0 6px; color:var(--accent-2); font-weight:600;">🛠 Framed practice — questions that build the missing concepts</div>
       <div style="display:flex; flex-wrap:wrap; gap:8px;">
         {% for q in role_readiness.framed_practice %}
-        <a href="/?q={{ q.id }}" title="{{ q.reason or '' }}" style="font-size:12px; color:var(--text); text-decoration:none; padding:6px 10px; background:var(--card-2); border:1px solid var(--border); border-radius:6px; max-width:100%;">
+        <a href="/practice?q={{ q.id }}" title="{{ q.reason or '' }}" style="font-size:12px; color:var(--text); text-decoration:none; padding:6px 10px; background:var(--card-2); border:1px solid var(--border); border-radius:6px; max-width:100%;">
           {{ q.title }} <span style="color:var(--text-faint); font-size:10px;">· {{ q.lang }}</span>
           {% if q.reason %}<div style="color:var(--text-dim); font-size:10px; margin-top:2px;">{{ q.reason }}</div>{% endif %}
         </a>

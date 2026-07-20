@@ -7,7 +7,8 @@ from services.llm import chat_content
 WHITEBOARD_WRAP_RE = re.compile(r"^\[Candidate's current whiteboard\]\n(.*?)\n\n\[Candidate says\]\n(.*)$", re.S)
 
 def _repair_truncated_json(raw):
-    from app import client, MODEL, JUDGE_SYSTEM_PROMPT, JUDGE_OUTPUT_SCHEMA, QUESTIONS, log  # lazy: breaks app<->service import cycle
+    import app as _app  # lazy: full app namespace (request-time)
+    globals().update({k: v for k, v in vars(_app).items() if not k.startswith('__')})
     """Best-effort repair of a JSON string the model cut off mid-output.
 
     Re-balances braces/brackets and strips a dangling trailing comma so a
@@ -51,7 +52,8 @@ def _repair_truncated_json(raw):
 
 
 def run_judge(scenario_json, transcript_turns, session_id, scenario_id):
-    from app import client, MODEL, JUDGE_SYSTEM_PROMPT, JUDGE_OUTPUT_SCHEMA, QUESTIONS, log  # lazy: breaks app<->service import cycle
+    import app as _app  # lazy: full app namespace (request-time)
+    globals().update({k: v for k, v in vars(_app).items() if not k.startswith('__')})
     """Call the judge model (separate from the client simulation) to score a
     completed decomposition session.
 
@@ -149,7 +151,8 @@ def run_judge(scenario_json, transcript_turns, session_id, scenario_id):
 # Judge will score only `always_scorable` dimensions when triggers are empty.
 
 def build_judge_transcript(transcript_turns):
-    from app import client, MODEL, JUDGE_SYSTEM_PROMPT, JUDGE_OUTPUT_SCHEMA, QUESTIONS, log  # lazy: breaks app<->service import cycle
+    import app as _app  # lazy: full app namespace (request-time)
+    globals().update({k: v for k, v in vars(_app).items() if not k.startswith('__')})
     """Convert raw chat turns ({role, content, turn?}) into the judge-facing
     transcript. Candidate turns that carry a whiteboard diagram get a structured
     `whiteboard` field so D2 (architecture) and D4 (ML formulation) can be scored
@@ -172,7 +175,8 @@ def build_judge_transcript(transcript_turns):
 
 
 def split_wrap_up_reply(reply, taxonomy=CONCEPT_TAXONOMY):
-    from app import client, MODEL, JUDGE_SYSTEM_PROMPT, JUDGE_OUTPUT_SCHEMA, QUESTIONS, log  # lazy: breaks app<->service import cycle
+    import app as _app  # lazy: full app namespace (request-time)
+    globals().update({k: v for k, v in vars(_app).items() if not k.startswith('__')})
     """Split an interview wrap-up reply into (prose, missed_concepts, rushed_to_design,
     communication_score, communication_note, rubric_scores) — the trailing ```json fence is a grading
     artifact and never shown to the candidate."""
@@ -195,7 +199,8 @@ def split_wrap_up_reply(reply, taxonomy=CONCEPT_TAXONOMY):
 
 
 def hire_verdict(missed_concepts, rushed_to_design, communication_score, rubric_scores=None):
-    from app import client, MODEL, JUDGE_SYSTEM_PROMPT, JUDGE_OUTPUT_SCHEMA, QUESTIONS, log  # lazy: breaks app<->service import cycle
+    import app as _app  # lazy: full app namespace (request-time)
+    globals().update({k: v for k, v in vars(_app).items() if not k.startswith('__')})
     """Cheap point-based read, not a real calibrated rubric — reuses the signals the
     debrief already computes to surface a directional strong hire / hire / no hire."""
     if rubric_scores:

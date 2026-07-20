@@ -219,8 +219,7 @@ async function startPractice(lane) {
     const el = document.querySelector(`.q-item[data-id="${res.id}"]`);
     if (el) { selectQuestion(el, res.id); }
     else { await loadQuestion(res.id); }
-    const q = QUESTIONS[res.id] || current;
-    if (q && (q.lang === 'design' || q.lang === 'decomposition') && !micOn) setMicOn(true);
+    if (current && (current.lang === 'design' || current.lang === 'decomposition') && !micOn) setMicOn(true);
   } catch (e) {
     showToast('Could not start practice: ' + e.message);
   } finally {
