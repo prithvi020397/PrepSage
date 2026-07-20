@@ -4,6 +4,12 @@ from flask import jsonify, request, session, g, render_template, redirect, flash
 
 bp = Blueprint('auth', __name__)
 
+@bp.route("/login")
+@bp.route("/signup")
+def auth_pages():
+    # Auth is an overlay available on every page; redirect to the app root.
+    return redirect("/")
+
 @bp.route("/api/signup", methods=["POST"])
 def api_signup():
     import app as _app  # lazy: entire app namespace (request-time)

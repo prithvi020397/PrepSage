@@ -1292,3 +1292,12 @@ app.register_blueprint(documents_bp)
 app.register_blueprint(analytics_bp)
 app.register_blueprint(practice_bp)
 app.register_blueprint(interview_bp)
+
+
+# Custom 404 so unknown paths (incl. /login, /signup which are overlay-only)
+# render a styled page instead of Flask's default plain text.
+@app.errorhandler(404)
+def not_found(e):
+    # Respect direct nav to the overlay-only auth routes: send them to "/",
+    # where the auth overlay is reachable from any page.
+    return render_template("404.html"), 404

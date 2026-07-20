@@ -829,7 +829,9 @@ async function testLogin(fresh) {
     if (!r.ok || data.error) { authShowError(data.error || 'Test login failed.'); authSubmitBtn.disabled = false; return; }
     if (data.access_token) localStorage.setItem('loop_token', data.access_token);
     hideAuthOverlay();
-    if (data.fresh) setTimeout(() => location.reload(), 500);
+    // Reload so checkAuth re-runs and the session is reflected (banner hides,
+    // /api/me shows the test user instead of staying anonymous).
+    setTimeout(() => location.reload(), 500);
   } catch (e) { authShowError('Network error — try again.'); authSubmitBtn.disabled = false; }
 }
 
