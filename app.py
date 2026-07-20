@@ -876,14 +876,14 @@ def _compute_role_readiness():
 
     # lens 1: concept coverage from the matcher. Verify items are uncertain — excluded
     # from both numerator and denominator so coverage reflects only confident matches.
-    # Self-reported (user-confirmed) concepts count toward coverage but are kept separate
-    # from proven coverage so the number stays honest.
+    # Self-reported (user-confirmed) concepts DO count toward the headline coverage so
+    # tapping "I've done this" makes the number visibly rise, but the count is also
+    # shown separately so the reader knows how much is self-claimed vs resume-proven.
     total_concepts = (match["real_gap_count"] + match["translation_count"]
                       + match["covered_count"] + match["verify_count"] + match["self_reported_count"])
-    proven = match["covered_count"] + match["translation_count"]
+    proven = match["covered_count"] + match["translation_count"] + match["self_reported_count"]
     self_reported = match["self_reported_count"]
-    # Headline = proven only. verify stays in the denominator (uncertain != covered),
-    # and self-reported is shown separately and never folded into the headline number.
+    # Headline = proven (resume evidence + self-claimed). verify stays in the denominator.
     coverage = round(100 * proven / total_concepts) if total_concepts else 0
     proven_coverage = coverage
 
