@@ -102,6 +102,42 @@ phase there.
   practice, documents, analytics, pages, ...). `app.py` becomes a thin
   entrypoint: app factory + blueprint registration + logging setup. URL
   rules must be identical — no url_prefix that changes any path.
+
+  **Moving route functions:** include the preceding `@app.route(...)` /
+  `@app.<decorator>` lines in the moved block, then rewrite them to
+  `@bp.route(...)`. A function-extraction that starts at `def` leaves the
+  decorator orphaned in `app.py` → `SyntaxError` (a bare decorator followed
+  by module-level code) and silently drops the route in the blueprint.
+  Capture from the first decorator above `def` to the line before the next
+  `def` / `@app.` / top-level CONSTANT assignment.
+
+  **Lazy namespace injection (CRITICAL).** A route function that moved to
+  `routes/X.py` no longer has the old module-level `from app import ...`
+  symbols (`request`, `jsonify`, `g`, `session`, the shared dicts, helper
+  funcs). Each moved route function MUST get the full app namespace at
+  request time, with zero call-site edits:
+
+  ```python
+  def some_route():
+      import app as _app  # lazy: entire app namespace (request-time)
+      globals().update({k: v for k, v in vars(_app).items() if not k.startswith("__")})
+      # ... original body unchanged ...
+  ```
+
+  Why this exact form (hard-won):
+  - `from app import *` is **illegal inside a function** — Python raises
+    `SyntaxError: import * only allowed at module level`. So you cannot use it.
+  - A static `from app import NAME, NAME, ...` list is **fragile**: it fails the
+    moment a name is referenced but only *re-exported* from `app` (e.g. pulled
+    into `app.py` via `from core.constants import *`), giving
+    `ImportError: cannot import name 'CAPABILITY_CONCEPT_KEYWORDS'`. The whole
+    `vars(_app)` form imports re-exports too, so it just works.
+  - Inject at the top of each function body (after the signature + decorators),
+    not at module level — module-level `import app` in `routes/X.py` would
+    circular-import (app imports the blueprint at its end). Request-time import
+    is safe because `app` is fully initialized by then.
+  - This keeps every move a pure verbatim relocate (Rule 5): no per-function
+    import surgery, no risk of missing a symbol.
 - **Phase 6 — OPTIONAL (explicit user opt-in required).** Persistence
   upgrade (files → DB) to lift the single-worker cap. Default: STOP before
   this phase.
@@ -133,3 +169,38 @@ phase there.
   after every phase (same rules, same methods, same endpoints count).
 - Grep for leftover top-level executable statements in extracted modules —
   extracted files should only define.
+
+## KPI / Results (measure on every real refactor)
+
+Track these so the refactored app is provably equivalent to the monolith.
+
+| KPI | How to measure | Pass criterion |
+|-----|----------------|----------------|
+| Route contract unchanged | Diff `app.url_map` dump (rules+methods) against Phase-0 baseline | 100% identical rule count + paths + methods |
+| Response shape unchanged | curl 2–3 endpoints, diff JSON vs pre-refactor capture | byte-identical body |
+| Behavior unchanged | Full characterization + feature test suite | green before AND after every phase |
+| Fragile fixes preserved | Grep each fragile fix from the Rule-1 inventory in its new home | all present, unedited |
+| Import-time side effects intact | `import app` boots; no init errors | boots clean |
+| Test count | `pytest` after each phase | no net loss |
+
+### Measured on The Loop (pawscode) — real run
+
+- **Before:** `app.py` = 5,719 lines, single file, no package structure.
+- **After (Phases 0–5):** `app.py` = 1,278 lines (thin entrypoint);
+  `core/` (3 files: constants, questions, concepts),
+  `services/` (5 files: llm, extraction, execution, grading, persistence),
+  `routes/` (6 blueprints: pages, auth, documents, analytics, practice, interview).
+- **Routes:** 71 `@app.route` functions → blueprints; url_map **72 rules,
+  identical before/after** (one is the static favicon/after-request pair).
+- **Tests:** 63 passing after every phase (19 new characterization tests in
+  Phase 2 pinning `topic_for` both schemas, `_repair_truncated_json` 5 cases,
+  `hire_verdict` bands, `is_solved`/`is_due`/`schedule_review`).
+- **Fragile fixes preserved:** `topic_for()` schema-agnostic (classic `prompt`
+  + v2 `persona`/`triggers`/`rubric`); `run_judge` `max_tokens=4096` +
+  `_repair_truncated_json()` depth-aware brace rebalance; gunicorn `workers 1`;
+  removed a duplicate `/api/transcribe` (Whisper dup was serving in prod and
+  breaking transcription — a live bug surfaced by Phase 1).
+- **Live smoke test (LEGACY_MODE):** `/api/questions`, `/api/start`,
+  `/api/streak` → all HTTP 200; log shows method/path/status/ms per request.
+- **Time:** Phases 0–5 completed in one session, every phase a green-commit,
+  zero pushes until explicit approval (push gate honored).

@@ -244,6 +244,7 @@ function saveCurrentState() {
   if (!current) return;
   stateCache[current.id] = {
     code: cm.getValue(),
+    lang: current && current.lang,
     chatHTML: document.getElementById('chatlog').innerHTML,
     resultsHTML: document.getElementById('results').innerHTML,
     resultsClass: document.getElementById('results').className,

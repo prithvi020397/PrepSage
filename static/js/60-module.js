@@ -196,6 +196,10 @@ function applySidebarFilter() {
       next = next.nextElementSibling;
     }
     h.style.display = visible ? '' : 'none';
+    // keep the section count badge in sync with the filter
+    const total = Array.from(h.parentElement.children).filter(c => c.classList.contains('q-item')).length;
+    const countEl = h.querySelector('.count');
+    if (countEl) countEl.textContent = term ? visible : total;
   });
 }
 
@@ -501,7 +505,8 @@ async function loadQuestion(id) {
   const cached = stateCache[id];
   const results = document.getElementById('results');
   const planInput = document.getElementById('plan-input');
-  if (cached) {
+  // Guard against cross-language leaks: only restore cached code if it belongs to this question's language.
+  if (cached && cached.lang === q.lang) {
     cm.setValue(cached.code);
     document.getElementById('chatlog').innerHTML = cached.chatHTML;
     results.innerHTML = cached.resultsHTML;

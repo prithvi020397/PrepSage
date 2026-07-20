@@ -344,7 +344,7 @@
   {
     "id": "sql-10",
     "lang": "sql",
-    "title": "Duplicate emails",
+    "title": "Recurring emails (appears more than once)",
     "prompt": "Table `Person(id, email)`. Write a query that returns every email that appears more than once.",
     "concept": "GROUP BY email HAVING COUNT(*) > 1 finds duplicate groups directly. Filtering with WHERE instead of HAVING doesn't work, because WHERE runs before grouping/aggregation.",
     "starter_code": "SELECT ...\n",

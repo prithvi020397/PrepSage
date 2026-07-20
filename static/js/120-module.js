@@ -844,7 +844,7 @@ function showAuthBanner() {
   if (b) b.classList.add('show');
 }
 // Gate a persist-bound action: return true if caller may proceed (valid session).
-async function requireAuth() {
+async function requireAuth(reason) {
   const token = localStorage.getItem('loop_token');
   if (token) {
     try {
@@ -853,7 +853,7 @@ async function requireAuth() {
       if (data.user_id) return true;
     } catch (e) {}
   }
-  showAuthOverlay();
+  showAuthOverlay(reason);
   return false;
 }
 // Intercept a start/persist navigation: proceed only with a session.
@@ -862,7 +862,9 @@ async function gateStart(e) {
   e.preventDefault();
   return false;
 }
-function showAuthOverlay() {
+function showAuthOverlay(reason) {
+  const r = document.getElementById('auth-reason');
+  if (r) { if (reason) { r.textContent = reason; r.style.display = ''; } else { r.style.display = 'none'; } }
   authOverlay.classList.remove('hidden');
   authOverlay.classList.add('show');
   authOverlay.style.display = 'flex';
@@ -911,7 +913,7 @@ function renderDeadlineWidget(deadline) {
 }
 
 async function setInterviewDeadline() {
-  if (!(await requireAuth())) return;
+  if (!(await requireAuth('Sign up free to save your interview date.'))) return;
   const input = prompt('Interview date (YYYY-MM-DD), blank to clear:', document.getElementById('deadline-widget').dataset.deadline || '');
   if (input === null) return;
   const r = await api('/api/deadline', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({deadline: input.trim()})});

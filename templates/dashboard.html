@@ -438,6 +438,7 @@
     <div id="auth-form">
       <h2 id="auth-title">Welcome back</h2>
       <p class="auth-sub">Log in to pick up where you left off.</p>
+    <p id="auth-reason" class="auth-reason" style="display:none; margin:0 0 4px; font-size:12px; color:var(--accent);"></p>
       <div class="auth-error" id="auth-error"></div>
       <div class="auth-field">
         <label for="auth-email">Email</label>
@@ -726,7 +727,7 @@
         <div class="gap-label">{{ (g.raw or g.concept).replace('_',' ') }}<span class="why">?<span class="tp"><div class="tp-label">Why is this a gap?</div><strong>{{ (g.raw or g.concept).replace('_',' ') }}</strong> is a gap: JD requires this concept{% if g.evidence %} — <em>{{ g.evidence[:120] }}</em>{% endif %}. Not found in your resume.</span></span></div>
         <div style="font-size:12px; color:var(--text-dim); flex:1;">{{ g.evidence }}</div>
         <span class="gap-count" style="color: var(--error); width:auto; margin-right:8px;">{{ 'must-have' if g.importance == 'must_have' else 'nice' }}</span>
-        <button class="confirm-btn" onclick="confirmConcept(this, '{{ g.concept }}')">✓ I've done this</button>
+        {% if jd_loaded %}<button class="confirm-btn" onclick="confirmConcept(this, '{{ g.concept }}')">✓ I've done this</button>{% else %}<span class="gap-count" style="color:var(--text-faint);">upload a JD to confirm</span>{% endif %}
       </div>
       {% endfor %}
       {% endif %}
@@ -737,7 +738,7 @@
       <div class="gap-row">
         <div class="gap-label">{{ (s.raw or s.concept).replace('_',' ') }}<span class="why">?<span class="tp"><div class="tp-label">Self-reported</div>You confirmed you've done this. Not counted toward proven coverage. Verify by practicing.</span></span></div>
         <div style="font-size:12px; color:var(--text-dim); flex:1;">Self-attested — not yet proven by practice</div>
-        <button class="confirm-btn" style="border-color:var(--text-faint); color:var(--text-faint);" onclick="confirmConcept(this, '{{ s.concept }}', false)">undo</button>
+        {% if jd_loaded %}<button class="confirm-btn" style="border-color:var(--text-faint); color:var(--text-faint);" onclick="confirmConcept(this, '{{ s.concept }}', false)">undo</button>{% endif %}
       </div>
       {% endfor %}
       {% endif %}
@@ -865,7 +866,7 @@
             <span>{{ h.question }}</span>
             <span class="{{ 'ok' if h.ok else 'bad' }}">{{ 'nailed it' if h.ok else 'struggled' }}</span>
           </div>
-          <div class="sub">{{ h.qtype }} &middot; {{ h.get('topic', h.get('concept', '')).replace('_', ' ') }} &middot; {{ h.ts[:10] }}</div>
+          <div class="sub">{{ h.qtype }} &middot; {{ h.get('topic', h.get('concept', '')).replace('_', ' ') }} &middot; <span class="local-date" data-ts="{{ h.ts }}">{{ h.ts[:10] }}</span></div>
         </div>
         {% endfor %}
       {% else %}
@@ -879,6 +880,7 @@
       <h3 id="so-title">Erase all progress?</h3>
       <p>This permanently deletes every persistence file — solved counts, streaks, due reviews, saved code, chat history, and replay notes. The dashboard will reset to 0/{{ total_questions }}. This cannot be undone.</p>
       <input id="so-input" type="text" placeholder="Type DELETE to confirm" oninput="onSoInput(this)" autocomplete="off" spellcheck="false">
+      <div id="so-hint" class="sub" style="display:none; color:var(--text-faint); margin-top:6px;">Type the word <b>DELETE</b> exactly to enable the button.</div>
       <div class="modal-actions">
         <button class="btn btn-ghost" onclick="closeStartOver()">Cancel</button>
         <button class="btn-danger-solid" id="so-confirm" onclick="confirmStartOver()" disabled>Erase everything</button>
@@ -936,7 +938,10 @@
     }
 
     function onSoInput(el) {
-      document.getElementById('so-confirm').disabled = (el.value.trim() !== 'DELETE');
+      const val = el.value.trim();
+      document.getElementById('so-confirm').disabled = (val !== 'DELETE');
+      const hint = document.getElementById('so-hint');
+      if (hint) hint.style.display = (val && val !== 'DELETE') ? '' : 'none';
     }
 
     async function confirmStartOver() {
@@ -1236,7 +1241,7 @@
   }
   // Gate a persist-bound action: if no valid session, show the auth overlay.
   // Returns true when the caller may proceed (session present).
-  async function requireAuth() {
+  async function requireAuth(reason) {
     const token = localStorage.getItem('loop_token');
     if (token) {
       try {
@@ -1245,10 +1250,12 @@
         if (data.user_id) return true;
       } catch (e) {}
     }
-    showAuthOverlay();
+    showAuthOverlay(reason);
     return false;
   }
-  function showAuthOverlay() {
+  function showAuthOverlay(reason) {
+    const r = document.getElementById('auth-reason');
+    if (r) { if (reason) { r.textContent = reason; r.style.display = ''; } else { r.style.display = 'none'; } }
     authOverlay.classList.remove('hidden');
     authOverlay.classList.add('show');
     authOverlay.style.display = 'flex';
@@ -1287,5 +1294,13 @@
 
   })();
   </script>
+  // Render any UTC timestamp as the viewer's local date (avoids off-by-one from server UTC).
+  document.querySelectorAll('.local-date[data-ts]').forEach(el => {
+    try {
+      const d = new Date(el.getAttribute('data-ts'));
+      if (!isNaN(d)) el.textContent = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+    } catch (e) {}
+  });
+
 </body>
 </html>
