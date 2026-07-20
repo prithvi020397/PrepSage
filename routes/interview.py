@@ -8,8 +8,11 @@ bp = Blueprint('interview', __name__)
 def interview():
     import app as _app  # lazy: entire app namespace (request-time)
     globals().update({k: v for k, v in vars(_app).items() if not k.startswith('__')})
-    data = request.json
-    q = QUESTIONS.get(data["question_id"])
+    data = request.json or {}
+    qid = data.get("question_id")
+    if not qid:
+        return jsonify({"error": "question_id required"}), 400
+    q = QUESTIONS.get(qid)
     if not q or q["lang"] not in ("design", "decomposition"):
         return jsonify({"error": "not found"}), 404
 
