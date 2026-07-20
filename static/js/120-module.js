@@ -386,6 +386,7 @@ function escapeHtml(s) {
 }
 
 async function startMockLoop() {
+  if (!(await requireAuth())) return;
   const res = await (await api('/api/mock-loop/start')).json();
   if (!res.ids || !res.ids.length) { showToast('Not enough questions across categories to start a mock interview.'); return; }
   mockLoop = {ids: res.ids, stage: 0};
@@ -838,6 +839,29 @@ document.getElementById('auth-email').addEventListener('keydown', e => { if (e.k
 
 // Overlay is hidden by default (CSS). Only SHOW it when auth is genuinely required —
 // this prevents the login screen from flashing on every page load.
+function showAuthBanner() {
+  const b = document.getElementById('auth-banner');
+  if (b) b.classList.add('show');
+}
+// Gate a persist-bound action: return true if caller may proceed (valid session).
+async function requireAuth() {
+  const token = localStorage.getItem('loop_token');
+  if (token) {
+    try {
+      const r = await api('/api/me', { headers: { 'Authorization': 'Bearer ' + token } });
+      const data = await r.json();
+      if (data.user_id) return true;
+    } catch (e) {}
+  }
+  showAuthOverlay();
+  return false;
+}
+// Intercept a start/persist navigation: proceed only with a session.
+async function gateStart(e) {
+  if (await requireAuth()) return true;
+  e.preventDefault();
+  return false;
+}
 function showAuthOverlay() {
   authOverlay.classList.remove('hidden');
   authOverlay.classList.add('show');
@@ -859,7 +883,7 @@ function hideAuthOverlay() {
   } catch { /* Supabase unreachable — fall through to token check */ }
 
   const token = localStorage.getItem('loop_token');
-  if (!token) { showAuthOverlay(); return; }
+  if (!token) { showAuthBanner(); return; }
   try {
     const r2 = await api('/api/me', { headers: {'Authorization': 'Bearer ' + token} });
     const data2 = await r2.json();
@@ -887,6 +911,7 @@ function renderDeadlineWidget(deadline) {
 }
 
 async function setInterviewDeadline() {
+  if (!(await requireAuth())) return;
   const input = prompt('Interview date (YYYY-MM-DD), blank to clear:', document.getElementById('deadline-widget').dataset.deadline || '');
   if (input === null) return;
   const r = await api('/api/deadline', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({deadline: input.trim()})});

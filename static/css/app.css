@@ -1170,3 +1170,23 @@
     #auth-brand { border-right: none; border-bottom: 1px solid var(--border); padding: 36px 32px; }
     #auth-brand .auth-wordmark .lp { font-size: 46px; }
   }
+
+/* ── auth nudge banner (non-blocking, deferred auth) ── */
+#auth-banner {
+  display: none; align-items: center; gap: 14px;
+  margin: 14px 0 0; padding: 12px 16px;
+  border: 1px solid rgba(124,108,246,0.35); border-radius: 12px;
+  background: rgba(124,108,246,0.08); color: var(--text); font-size: 14px;
+}
+#auth-banner.show { display: flex; }
+#auth-banner .ab-text { flex: 1; }
+#auth-banner .ab-text b { color: var(--accent); }
+#auth-banner .ab-cta {
+  border: none; cursor: pointer; white-space: nowrap;
+  background: var(--accent); color: #0b0d12; font-weight: 700;
+  padding: 8px 14px; border-radius: 9px; font-size: 13px;
+}
+#auth-banner .ab-dismiss {
+  background: none; border: none; cursor: pointer; color: var(--text-faint);
+  font-size: 18px; line-height: 1; padding: 2px 4px;
+}

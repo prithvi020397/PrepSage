@@ -86,7 +86,7 @@
   </div>
   <span id="deadline-widget" style="color: var(--text-dim); font-size: 13px; cursor: pointer;" onclick="setInterviewDeadline()" title="Set your interview date — review intervals compress as it approaches"></span>
   <span id="streak-widget" style="color: var(--text-dim); font-size: 13px;" title="Practice streak (days in a row you've done at least one question)">🔥 <span id="streak-count">0</span>d</span>
-  <button class="btn btn-ghost" style="margin-left: 8px;" onclick="startMockLoop()" title="Chain a SQL/Python, design, and tradeoff question into one continuous mock interview">🔁 Mock interview</button>
+  <button class="btn btn-ghost" style="margin-left: 8px;" onclick="gateStart(event).then(ok => { if (ok) startMockLoop(); })" title="Chain a SQL/Python, design, and tradeoff question into one continuous mock interview">🔁 Mock interview</button>
   <a href="/dashboard" style="color: var(--text-dim); text-decoration: none; font-size: 13px;">Diagnose</a>
   <a href="/taxonomy" style="color: var(--text-dim); text-decoration: none; font-size: 13px; margin-left: 10px;">Taxonomy</a>
   <a href="#" onclick="event.preventDefault(); localStorage.removeItem('loop_token'); showAuthOverlay();" style="color: var(--text-dim); text-decoration: none; font-size: 12px; margin-left: 10px; opacity:0.6;" title="Log out">Logout</a>
@@ -105,6 +105,11 @@
   </div>
   <div id="sidebar-resizer"></div>
   <main id="main">
+  <div id="auth-banner">
+    <div class="ab-text">Sign up free to <b>save your progress</b> &mdash; your attempts, gaps, and streaks persist across devices.</div>
+    <button class="ab-cta" onclick="showAuthOverlay()">Sign up</button>
+    <button class="ab-dismiss" onclick="document.getElementById('auth-banner').classList.remove('show')" title="Dismiss">&times;</button>
+  </div>
     <div id="main-left">
       <div id="question-card">
         <div class="q-header">
