@@ -698,16 +698,25 @@ def _compute_concept_match():
                 "translations": [], "covered": [],
                 "real_gap_count": 0, "translation_count": 0, "covered_count": 0,
                 "verify_count": 0, "self_reported_count": 0}
+    user_confirmed = set(jd.get("user_confirmed", []))
     if not resume:
-        # JD loaded but no resume — report every required concept as unverifiable
-        real_gaps = [{"concept": c.get("concept"), "evidence": c.get("evidence", ""),
-                       "importance": c.get("importance", "must_have")}
-                      for c in jd.get("concepts_required", [])]
+        # JD loaded but no resume — report every required concept as unverifiable.
+        # User self-attestations (user_confirmed) still move a concept out of the
+        # real-gap list into self_reported so "I've done this" visibly sticks.
+        real_gaps, self_reported = [], []
+        for c in jd.get("concepts_required", []):
+            concept = _normalize_concept(c.get("concept", ""))
+            entry = {"concept": c.get("concept"), "evidence": c.get("evidence", ""),
+                     "importance": c.get("importance", "must_have")}
+            if concept in user_confirmed:
+                self_reported.append(entry)
+            else:
+                real_gaps.append(entry)
         return {"jd_loaded": True, "resume_loaded": False,
                 "real_gaps": real_gaps, "translations": [], "covered": [],
-                "verify": [], "self_reported": [],
+                "verify": [], "self_reported": self_reported,
                 "real_gap_count": len(real_gaps), "translation_count": 0, "covered_count": 0,
-                "verify_count": 0, "self_reported_count": 0}
+                "verify_count": 0, "self_reported_count": len(self_reported)}
 
     evidence_text, evidence_skills = _resume_concept_evidence()
 
