@@ -47,3 +47,13 @@ Status: ALL reported items resolved or explicitly deferred (infra-limited).
 - Onboarding accepts empty form (Skip exists — likely intentional; confirm with product).
 - Anonymous state volatility / ephemeral Render disk — infra; move persistence off local disk (Supabase already the cloud path).
 - /api/me 401 for anonymous — cosmetic monitoring noise; body already says mode:anonymous.
+
+## Retest #4 — v4 (ce44338)
+- Auth 500 (broke all logged-in features, degraded anonymous after login attempt). ROOT CAUSE: c.auth.set_session(token, "") crashed on empty refresh token. FIXED: use c.postgrest.auth(token) for RLS; hardened before_request so no Supabase error 500s (degrades to legacy). Verified /api/me with valid Bearer -> 200 (was 500).
+- Flow 4 JD confirm not persisting on reload. ROOT CAUSE: load_progress rebuilt PROGRESS only from per-question rows, dropping _jd/_resume/_deadline. FIXED: store underscore-meta in __meta__ row (new meta jsonb column) + merge back on load. User must run: alter table progress add column if not exists meta jsonb not null default '{}'::jsonb; (done).
+- Flow 7 FDE category not hiding at 0 matches. ROOT CAUSE: trailing browseHint div treated as q-item -> .querySelector('.q-title').textContent on null threw, aborting the loop before FDE. FIXED: skip non-q-item siblings in applySidebarFilter.
+- Flow 11 mobile /practice side-by-side overflow. FIXED: #main display:block at <=900px so columns stack (can't sit side-by-side). Bumped app.css ?v=4.
+- Flow 12 /login -> /dashboard: left as reasonable deviation.
+
+## Remaining (none blocking)
+- Real-credential login/persistence verified only after auth fix ships; re-run v4 QA checklist Flow 8/9/14 to confirm.
