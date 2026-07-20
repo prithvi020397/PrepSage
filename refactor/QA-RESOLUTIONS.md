@@ -57,3 +57,7 @@ Status: ALL reported items resolved or explicitly deferred (infra-limited).
 
 ## Remaining (none blocking)
 - Real-credential login/persistence verified only after auth fix ships; re-run v4 QA checklist Flow 8/9/14 to confirm.
+
+## Retest #4b — Flow 4 render (dad30bd)
+- Confirmed concepts not removed from gap list in UI (server-side persisted fine). ROOT CAUSE: _compute_concept_match early-returned the no-resume (JD-only) path WITHOUT applying user_confirmed. FIXED: split concepts_required into real_gaps/self_reported by user_confirmed in that path too. Verified cloud_platform moves to self_reported, out of gaps, with JD-only (no resume).
+- Flow 4 now FULLY fixed: backend + render.
