@@ -6,7 +6,9 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-client = OpenAI(base_url="https://openrouter.ai/api/v1", api_key=os.environ["OPENROUTER_API_KEY"])
+client = OpenAI(
+    base_url="https://openrouter.ai/api/v1", api_key=os.environ["OPENROUTER_API_KEY"]
+)
 MODEL = "deepseek/deepseek-v4-flash"
 
 QUESTIONS = {q["id"]: q for q in json.load(open("questions.json"))}
@@ -22,46 +24,99 @@ LINK_FILE = "question_concept_links.json"
 # dict (author assertion, unverified), we ask the LLM once, per question, which of these
 # concepts the question actually exercises. Cached to LINK_FILE so runtime is free.
 GAP_CONCEPTS = [
-    "clarifying_requirements", "batch_vs_stream_choice", "partitioning_hot_key_skew",
-    "idempotency_dedup", "backfill_reprocessing", "schema_evolution_compat",
-    "replication_consistency", "data_quality_observability", "storage_format_choice",
-    "late_data_watermarks", "domain_alignment", "entity_enumeration",
-    "grain_awareness", "scd_strategy", "missing_dimension_audit",
-    "streaming_paradigm", "batch_paradigm", "feature_store", "cloud_platform",
-    "orchestration", "iac", "warehouse", "sql_database",
-    "container_orchestration", "containers",
+    "clarifying_requirements",
+    "batch_vs_stream_choice",
+    "partitioning_hot_key_skew",
+    "idempotency_dedup",
+    "backfill_reprocessing",
+    "schema_evolution_compat",
+    "replication_consistency",
+    "data_quality_observability",
+    "storage_format_choice",
+    "late_data_watermarks",
+    "domain_alignment",
+    "entity_enumeration",
+    "grain_awareness",
+    "scd_strategy",
+    "missing_dimension_audit",
+    "streaming_paradigm",
+    "batch_paradigm",
+    "feature_store",
+    "cloud_platform",
+    "orchestration",
+    "iac",
+    "warehouse",
+    "sql_database",
+    "container_orchestration",
+    "containers",
+    "pipeline_design",
+    "system_design_tradeoffs",
+    "architecture_decomposition",
+    "data_modeling",
+    "latency_throughput_tradeoffs",
 ]
 
 TOPIC_KEYWORDS = [
-    ("window function", "window functions"), ("over (partition", "window functions"),
-    ("rank", "window functions"), ("running total", "window functions"),
-    ("group by", "group by / aggregation"), ("having", "group by / aggregation"),
-    ("join", "joins"), ("subquery", "subqueries"), ("self join", "joins"),
-    ("recursion", "recursion"), ("recursive", "recursion"),
-    ("dynamic programming", "dynamic programming"), ("dp", "dynamic programming"),
-    ("graph", "graphs / BFS-DFS"), ("bfs", "graphs / BFS-DFS"), ("dfs", "graphs / BFS-DFS"),
-    ("tree", "trees"), ("binary search tree", "trees"),
+    ("window function", "window functions"),
+    ("over (partition", "window functions"),
+    ("rank", "window functions"),
+    ("running total", "window functions"),
+    ("group by", "group by / aggregation"),
+    ("having", "group by / aggregation"),
+    ("join", "joins"),
+    ("subquery", "subqueries"),
+    ("self join", "joins"),
+    ("recursion", "recursion"),
+    ("recursive", "recursion"),
+    ("dynamic programming", "dynamic programming"),
+    ("dp", "dynamic programming"),
+    ("graph", "graphs / BFS-DFS"),
+    ("bfs", "graphs / BFS-DFS"),
+    ("dfs", "graphs / BFS-DFS"),
+    ("tree", "trees"),
+    ("binary search tree", "trees"),
     ("linked list", "linked lists"),
-    ("two pointer", "two pointers"), ("sliding window", "sliding window"),
-    ("hash", "hashing"), ("dictionary", "hashing"), ("hashmap", "hashing"),
-    ("sort", "sorting"), ("heap", "heaps"), ("priority queue", "heaps"),
-    ("backtrack", "backtracking"), ("greedi", "greedy"), ("fibonacci", "dynamic programming"),
-    ("kadane", "dynamic programming"), ("memo", "dynamic programming"),
-    ("string", "string manipulation"), ("palindrome", "string manipulation"),
-    ("interval", "intervals"), ("matrix", "matrices"), ("bit", "bit manipulation"),
-    ("stack", "stacks / queues"), ("queue", "stacks / queues"),
-    ("date", "date / time"), ("null", "NULL handling"),
+    ("two pointer", "two pointers"),
+    ("sliding window", "sliding window"),
+    ("hash", "hashing"),
+    ("dictionary", "hashing"),
+    ("hashmap", "hashing"),
+    ("sort", "sorting"),
+    ("heap", "heaps"),
+    ("priority queue", "heaps"),
+    ("backtrack", "backtracking"),
+    ("greedi", "greedy"),
+    ("fibonacci", "dynamic programming"),
+    ("kadane", "dynamic programming"),
+    ("memo", "dynamic programming"),
+    ("string", "string manipulation"),
+    ("palindrome", "string manipulation"),
+    ("interval", "intervals"),
+    ("matrix", "matrices"),
+    ("bit", "bit manipulation"),
+    ("stack", "stacks / queues"),
+    ("queue", "stacks / queues"),
+    ("date", "date / time"),
+    ("null", "NULL handling"),
 ]
 
 PATTERN_MAP = {
-    "dynamic programming": "dynamic programming", "graphs / BFS-DFS": "graphs / BFS-DFS",
-    "trees": "trees", "linked lists": "linked lists",
-    "two pointers": "two pointers", "sliding window": "sliding window",
-    "hashing": "hashing", "sorting": "sorting",
-    "heaps": "heaps", "backtracking": "backtracking",
-    "greedy": "greedy", "string manipulation": "string manipulation",
-    "intervals": "intervals", "matrices": "matrices",
-    "stacks / queues": "stacks / queues", "bit manipulation": "hashing",
+    "dynamic programming": "dynamic programming",
+    "graphs / BFS-DFS": "graphs / BFS-DFS",
+    "trees": "trees",
+    "linked lists": "linked lists",
+    "two pointers": "two pointers",
+    "sliding window": "sliding window",
+    "hashing": "hashing",
+    "sorting": "sorting",
+    "heaps": "heaps",
+    "backtracking": "backtracking",
+    "greedy": "greedy",
+    "string manipulation": "string manipulation",
+    "intervals": "intervals",
+    "matrices": "matrices",
+    "stacks / queues": "stacks / queues",
+    "bit manipulation": "hashing",
     "recursion": "recursion",
 }
 
@@ -87,11 +142,15 @@ PATTERN_SKELETONS = {
 
 SQL_PATTERN_SKELETONS = {
     "window functions": ("Window Function", "SELECT col, RANK() OVER (...)"),
-    "group by / aggregation": ("Group By / Aggregation", "SELECT group_col, AGG_FUNC(value_col)"),
+    "group by / aggregation": (
+        "Group By / Aggregation",
+        "SELECT group_col, AGG_FUNC(value_col)",
+    ),
     "joins": ("Join", "SELECT a.col, b.col FROM table_a a JOIN table_b b"),
     "subqueries": ("Subquery", "SELECT col FROM table WHERE col = (SELECT ...)"),
     "_default": ("Query Structure", "SELECT col FROM table WHERE condition"),
 }
+
 
 def topic_for(q):
     text = (q["title"] + " " + q["prompt"] + " " + q.get("concept", "")).lower()
@@ -100,6 +159,7 @@ def topic_for(q):
             return topic
     return "other-" + q["lang"]
 
+
 def pattern_for(q):
     t = topic_for(q)
     if q["lang"] == "sql":
@@ -107,11 +167,13 @@ def pattern_for(q):
     key = PATTERN_MAP.get(t, "_default")
     return PATTERN_SKELETONS.get(key, PATTERN_SKELETONS["_default"])
 
+
 def load_existing(path):
     if os.path.exists(path):
         with open(path) as f:
             return json.load(f)
     return {}
+
 
 def save_json(path, data):
     with open(path, "w") as f:
@@ -122,8 +184,14 @@ def save_json(path, data):
 def gen_trace(q):
     pattern_info = pattern_for(q)
     tc = q["test_cases"][0]
-    sample_data = tc.get("harness", "") if q["lang"] == "python" else tc.get("schema_sql", "")
-    sample_output = tc.get("expected_stdout", "") if q["lang"] == "python" else json.dumps(tc.get("expected", []))
+    sample_data = (
+        tc.get("harness", "") if q["lang"] == "python" else tc.get("schema_sql", "")
+    )
+    sample_output = (
+        tc.get("expected_stdout", "")
+        if q["lang"] == "python"
+        else json.dumps(tc.get("expected", []))
+    )
 
     if q["lang"] == "sql":
         example = """Example of a good full trace for 'Second Highest Salary':
@@ -134,10 +202,10 @@ def gen_trace(q):
 ]"""
         prompt = f"""You are a coding tutor that teaches CODE TRANSLATION. The student knows the theory but struggles to write specific code lines. Generate trace steps that teach them WHICH CODE to write.
 
-Problem: {q['title']}
-{q['prompt']}
-Concept: {q['concept']}
-Pattern skeleton: {pattern_info[1] if pattern_info[1] else 'N/A'}
+Problem: {q["title"]}
+{q["prompt"]}
+Concept: {q["concept"]}
+Pattern skeleton: {pattern_info[1] if pattern_info[1] else "N/A"}
 
 Sample call/harness: {sample_data}
 Expected output: {sample_output}
@@ -158,10 +226,10 @@ Respond with ONLY JSON:
     else:
         prompt = f"""You are a coding tutor that teaches CODE TRANSLATION through SCAFFOLDED CODE CONSTRUCTION. The student knows the theory but struggles to write specific code lines.
 
-Problem: {q['title']}
-{q['prompt']}
-Concept: {q['concept']}
-Pattern skeleton: {pattern_info[1] if pattern_info[1] else 'N/A'}
+Problem: {q["title"]}
+{q["prompt"]}
+Concept: {q["concept"]}
+Pattern skeleton: {pattern_info[1] if pattern_info[1] else "N/A"}
 
 Sample call/harness: {sample_data}
 Expected output: {sample_output}
@@ -191,8 +259,11 @@ Respond with ONLY JSON:
 
     try:
         resp = client.chat.completions.create(
-            model=MODEL, messages=[{"role": "user", "content": prompt}],
-            max_tokens=2000, temperature=0, extra_body={"reasoning": {"enabled": False}},
+            model=MODEL,
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=2000,
+            temperature=0,
+            extra_body={"reasoning": {"enabled": False}},
         )
         raw = resp.choices[0].message.content.strip()
         if "```" in raw:
@@ -201,7 +272,7 @@ Respond with ONLY JSON:
                 raw = raw[4:]
         start = raw.find("{")
         end = raw.rfind("}")
-        raw = raw[start:end+1]
+        raw = raw[start : end + 1]
         result = json.loads(raw)
         steps = result.get("steps", [])
     except Exception as e:
@@ -214,9 +285,9 @@ Respond with ONLY JSON:
 def gen_concept_map(q):
     prompt = f"""You are a coding tutor. For this problem, generate concise one-liner explanations for each concept-map stage.
 
-Problem: {q['title']}
-{q['prompt']}
-Concept: {q['concept']}
+Problem: {q["title"]}
+{q["prompt"]}
+Concept: {q["concept"]}
 
 For each node provide:
 - "why": one-liner on why this stage matters
@@ -234,8 +305,11 @@ Respond ONLY strict JSON, no markdown fences:
 
     try:
         resp = client.chat.completions.create(
-            model=MODEL, messages=[{"role": "user", "content": prompt}],
-            max_tokens=700, temperature=0, extra_body={"reasoning": {"enabled": False}},
+            model=MODEL,
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=700,
+            temperature=0,
+            extra_body={"reasoning": {"enabled": False}},
         )
         raw = resp.choices[0].message.content.strip()
         if "```" in raw:
@@ -244,7 +318,7 @@ Respond ONLY strict JSON, no markdown fences:
                 raw = raw[4:]
         start = raw.find("{")
         end = raw.rfind("}")
-        raw = raw[start:end+1]
+        raw = raw[start : end + 1]
         result = json.loads(raw)
         details = result.get("details", {})
     except Exception as e:
@@ -267,9 +341,9 @@ def gen_question_context(q):
     prompt = f"""You are rewriting a coding-interview question so it reads like a real interview prompt, not a textbook exercise.
 
 Bare problem:
-Title: {q['title']}
-Prompt: {q['prompt']}
-The concept this tests (for your judgment only — do NOT copy it verbatim): {q.get('concept', '')}
+Title: {q["title"]}
+Prompt: {q["prompt"]}
+The concept this tests (for your judgment only — do NOT copy it verbatim): {q.get("concept", "")}
 
 Produce THREE short fields:
 - "scenario": 1-2 sentences framing this as a realistic task a data engineer / backend engineer would actually be given (a team, a system, a real reason the result is needed). Concrete, not generic. Keep it under 40 words.
@@ -281,11 +355,14 @@ Respond ONLY strict JSON, no markdown fences:
 
     try:
         resp = client.chat.completions.create(
-            model=MODEL, messages=[{"role": "user", "content": prompt}],
-            max_tokens=400, temperature=0.3, extra_body={"reasoning": {"enabled": False}},
+            model=MODEL,
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=400,
+            temperature=0.3,
+            extra_body={"reasoning": {"enabled": False}},
         )
         raw = resp.choices[0].message.content.strip()
-        raw = raw[raw.index("{"):raw.rindex("}") + 1]
+        raw = raw[raw.index("{") : raw.rindex("}") + 1]
         result = json.loads(raw)
         scenario = (result.get("scenario") or "").strip()
         why = (result.get("why_asked") or "").strip()
@@ -300,26 +377,33 @@ Respond ONLY strict JSON, no markdown fences:
 
 
 def gen_solution(q):
-    prompt = f"""Write a correct, clean {q['lang']} solution for this problem.
+    prompt = f"""Write a correct, clean {q["lang"]} solution for this problem.
 
-Problem: {q['title']}
-{q['prompt']}
-Concept: {q['concept']}
+Problem: {q["title"]}
+{q["prompt"]}
+Concept: {q["concept"]}
 
 Respond ONLY with the code, no markdown fences, no commentary."""
 
     try:
         resp = client.chat.completions.create(
-            model=MODEL, messages=[{"role": "user", "content": prompt}],
-            max_tokens=500, temperature=0, extra_body={"reasoning": {"enabled": False}},
+            model=MODEL,
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=500,
+            temperature=0,
+            extra_body={"reasoning": {"enabled": False}},
         )
         solution = resp.choices[0].message.content.strip()
         if "```" in solution:
             for part in solution.split("```"):
-                if q["lang"] in part or (not part.startswith("{") and not part.startswith("<") and not part.startswith("[")):
+                if q["lang"] in part or (
+                    not part.startswith("{")
+                    and not part.startswith("<")
+                    and not part.startswith("[")
+                ):
                     solution = part
                     if solution.startswith(q["lang"]):
-                        solution = solution[len(q["lang"]):].strip()
+                        solution = solution[len(q["lang"]) :].strip()
                     break
         return solution.strip()
     except Exception as e:
@@ -333,13 +417,13 @@ def gen_concept_links(q):
     caller. This replaces the hand-authored GAP_TO_QUESTIONS dict with a verifiable,
     reason-bearing mapping — every link is traceable to an LLM judgment, not an author guess."""
     concept_block = "\n".join(f"- {c}" for c in GAP_CONCEPTS)
-    prompt = f"""You are auditing a coding-interview question bank for a data-engineering interview coach. For the question below, decide which of the listed data-engineering CONCEPTS it genuinely helps a candidate PRACTICE or BUILD — not just concepts it incidentally touches.
+    prompt = f"""You are auditing a coding-interview question bank for a data-engineering interview coach. For the question below, decide which of the listed CONCEPTS it genuinely helps a candidate PRACTICE or BUILD — not just concepts it incidentally touches.
 
-Question title: {q['title']}
-Language: {q['lang']}
-Prompt: {q['prompt']}
+Question title: {q["title"]}
+Language: {q["lang"]}
+Prompt: {q["prompt"]}
 
-Concepts (pick the ones this question's SKILL transfers to):
+Concepts (pick the ones this question's SKILL transfers to — this includes system design, tradeoff analysis, and architecture decomposition skills):
 {concept_block}
 
 For each concept you judge relevant, give a relevance 1-3:
@@ -355,11 +439,14 @@ Respond ONLY strict JSON, no markdown:
 
     try:
         resp = client.chat.completions.create(
-            model=MODEL, messages=[{"role": "user", "content": prompt}],
-            max_tokens=500, temperature=0, extra_body={"reasoning": {"enabled": False}},
+            model=MODEL,
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=500,
+            temperature=0,
+            extra_body={"reasoning": {"enabled": False}},
         )
         raw = resp.choices[0].message.content.strip()
-        raw = raw[raw.index("{"):raw.rindex("}") + 1]
+        raw = raw[raw.index("{") : raw.rindex("}") + 1]
         result = json.loads(raw)
         links = result.get("links", [])
         clean = []
@@ -367,7 +454,13 @@ Respond ONLY strict JSON, no markdown:
             c = link.get("concept")
             r = int(link.get("relevance", 0))
             if c in GAP_CONCEPTS and r >= 1:
-                clean.append({"concept": c, "relevance": r, "reason": str(link.get("reason", "")).strip()})
+                clean.append(
+                    {
+                        "concept": c,
+                        "relevance": r,
+                        "reason": str(link.get("reason", "")).strip(),
+                    }
+                )
         return clean
     except Exception as e:
         print(f"    link LLM error: {e}")
@@ -389,10 +482,7 @@ def main():
 
     for qid in qids:
         q = QUESTIONS[qid]
-        if q["lang"] not in ("sql", "python"):
-            continue
-
-        print(f"[{done+1}/{len(qids)}] {qid}: {q['title']}")
+        print(f"[{done + 1}/{len(qids)}] {qid}: {q['title']}")
 
         if qid not in contexts:
             contexts[qid] = gen_question_context(q)
