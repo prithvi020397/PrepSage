@@ -160,6 +160,7 @@
   <div class="actions">
     <button onclick="saveOnboarding()">Get started</button>
   </div>
+  <p id="onboard-hint" style="display:none; color:#e0574f; font-size:13px; margin:8px 0 0; text-align:center;">Fill in at least one field, or use Skip below.</p>
   <a class="skip" href="/dashboard">Skip — I'll figure it out</a>
 </div>
 <script>
@@ -169,6 +170,10 @@ async function saveOnboarding() {
     strongest: document.getElementById('onboard-strongest').value,
     weakest: document.getElementById('onboard-weakest').value,
   };
+  if (!body.deadline && !body.strongest && !body.weakest) {
+    document.getElementById('onboard-hint').style.display = '';
+    return;
+  }
   await fetch('/api/onboarding', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)});
   window.location.href = '/dashboard';
 }

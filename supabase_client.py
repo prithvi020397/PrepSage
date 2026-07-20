@@ -90,7 +90,10 @@ def load_progress(user_id, token=None):
     if SUPABASE_ENABLED and user_id:
         c = get_client_with_token(token) if token else get_client()
         if c:
-            res = c.table("progress").select("*").eq("user_id", user_id).execute()
+            try:
+                res = c.table("progress").select("*").eq("user_id", user_id).execute()
+            except Exception:
+                return _read_json(PROGRESS_FILE, {})
             out = {}
             for row in (res.data or []):
                 qid = row.pop("qid")
@@ -113,10 +116,76 @@ def save_progress(user_id, progress, token=None):
                 {"user_id": user_id, "qid": qid, **state}
                 for qid, state in progress.items()
             ]
-            for row in rows:
-                c.table("progress").upsert(row).execute()
-            return
+            try:
+                for row in rows:
+                    c.table("progress").upsert(row).execute()
+            except Exception:
+                pass
+            else:
+                return
     _write_json(PROGRESS_FILE, progress)
+
+
+def _load_json_state(user_id, table, default, token=None):
+    """Load a whole-dict jsonb state row for the user (or legacy file)."""
+    if SUPABASE_ENABLED and user_id:
+        c = get_client_with_token(token) if token else get_client()
+        if c:
+            try:
+                res = c.table(table).select("data").eq("user_id", user_id).maybe_single().execute()
+                if res and res.data and res.data.get("data") is not None:
+                    return res.data["data"]
+            except Exception:
+                pass
+    if table == "chats":
+        return _read_json(CHATS_FILE, default)
+    if table == "judges":
+        return _read_json(JUDGES_FILE, default)
+    if table == "replay_comments":
+        return _read_json(REPLAY_COMMENTS_FILE, default)
+    return default
+
+
+def _save_json_state(user_id, table, data, token=None):
+    """Upsert a whole-dict jsonb state row for the user (or legacy file)."""
+    if SUPABASE_ENABLED and user_id:
+        c = get_client_with_token(token) if token else get_client()
+        if c:
+            try:
+                c.table(table).upsert({"user_id": user_id, "data": data}).execute()
+                return
+            except Exception:
+                pass
+    if table == "chats":
+        _write_json(CHATS_FILE, data)
+    elif table == "judges":
+        _write_json(JUDGES_FILE, data)
+    elif table == "replay_comments":
+        _write_json(REPLAY_COMMENTS_FILE, data)
+
+
+def load_chats(user_id, token=None):
+    return _json_state(user_id, "chats", {})
+
+
+def save_chats(user_id, chats, token=None):
+    _save_json_state(user_id, "chats", chats, token)
+
+
+def load_judges(user_id, token=None):
+    return _json_state(user_id, "judges", {})
+
+
+def save_judges(user_id, judges, token=None):
+    _save_json_state(user_id, "judges", judges, token)
+
+
+def load_replay_comments(user_id, token=None):
+    return _json_state(user_id, "replay_comments", {})
+
+
+def save_replay_comments(user_id, comments, token=None):
+    _save_json_state(user_id, "replay_comments", comments, token)
 
 
 def get_user_id_from_request(request):

@@ -162,7 +162,8 @@ def api_me():
         return jsonify({"user_id": None, "mode": "legacy"})
     uid = current_user_id()
     if not uid:
-        return jsonify({"user_id": None, "mode": "anonymous"}), 401
+        # Anonymous is a valid, expected state — 200 (body conveys mode) to avoid monitoring noise.
+        return jsonify({"user_id": None, "mode": "anonymous"})
     return jsonify({"user_id": uid, "mode": "supabase"})
 
 

@@ -61,15 +61,60 @@ from core.concepts import (  # noqa: F401
     _translation_source, _find_translation_sibling,
 )
 
+# Per-user Supabase persistence (cloud multi-user mode).
+# For authenticated requests we load the user's progress/chats/judges/replay
+# from Supabase into the module globals for the request, then write them back
+# on teardown. Anonymous/legacy/local requests keep using the local JSON files,
+# and the existing save_*() helpers still write those as a fallback.
 @app.before_request
 def _req_start():
     g._t0 = time.time()
+    if request.path.startswith("/static") or request.path in ("/health", "/ping"):
+        return
+    if not SUPABASE_ENABLED or sb is None:
+        return
+    uid = sb.get_user_id_from_request(request)
+    if not uid:
+        # No authenticated user: serve the shared legacy file-based state so a
+        # previous authenticated user's data doesn't leak into this request.
+        global PROGRESS, CHATS, JUDGES, REPLAY_COMMENTS
+        PROGRESS = _read_state(PROGRESS_FILE, {})
+        CHATS = _read_state(CHATS_FILE, {})
+        JUDGES = _read_state(JUDGES_FILE, {})
+        REPLAY_COMMENTS = _read_state(REPLAY_COMMENTS_FILE, {})
+        g._supabase_user = None
+        g._supabase_loaded = False
+        return
+    auth = request.headers.get("Authorization", "")
+    token = auth[len("Bearer "):] if auth.startswith("Bearer ") else None
+    g._supabase_user = uid
+    g._supabase_token = token
+    g._supabase_loaded = True
+    PROGRESS = sb.load_progress(uid, token)
+    CHATS = sb.load_chats(uid, token)
+    JUDGES = sb.load_judges(uid, token)
+    REPLAY_COMMENTS = sb.load_replay_comments(uid, token)
 
 @app.after_request
 def _req_log(resp):
     ms = int((time.time() - getattr(g, "_t0", time.time())) * 1000)
     log.info("%s %s %s %dms", request.method, request.path, resp.status_code, ms)
     return resp
+
+@app.teardown_request
+def _persist_user_state(exc):
+    uid = getattr(g, "_supabase_user", None)
+    if not uid or not getattr(g, "_supabase_loaded", False):
+        return
+    token = getattr(g, "_supabase_token", None)
+    try:
+        sb.save_progress(uid, PROGRESS, token)
+        sb.save_chats(uid, CHATS, token)
+        sb.save_judges(uid, JUDGES, token)
+        sb.save_replay_comments(uid, REPLAY_COMMENTS, token)
+    except Exception:
+        log.exception("teardown: failed to persist user state for %s", uid)
+
 
 HEADROOM_ENABLED = os.environ.get("HEADROOM_ENABLED", "").lower() in ("1", "true", "yes")
 API_BASE = "http://localhost:9090/v1" if HEADROOM_ENABLED else "https://openrouter.ai/api/v1"
@@ -150,6 +195,14 @@ PENDING_DRYRUN = set()  # qids where the tutor just posed a dry-run challenge, a
 PROGRESS_FILE = "progress.json"
 # qid -> {"solved_at": iso, "fails": int, "due_at": iso} — this one DOES persist to disk,
 # spaced-repetition scheduling is pointless if it resets every time Flask autoreloads.
+def _read_state(path, default):
+    """Reload a JSON state file (used to restore legacy globals per request)."""
+    try:
+        with open(path) as f:
+            return json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        return default
+
 PROGRESS = json.load(open(PROGRESS_FILE)) if os.path.exists(PROGRESS_FILE) else {}
 
 HISTORY_FILE = "history.json"
