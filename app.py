@@ -644,6 +644,7 @@ JD_CONCEPT_TRANSLATIONS = {
     "kafka": "streaming_paradigm", "flink": "streaming_paradigm",
     "spark streaming": "streaming_paradigm", "kinesis": "streaming_paradigm",
     "pyspark": "batch_paradigm", "spark": "batch_paradigm", "databricks": "batch_paradigm",
+    "java": "batch_paradigm",
     "airflow": "orchestration", "luigi": "orchestration", "dagster": "orchestration",
     "terraform": "iac", "pulumi": "iac", "cloudformation": "iac",
     "dbt": "data_modeling", "snowflake": "warehouse", "bigquery": "warehouse",

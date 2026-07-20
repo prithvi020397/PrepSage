@@ -33,7 +33,7 @@ def _concept_is_present(concept, evidence_text, evidence_skills):
     strong = {
         "streaming_paradigm": ["kafka", "flink", "kinesis", "spark streaming", "pub/sub",
                                "streaming pipeline", "real-time pipeline", "stream processor"],
-        "batch_paradigm": ["batch", "pyspark", "spark", "etl", "dataproc", "scheduled job",
+        "batch_paradigm": ["batch", "pyspark", "spark", "java", "etl", "dataproc", "scheduled job",
                            "daily job", "hourly job", "airflow"],
         "cloud_platform": ["azure", "aws", "gcp", "databricks", "s3", "blob", "cloud"],
         "idempotency_dedup": ["idempot", "dedup", "exactly-once", "exactly once", "deduplicate"],
@@ -101,7 +101,7 @@ def _find_translation_sibling(concept, resume_tool_set):
     families = {
         "streaming_paradigm": ["kafka", "flink", "kinesis", "spark streaming", "pubsub"],
         "cloud_platform": ["aws", "azure", "gcp", "google cloud", "databricks"],
-        "batch_paradigm": ["spark", "pyspark", "databricks", "hadoop"],
+        "batch_paradigm": ["spark", "pyspark", "databricks", "hadoop", "java"],
         "orchestration": ["airflow", "dagster", "luigi", "prefect"],
         "iac": ["terraform", "pulumi", "cloudformation"],
         "warehouse": ["snowflake", "bigquery", "redshift", "databricks"],
