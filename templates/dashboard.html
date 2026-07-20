@@ -408,6 +408,66 @@
   font-weight: 500; transition: color 0.15s ease;
 }
 #auth-form .auth-toggle a:hover { color: var(--accent-2); }
+/* ── improved form inputs: visibility + touch targets (Phase 1) ── */
+input[type="text"], input[type="email"], input[type="password"], textarea, select {
+  border: 1px solid var(--border) !important;
+  padding: 11px 12px !important;
+  background-color: var(--card-2) !important;
+  min-height: 44px !important;
+}
+textarea { min-height: 100px !important; resize: vertical; }
+input::placeholder, textarea::placeholder { opacity: 0.7; color: var(--text-dim); }
+/* ── section header with numbered badge ── */
+.section-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.section-number {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  background-color: #22c55e;
+  color: #0e1015;
+  border-radius: 50%;
+  font-weight: 700;
+  font-size: 14px;
+  flex-shrink: 0;
+}
+.section-header .section-title {
+  margin-bottom: 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+/* ── button hierarchy: primary (green), secondary (outline), danger (red) ── */
+.btn-primary {
+  background: #22c55e;
+  color: #0e1015;
+  border: none;
+  padding: 11px 20px;
+  min-height: 44px;
+  font-weight: 600;
+}
+.btn-primary:hover { background: #16a34a; }
+.btn-secondary {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 11px 20px;
+  min-height: 44px;
+}
+.btn-secondary:hover { border-color: #22c55e; color: #22c55e; }
+.btn-danger {
+  background: transparent;
+  border: 1px solid var(--error);
+  color: var(--error);
+  padding: 11px 20px;
+  min-height: 44px;
+}
+.btn-danger:hover { background: rgba(255, 107, 107, 0.1); }
 @media (max-width: 720px) {
   #auth-shell { flex-direction: column; max-width: 420px; min-height: 0; }
   #auth-brand { border-right: none; border-bottom: 1px solid var(--border); padding: 36px 32px; }
@@ -544,7 +604,10 @@
     </div>
 
     <div class="card" style="border-color: rgba(124,108,246,0.3);">
-      <div class="section-title" style="color:var(--accent);">🎯 Job description</div>
+      <div class="section-header">
+        <div class="section-number">2</div>
+        <div class="section-title" style="color:var(--accent);">🎯 Job description</div>
+      </div>
       {% if jd_loaded %}
         <div class="sub" style="margin-bottom:8px;">{% if jd_synthetic %}Synthetic profile{% else %}Uploaded {{ jd.uploaded_at[:10] }}{% endif %} — <strong style="color:var(--text);">{{ jd.role_title }}</strong>{% if jd.seniority %} ({{ jd.seniority }}){% endif %}{% if jd.domain %} · {{ jd.domain }}{% endif %}</div>
         {% if not jd_synthetic %}
@@ -562,7 +625,7 @@
         </div>
         <div id="jd-repaste-section" style="display:none; margin-top:8px;">
           <textarea id="jd-repaste-input" rows="6" placeholder="Paste the full job description here..." style="width:100%; padding:10px 12px; background:var(--card); border:1px solid var(--border); border-radius:8px; color:var(--text); font-size:13px; font-family:'Inter',sans-serif; resize:vertical; outline:none;"></textarea>
-          <button class="btn" onclick="uploadJDText('jd-repaste-input')" style="margin-top:8px; font-size:13px;">Parse JD</button>
+          <button class="btn btn-primary" onclick="uploadJDText('jd-repaste-input')" style="margin-top:8px; font-size:13px;">Parse JD</button>
           <span id="jd-text-status" class="sub" style="margin-left:8px;"></span>
         </div>
         {% endif %}
@@ -574,7 +637,7 @@
         </div>
         <div id="jd-text-section">
           <textarea id="jd-text-input" rows="8" placeholder="Paste the full job description here..." style="width:100%; padding:10px 12px; background:var(--card); border:1px solid var(--border); border-radius:8px; color:var(--text); font-size:13px; font-family:'Inter',sans-serif; resize:vertical; outline:none;"></textarea>
-          <button class="btn" onclick="uploadJDText()" style="margin-top:8px; font-size:13px;">Parse JD</button>
+          <button class="btn btn-primary" onclick="uploadJDText()" style="margin-top:8px; font-size:13px;">Parse JD</button>
           <span id="jd-text-status" class="sub" style="margin-left:8px;"></span>
         </div>
         <div id="jd-profile-section" style="display:none;">
@@ -622,7 +685,10 @@
 
     {% if jd_loaded %}
     <div class="card" style="border-color: rgba(94,230,216,0.3);">
-      <div class="section-title" style="color:var(--accent-2);">🧭 Role readiness — your path to {{ jd.role_title }}</div>
+      <div class="section-header">
+        <div class="section-number">3</div>
+        <div class="section-title" style="color:var(--accent-2);">🧭 Role readiness — your path to {{ jd.role_title }}</div>
+      </div>
       <div class="sub" style="margin-bottom:12px;">{{ role_readiness.framing_note }}</div>
       <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(150px,1fr)); gap:12px; margin-bottom:12px;">
         <div>
@@ -739,7 +805,7 @@
     <div class="danger-zone">
       <div class="dz-title">Danger zone</div>
       <div class="dz-desc">Permanently erase all progress — solved counts, streaks, due reviews, saved code, chat history, and replay notes. The dashboard will read 0/{{ total_questions }}. This cannot be undone.</div>
-      <button class="btn btn-ghost danger-btn" id="startover-btn" onclick="openStartOver()">Start over</button>
+      <button class="btn btn-danger" id="startover-btn" onclick="openStartOver()">Start over</button>
     </div>
 
     {% if study_plan %}
@@ -795,7 +861,10 @@
 
 
     <div class="card">
-      <div class="section-title">📓 Real interview postmortem journal</div>
+      <div class="section-header">
+        <div class="section-number">4</div>
+        <div class="section-title">📓 Real interview postmortem journal</div>
+      </div>
       <div class="sub" style="margin-bottom:10px;">Got asked something in an actual interview? Log it so it counts toward the tracking above.</div>
       <textarea id="pm-question" placeholder="The question, as close to verbatim as you remember…" style="width:100%; min-height:50px; margin-bottom:8px; padding:8px 10px; background:var(--card-2); border:1px solid var(--border); border-radius:6px; color:var(--text); font-family:inherit; font-size:13px; resize:vertical; box-sizing:border-box;"></textarea>
       <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:10px;">
@@ -807,7 +876,7 @@
         <label style="font-size:12.5px; color:var(--text-dim); display:flex; align-items:center; gap:5px;">
           <input type="checkbox" id="pm-ok"> I nailed it
         </label>
-        <button id="pm-submit" onclick="submitPostmortem()" style="margin-left:auto; cursor:pointer; background:var(--accent); color:#0e1015; border:none; border-radius:6px; padding:7px 14px; font-size:12.5px; font-weight:600;">Log it</button>
+        <button class="btn btn-primary" id="pm-submit" onclick="submitPostmortem()" style="margin-left:auto; cursor:pointer; background:#22c55e; color:#0e1015; border:none; border-radius:6px; padding:7px 14px; font-size:12.5px; font-weight:600;">Log it</button>
       </div>
       <div id="pm-status" class="sub"></div>
       {% if postmortems %}
