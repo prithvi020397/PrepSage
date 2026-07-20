@@ -188,16 +188,18 @@ function applySidebarFilter() {
   document.querySelectorAll('.q-section-header').forEach(h => {
     const collapsed = h.classList.contains('collapsed');
     let visible = 0;
+    let total = 0;
     let next = h.nextElementSibling;
     while (next && !next.classList.contains('q-section-header')) {
+      total++;
       const match = !term || next.querySelector('.q-title').textContent.toLowerCase().includes(term);
       next.style.display = (match && (!collapsed || term)) ? '' : 'none';
       if (match) visible++;
       next = next.nextElementSibling;
     }
-    h.style.display = visible ? '' : 'none';
-    // keep the section count badge in sync with the filter
-    const total = Array.from(h.parentElement.children).filter(c => c.classList.contains('q-item')).length;
+    // hide sections with no matches while filtering; always show when unfiltered
+    h.style.display = (term && visible === 0) ? 'none' : '';
+    // keep the section count badge in sync: per-section total when unfiltered, live matches when filtering
     const countEl = h.querySelector('.count');
     if (countEl) countEl.textContent = term ? visible : total;
   });

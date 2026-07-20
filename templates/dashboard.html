@@ -2,6 +2,7 @@
 <html>
 <head>
 <meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>The Loop — Diagnose</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1293,7 +1294,7 @@
   }
 
   })();
-  </script>
+
   // Render any UTC timestamp as the viewer's local date (avoids off-by-one from server UTC).
   document.querySelectorAll('.local-date[data-ts]').forEach(el => {
     try {
@@ -1301,6 +1302,7 @@
       if (!isNaN(d)) el.textContent = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
     } catch (e) {}
   });
+  </script>
 
 </body>
 </html>
