@@ -106,11 +106,25 @@ LLM framing). `history.json`, `chats.json`, `progress.json`, and `replay_comment
 runtime state — they're created automatically on first run and are gitignored, so your local practice
 history never gets committed.
 
+**Cloud multi-user (Supabase).** When `SUPABASE_URL` + `SUPABASE_KEY` are set, the app switches from
+file-based state to per-user Postgres storage. Each authenticated user's `progress`, `chats`,
+`judges`, and `replay_comments` are loaded from Supabase at request time and written back on
+teardown, isolated by `user_id` via row-level security (RLS). Anonymous users and local runs keep
+using the JSON files. **One-time setup:** run `refactor/supabase-schema.sql` in the Supabase SQL
+editor to create the four tables + RLS policies. If the tables are missing, the app degrades
+gracefully to local files (and logs a warning) — so always run that SQL before relying on cloud
+persistence.
+
 ## Deployment
 
 The repo includes a `Procfile` and `render.yaml` for [Render](https://render.com/): set
-`OPENROUTER_API_KEY` as an environment variable in the Render dashboard (it's marked `sync: false` so
-it's never stored in the repo). `gunicorn app:app` is the start command.
+`OPENROUTER_API_KEY`, `DEEPGRAM_API_KEY`, `SUPABASE_URL`, and `SUPABASE_KEY` as environment variables
+in the Render dashboard (secrets are marked `sync: false` so they're never stored in the repo).
+`gunicorn app:app` is the start command.
+
+> **Supabase tables:** for per-user cloud persistence, run `refactor/supabase-schema.sql` once in the
+> Supabase SQL editor (creates `progress`, `chats`, `judges`, `replay_comments` + RLS). Without it the
+> app still runs but falls back to ephemeral local files.
 
 > **Concurrency:** the app ships with `workers 1`. Module-level runtime state
 > (the in-memory dicts and per-user JSON files) is **not** concurrency-safe, so

@@ -21,9 +21,11 @@ behind a public URL via Coolify using the **Dockerfile** provider. No database n
 5. Health check: use `GET /` (the app index) — no dedicated `/health` route exists yet.
 
 ## Notes / limitations
-- **State is ephemeral.** `progress.json`, `history.json`, `chats.json` live in the container's
-  filesystem. They are lost on redeploy/restart. For persistent multi-user state, see the
-  Supabase work (not yet started). For now this is fine for a demo / single session.
+- **State is ephemeral by default.** `progress.json`, `history.json`, `chats.json` live in the
+  container's filesystem and are lost on redeploy/restart for anonymous users. Per-user persistence
+  is available via Supabase: set `SUPABASE_URL` + `SUPABASE_KEY` and run `refactor/supabase-schema.sql`
+  in Supabase once — then each authenticated user's `progress`/`chats`/`judges`/`replay_comments`
+  persist across redeploys (isolated by RLS). Anonymous sessions remain ephemeral.
 - **`OPENROUTER_API_KEY` is mandatory.** Without it the container exits immediately at import.
 - The image uses `python:3.12-slim` + `gunicorn` (2 workers, 120s timeout).
 - `.dockerignore` excludes local-only files (`graphify-out/`, `.opencode/`, `.env`, `*.pdf`, state files).
