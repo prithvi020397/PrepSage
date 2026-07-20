@@ -53,13 +53,21 @@ log.propagate = False
 # Re-exported here so existing call sites keep working without edits.
 from core.constants import *  # noqa: F401,F403
 from core.questions import (  # noqa: F401
-    taxonomy_for, war_stories_for, baseline_rubric_for,
-    persona_for, pattern_for, topic_for,
+    taxonomy_for,
+    war_stories_for,
+    baseline_rubric_for,
+    persona_for,
+    pattern_for,
+    topic_for,
 )
 from core.concepts import (  # noqa: F401
-    CONCEPT_NORMALIZATION, _normalize_concept, _concept_is_present,
-    _translation_source, _find_translation_sibling,
+    CONCEPT_NORMALIZATION,
+    _normalize_concept,
+    _concept_is_present,
+    _translation_source,
+    _find_translation_sibling,
 )
+
 
 # Per-user Supabase persistence (cloud multi-user mode).
 # For authenticated requests we load the user's progress/chats/judges/replay
@@ -91,7 +99,7 @@ def _req_start():
     # Authenticated: load this user's state for the request. Any Supabase error
     # must NEVER 500 the request — fall back to legacy file state instead.
     auth = request.headers.get("Authorization", "")
-    token = auth[len("Bearer "):] if auth.startswith("Bearer ") else None
+    token = auth[len("Bearer ") :] if auth.startswith("Bearer ") else None
     g._supabase_user = uid
     g._supabase_token = token
     g._supabase_loaded = True
@@ -101,18 +109,22 @@ def _req_start():
         JUDGES = sb.load_judges(uid, token)
         REPLAY_COMMENTS = sb.load_replay_comments(uid, token)
     except Exception:
-        log.exception("before_request: Supabase load failed for %s; using legacy state", uid)
+        log.exception(
+            "before_request: Supabase load failed for %s; using legacy state", uid
+        )
         PROGRESS = _read_state(PROGRESS_FILE, {})
         CHATS = _read_state(CHATS_FILE, {})
         JUDGES = _read_state(JUDGES_FILE, {})
         REPLAY_COMMENTS = _read_state(REPLAY_COMMENTS_FILE, {})
         g._supabase_loaded = False
 
+
 @app.after_request
 def _req_log(resp):
     ms = int((time.time() - getattr(g, "_t0", time.time())) * 1000)
     log.info("%s %s %s %dms", request.method, request.path, resp.status_code, ms)
     return resp
+
 
 @app.teardown_request
 def _persist_user_state(exc):
@@ -129,10 +141,20 @@ def _persist_user_state(exc):
         log.exception("teardown: failed to persist user state for %s", uid)
 
 
-HEADROOM_ENABLED = os.environ.get("HEADROOM_ENABLED", "").lower() in ("1", "true", "yes")
-API_BASE = "http://localhost:9090/v1" if HEADROOM_ENABLED else "https://openrouter.ai/api/v1"
-client = OpenAI(base_url=API_BASE, api_key=os.environ.get("OPENROUTER_API_KEY", "sk-placeholder-not-used"),
-                timeout=60, max_retries=1)
+HEADROOM_ENABLED = os.environ.get("HEADROOM_ENABLED", "").lower() in (
+    "1",
+    "true",
+    "yes",
+)
+API_BASE = (
+    "http://localhost:9090/v1" if HEADROOM_ENABLED else "https://openrouter.ai/api/v1"
+)
+client = OpenAI(
+    base_url=API_BASE,
+    api_key=os.environ.get("OPENROUTER_API_KEY", "sk-placeholder-not-used"),
+    timeout=60,
+    max_retries=1,
+)
 MODEL = "deepseek/deepseek-v4-flash"
 
 DEEPGRAM_API_KEY = os.environ.get("DEEPGRAM_API_KEY", "")
@@ -143,7 +165,11 @@ DEEPGRAM_API_KEY = os.environ.get("DEEPGRAM_API_KEY", "")
 # recommended" instead of silently serving concepts mapped under an old taxonomy.
 TAXONOMY_VERSION = "2026-07-17"
 # ponytail: separate client — OpenRouter doesn't proxy Whisper transcription, needs a real OpenAI key
-whisper_client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY", "")) if os.environ.get("OPENAI_API_KEY") else None
+whisper_client = (
+    OpenAI(api_key=os.environ.get("OPENAI_API_KEY", ""))
+    if os.environ.get("OPENAI_API_KEY")
+    else None
+)
 
 # ponytail: Firecrawl layer is OPTIONAL. If the module or its deps are missing, every hybrid call
 # degrades to the precomputed bank. Import failure must never break app startup.
@@ -165,6 +191,7 @@ except Exception:
 # so the app runs unchanged in local mode. Import failure must never break startup.
 try:
     import supabase_client as sb
+
     SUPABASE_ENABLED = sb.SUPABASE_ENABLED
 except Exception:
     sb = None
@@ -199,13 +226,18 @@ def _load_concept_links():
         _CONCEPT_LINKS_CACHE = {}
     return _CONCEPT_LINKS_CACHE
 
+
 # ponytail: in-memory, single-user, resets on restart — fine for a local tutor
 ATTEMPTS = {}
 STRUGGLES = {}  # qid -> {"title", "concept", "fails"} — for cross-question pattern callouts
 PENDING_RECALL = set()  # qids where the tutor just asked a recall-check question, awaiting the student's answer
-PENDING_DRYRUN = set()  # qids where the tutor just posed a dry-run challenge, awaiting the student's trace
+PENDING_DRYRUN = (
+    set()
+)  # qids where the tutor just posed a dry-run challenge, awaiting the student's trace
 
 PROGRESS_FILE = "progress.json"
+
+
 # qid -> {"solved_at": iso, "fails": int, "due_at": iso} — this one DOES persist to disk,
 # spaced-repetition scheduling is pointless if it resets every time Flask autoreloads.
 def _read_state(path, default):
@@ -215,6 +247,7 @@ def _read_state(path, default):
             return json.load(f)
     except (FileNotFoundError, json.JSONDecodeError):
         return default
+
 
 PROGRESS = json.load(open(PROGRESS_FILE)) if os.path.exists(PROGRESS_FILE) else {}
 
@@ -231,21 +264,33 @@ CHATS = json.load(open(CHATS_FILE)) if os.path.exists(CHATS_FILE) else {}
 REPLAY_COMMENTS_FILE = "replay_comments.json"
 # chat_key -> [{"turn_idx", "author", "text", "ts"}, ...] — same persistence shape as
 # CHATS, so a shared replay link's comments survive a restart too.
-REPLAY_COMMENTS = json.load(open(REPLAY_COMMENTS_FILE)) if os.path.exists(REPLAY_COMMENTS_FILE) else {}
+REPLAY_COMMENTS = (
+    json.load(open(REPLAY_COMMENTS_FILE))
+    if os.path.exists(REPLAY_COMMENTS_FILE)
+    else {}
+)
 
 JUDGES_FILE = "judges.json"
 # chat_key -> judge_result dict — persisted so /api/export can reconstruct reports
 # after the session ends, without re-running the judge model.
 JUDGES = json.load(open(JUDGES_FILE)) if os.path.exists(JUDGES_FILE) else {}
 
-PRECOMPUTED_TRACES = json.load(open("traces.json")) if os.path.exists("traces.json") else {}
-PRECOMPUTED_CONCEPTS = json.load(open("concept_maps.json")) if os.path.exists("concept_maps.json") else {}
-PRECOMPUTED_SOLUTIONS = json.load(open("solutions.json")) if os.path.exists("solutions.json") else {}
-PRECOMPUTED_CONTEXTS = json.load(open("question_contexts.json")) if os.path.exists("question_contexts.json") else {}
+PRECOMPUTED_TRACES = (
+    json.load(open("traces.json")) if os.path.exists("traces.json") else {}
+)
+PRECOMPUTED_CONCEPTS = (
+    json.load(open("concept_maps.json")) if os.path.exists("concept_maps.json") else {}
+)
+PRECOMPUTED_SOLUTIONS = (
+    json.load(open("solutions.json")) if os.path.exists("solutions.json") else {}
+)
+PRECOMPUTED_CONTEXTS = (
+    json.load(open("question_contexts.json"))
+    if os.path.exists("question_contexts.json")
+    else {}
+)
 
 # ponytail: static keyword map, not an LLM call — topic tagging doesn't need to cost anything.
-
-
 
 
 LEGACY_FAKE_TOKEN = "legacy-local-mode"
@@ -276,23 +321,32 @@ def _gen_question_context(q):
     precomputed question_contexts.json. Mirrors gen_question_context in precompute.py."""
     prompt = f"""Rewrite this coding-interview question so it reads like a real interview prompt.
 
-Title: {q['title']}
-Prompt: {q['prompt']}
-Concept (judgment only): {q.get('concept', '')}
+Title: {q["title"]}
+Prompt: {q["prompt"]}
+Concept (judgment only): {q.get("concept", "")}
 
 Respond ONLY strict JSON:
 {{"scenario": "1-2 sentence realistic task framing (under 40 words)", "why_asked": "one sentence on the skill probed (under 25 words)", "edge_cases": ["short edge case 1", "short edge case 2"]}}"""
     try:
         resp = client.chat.completions.create(
-            model=MODEL, messages=[{"role": "user", "content": prompt}],
-            max_tokens=400, temperature=0.3, extra_body={"reasoning": {"enabled": False}},
+            model=MODEL,
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=400,
+            temperature=0.3,
+            extra_body={"reasoning": {"enabled": False}},
         )
         raw = chat_content(resp)
-        raw = raw[raw.index("{"):raw.rindex("}") + 1]
+        raw = raw[raw.index("{") : raw.rindex("}") + 1]
         result = json.loads(raw)
-        return {"scenario": result.get("scenario", "").strip(),
-                "why_asked": result.get("why_asked", "").strip(),
-                "edge_cases": [str(e).strip() for e in (result.get("edge_cases") or []) if str(e).strip()][:2]}
+        return {
+            "scenario": result.get("scenario", "").strip(),
+            "why_asked": result.get("why_asked", "").strip(),
+            "edge_cases": [
+                str(e).strip()
+                for e in (result.get("edge_cases") or [])
+                if str(e).strip()
+            ][:2],
+        }
     except Exception:
         return {"scenario": "", "why_asked": "", "edge_cases": []}
 
@@ -310,9 +364,15 @@ def recurring_missed_topics():
     # ponytail: SQL/Python's version of recurring_missed_concepts — same "seen >=2 times
     # recently" rule, but over topic_for()'s auto-derived topics instead of a hand-authored
     # taxonomy, since submit fails + debrief misses already carry a topic.
-    recent = [h for h in HISTORY
-              if (h.get("event") == "submit" and not h.get("passed"))
-              or (h.get("event") == "debrief" and (not h.get("complexity_ok", True) or not h.get("edge_ok", True)))][-15:]
+    recent = [
+        h
+        for h in HISTORY
+        if (h.get("event") == "submit" and not h.get("passed"))
+        or (
+            h.get("event") == "debrief"
+            and (not h.get("complexity_ok", True) or not h.get("edge_ok", True))
+        )
+    ][-15:]
     counts = {}
     for h in recent:
         t = h.get("topic")
@@ -330,14 +390,18 @@ def schedule_review(qid, fails):
         days_left = (datetime.fromisoformat(deadline["date"]) - datetime.now()).days
         # ponytail: compress toward the deadline (half of what's left) instead of a real
         # deadline-aware scheduler that redistributes ALL due questions across the remaining days
-        interval_days = 1 if days_left <= 0 else max(1, min(interval_days, days_left // 2))
+        interval_days = (
+            1 if days_left <= 0 else max(1, min(interval_days, days_left // 2))
+        )
     now = datetime.now()
     entry = PROGRESS.get(qid) if isinstance(PROGRESS.get(qid), dict) else {}
-    entry.update({
-        "solved_at": now.isoformat(),
-        "fails": fails,
-        "due_at": (now + timedelta(days=interval_days)).isoformat(),
-    })
+    entry.update(
+        {
+            "solved_at": now.isoformat(),
+            "fails": fails,
+            "due_at": (now + timedelta(days=interval_days)).isoformat(),
+        }
+    )
     PROGRESS[qid] = entry
     save_progress()
 
@@ -400,9 +464,20 @@ def _compute_gap_alerts():
         if sn in ("sql", "python", "java", "scala", "javascript", "typescript"):
             return True
         # design domain match
-        design_domains = {"distributed systems", "data engineering", "machine learning",
-                          "cloud infrastructure", "microservices", "streaming", "databases",
-                          "payments", "ad tech", "healthcare", "retail", "real-time systems"}
+        design_domains = {
+            "distributed systems",
+            "data engineering",
+            "machine learning",
+            "cloud infrastructure",
+            "microservices",
+            "streaming",
+            "databases",
+            "payments",
+            "ad tech",
+            "healthcare",
+            "retail",
+            "real-time systems",
+        }
         if sn in design_domains:
             return True
         return False
@@ -433,24 +508,43 @@ def _compute_gap_alerts():
                 best_match = topic
                 best_score = 1.0
             elif any(w in topic for w in name.lower().split() if len(w) > 3):
-                score = sum(1 for w in name.lower().split() if w in topic and len(w) > 3) / max(1, len(name.split()))
+                score = sum(
+                    1 for w in name.lower().split() if w in topic and len(w) > 3
+                ) / max(1, len(name.split()))
                 if score > best_score:
                     best_match = topic
                     best_score = score
 
         if best_match and best_score > 0.3:
             stats = topic_stats[best_match]
-            pct = round(100 * stats["passed"] / stats["total"]) if stats["total"] > 0 else 0
+            pct = (
+                round(100 * stats["passed"] / stats["total"])
+                if stats["total"] > 0
+                else 0
+            )
             if pct < 70:
-                gaps.append({"claimed": name, "topic": best_match, "accuracy": pct,
-                             "attempts": stats["total"],
-                             "severity": "high" if pct < 40 else "medium",
-                             "depth": entry.get("depth", "moderate")})
+                gaps.append(
+                    {
+                        "claimed": name,
+                        "topic": best_match,
+                        "accuracy": pct,
+                        "attempts": stats["total"],
+                        "severity": "high" if pct < 40 else "medium",
+                        "depth": entry.get("depth", "moderate"),
+                    }
+                )
         elif not best_match:
             # claimed skill with zero practice — only show if relevant
-            gaps.append({"claimed": name, "topic": None, "accuracy": 0,
-                         "attempts": 0, "severity": "high",
-                         "depth": entry.get("depth", "moderate")})
+            gaps.append(
+                {
+                    "claimed": name,
+                    "topic": None,
+                    "accuracy": 0,
+                    "attempts": 0,
+                    "severity": "high",
+                    "depth": entry.get("depth", "moderate"),
+                }
+            )
 
     # also check domains
     for domain in claimed_domains:
@@ -463,12 +557,22 @@ def _compute_gap_alerts():
                 break
         if best_match:
             stats = topic_stats[best_match]
-            pct = round(100 * stats["passed"] / stats["total"]) if stats["total"] > 0 else 0
+            pct = (
+                round(100 * stats["passed"] / stats["total"])
+                if stats["total"] > 0
+                else 0
+            )
             if pct < 70:
-                gaps.append({"claimed": domain, "topic": best_match, "accuracy": pct,
-                             "attempts": stats["total"],
-                             "severity": "high" if pct < 40 else "medium",
-                             "depth": "domain"})
+                gaps.append(
+                    {
+                        "claimed": domain,
+                        "topic": best_match,
+                        "accuracy": pct,
+                        "attempts": stats["total"],
+                        "severity": "high" if pct < 40 else "medium",
+                        "depth": "domain",
+                    }
+                )
 
     gaps.sort(key=lambda g: (0 if g["severity"] == "high" else 1, g["accuracy"]))
     return gaps[:8]
@@ -500,62 +604,93 @@ def _compute_study_plan():
     for topic, stats in topic_stats.items():
         pct = round(100 * stats["passed"] / stats["total"]) if stats["total"] > 0 else 0
         if pct < 70 and stats["total"] >= 1:
-            weak_topics.append({"topic": topic, "accuracy": pct, "attempts": stats["total"]})
+            weak_topics.append(
+                {"topic": topic, "accuracy": pct, "attempts": stats["total"]}
+            )
     weak_topics.sort(key=lambda w: w["accuracy"])
 
     plan = []
     # priority 1: weak topics that match claimed skills
     raw_skills = resume.get("skills", [])
-    skill_names = [s.get("name", s).lower() if isinstance(s, dict) else s.lower() for s in raw_skills]
+    skill_names = [
+        s.get("name", s).lower() if isinstance(s, dict) else s.lower()
+        for s in raw_skills
+    ]
     for wt in weak_topics[:3]:
         if any(s in wt["topic"].lower() for s in skill_names if len(s) > 3):
-            plan.append({
-                "title": f"Practice {wt['topic']}",
-                "action": f"You claim this skill but have {wt['accuracy']}% accuracy. Drill the weak spots.",
-                "priority": "high",
-                "category": "sql" if "sql" in wt["topic"].lower() or "join" in wt["topic"].lower() or "window" in wt["topic"].lower() else "python",
-            })
+            plan.append(
+                {
+                    "title": f"Practice {wt['topic']}",
+                    "action": f"You claim this skill but have {wt['accuracy']}% accuracy. Drill the weak spots.",
+                    "priority": "high",
+                    "category": "sql"
+                    if "sql" in wt["topic"].lower()
+                    or "join" in wt["topic"].lower()
+                    or "window" in wt["topic"].lower()
+                    else "python",
+                }
+            )
 
     # priority 2: due reviews
     due_count = sum(1 for qid in PROGRESS if is_due(qid))
     if due_count > 0:
-        plan.append({
-            "title": f"Review {due_count} due question{'s' if due_count != 1 else ''}",
-            "action": "Spaced repetition keeps knowledge fresh. Review before starting new questions.",
-            "priority": "high",
-            "category": "sql",
-        })
+        plan.append(
+            {
+                "title": f"Review {due_count} due question{'s' if due_count != 1 else ''}",
+                "action": "Spaced repetition keeps knowledge fresh. Review before starting new questions.",
+                "priority": "high",
+                "category": "sql",
+            }
+        )
 
     # priority 3: design practice if claimed but not practiced
-    design_count = sum(1 for q in QUESTIONS.values() if q["lang"] == "design" and not is_solved(q["id"]))
+    design_count = sum(
+        1
+        for q in QUESTIONS.values()
+        if q["lang"] == "design" and not is_solved(q["id"])
+    )
     design_practiced = any(h.get("event") == "design_debrief" for h in HISTORY)
     domains = [d.lower() for d in resume.get("domains", [])]
     if domains and not design_practiced and design_count > 0:
-        plan.append({
-            "title": "Try a system design question",
-            "action": f"Your resume mentions {', '.join(domains[:2])} — practice applying your experience to design problems.",
-            "priority": "medium",
-            "category": "design",
-        })
+        plan.append(
+            {
+                "title": "Try a system design question",
+                "action": f"Your resume mentions {', '.join(domains[:2])} — practice applying your experience to design problems.",
+                "priority": "medium",
+                "category": "design",
+            }
+        )
 
     # fill to 5 items
     if len(plan) < 5:
-        unsolved_sql = sum(1 for q in QUESTIONS.values() if q["lang"] == "sql" and not is_solved(q["id"]))
-        unsolved_py = sum(1 for q in QUESTIONS.values() if q["lang"] == "python" and not is_solved(q["id"]))
+        unsolved_sql = sum(
+            1
+            for q in QUESTIONS.values()
+            if q["lang"] == "sql" and not is_solved(q["id"])
+        )
+        unsolved_py = sum(
+            1
+            for q in QUESTIONS.values()
+            if q["lang"] == "python" and not is_solved(q["id"])
+        )
         if unsolved_sql > 0:
-            plan.append({
-                "title": f"Solve {unsolved_sql} SQL question{'s' if unsolved_sql != 1 else ''}",
-                "action": "Keep momentum on your core skill.",
-                "priority": "low",
-                "category": "sql",
-            })
+            plan.append(
+                {
+                    "title": f"Solve {unsolved_sql} SQL question{'s' if unsolved_sql != 1 else ''}",
+                    "action": "Keep momentum on your core skill.",
+                    "priority": "low",
+                    "category": "sql",
+                }
+            )
         if unsolved_py > 0 and len(plan) < 5:
-            plan.append({
-                "title": f"Solve {unsolved_py} Python question{'s' if unsolved_py != 1 else ''}",
-                "action": "Build coding fluency.",
-                "priority": "low",
-                "category": "python",
-            })
+            plan.append(
+                {
+                    "title": f"Solve {unsolved_py} Python question{'s' if unsolved_py != 1 else ''}",
+                    "action": "Build coding fluency.",
+                    "priority": "low",
+                    "category": "python",
+                }
+            )
 
     return plan[:5]
 
@@ -564,7 +699,12 @@ def _compute_claim_validation():
     """Track which resume claims have been validated by practice (no LLM call)."""
     resume = PROGRESS.get("_resume")
     if not resume:
-        return {"validated": [], "unvalidated": [], "total_skills": 0, "validated_count": 0}
+        return {
+            "validated": [],
+            "unvalidated": [],
+            "total_skills": 0,
+            "validated_count": 0,
+        }
 
     raw_skills = resume.get("skills", [])
     skill_entries = []
@@ -600,17 +740,28 @@ def _compute_claim_validation():
 
         if best_match:
             stats = topic_stats[best_match]
-            pct = round(100 * stats["passed"] / stats["total"]) if stats["total"] > 0 else 0
-            validated.append({
-                "skill": name, "accuracy": pct, "attempts": stats["total"],
-                "depth": entry.get("depth", "moderate"),
-                "strong": pct >= 70,
-            })
+            pct = (
+                round(100 * stats["passed"] / stats["total"])
+                if stats["total"] > 0
+                else 0
+            )
+            validated.append(
+                {
+                    "skill": name,
+                    "accuracy": pct,
+                    "attempts": stats["total"],
+                    "depth": entry.get("depth", "moderate"),
+                    "strong": pct >= 70,
+                }
+            )
         else:
-            unvalidated.append({
-                "skill": name, "depth": entry.get("depth", "moderate"),
-                "context": entry.get("context", ""),
-            })
+            unvalidated.append(
+                {
+                    "skill": name,
+                    "depth": entry.get("depth", "moderate"),
+                    "context": entry.get("context", ""),
+                }
+            )
 
     validated.sort(key=lambda v: (-v["strong"], -v["accuracy"]))
     unvalidated.sort(key=lambda u: 0 if u["depth"] == "deep" else 1)
@@ -639,19 +790,39 @@ def _stamp_taxonomy(data):
 # are treated
 # as the same concept (cloud platform) — a translation, not a gap.
 JD_CONCEPT_TRANSLATIONS = {
-    "azure": "cloud_platform", "aws": "cloud_platform", "gcp": "cloud_platform",
-    "google cloud": "cloud_platform", "cloud platform": "cloud_platform",
-    "kafka": "streaming_paradigm", "flink": "streaming_paradigm",
-    "spark streaming": "streaming_paradigm", "kinesis": "streaming_paradigm",
-    "pyspark": "batch_paradigm", "spark": "batch_paradigm", "databricks": "batch_paradigm",
+    "azure": "cloud_platform",
+    "aws": "cloud_platform",
+    "gcp": "cloud_platform",
+    "google cloud": "cloud_platform",
+    "cloud platform": "cloud_platform",
+    "kafka": "streaming_paradigm",
+    "flink": "streaming_paradigm",
+    "spark streaming": "streaming_paradigm",
+    "kinesis": "streaming_paradigm",
+    "pyspark": "batch_paradigm",
+    "spark": "batch_paradigm",
+    "databricks": "batch_paradigm",
     "java": "batch_paradigm",
-    "airflow": "orchestration", "luigi": "orchestration", "dagster": "orchestration",
-    "terraform": "iac", "pulumi": "iac", "cloudformation": "iac",
-    "dbt": "data_modeling", "snowflake": "warehouse", "bigquery": "warehouse",
-    "redshift": "warehouse", "postgres": "sql_database", "mysql": "sql_database",
-    "sql server": "sql_database", "t-sql": "sql_database",
-    "iceberg": "storage_format", "delta lake": "storage_format", "parquet": "storage_format",
-    "hive": "storage_format", "kubernetes": "container_orchestration", "docker": "containers",
+    "airflow": "orchestration",
+    "luigi": "orchestration",
+    "dagster": "orchestration",
+    "terraform": "iac",
+    "pulumi": "iac",
+    "cloudformation": "iac",
+    "dbt": "data_modeling",
+    "snowflake": "warehouse",
+    "bigquery": "warehouse",
+    "redshift": "warehouse",
+    "postgres": "sql_database",
+    "mysql": "sql_database",
+    "sql server": "sql_database",
+    "t-sql": "sql_database",
+    "iceberg": "storage_format",
+    "delta lake": "storage_format",
+    "parquet": "storage_format",
+    "hive": "storage_format",
+    "kubernetes": "container_orchestration",
+    "docker": "containers",
 }
 
 
@@ -667,7 +838,9 @@ def _resume_concept_evidence():
     evidence_skills = []
     for s in resume.get("skills", []):
         if isinstance(s, dict):
-            parts.append(f"skill: {s.get('name','')} ({s.get('depth','moderate')}) — {s.get('context','')}")
+            parts.append(
+                f"skill: {s.get('name', '')} ({s.get('depth', 'moderate')}) — {s.get('context', '')}"
+            )
             evidence_skills.append(s.get("name", "").lower())
         else:
             parts.append(f"skill: {s}")
@@ -675,7 +848,7 @@ def _resume_concept_evidence():
     for p in resume.get("projects", []):
         desc = p.get("description", p.get("one_liner", ""))
         tech = ", ".join(p.get("tech", []))
-        parts.append(f"project: {p.get('name','')} — {desc} (tech: {tech})")
+        parts.append(f"project: {p.get('name', '')} — {desc} (tech: {tech})")
     for d in resume.get("domains", []):
         parts.append(f"domain: {d}")
     return "\n".join(parts), evidence_skills
@@ -686,8 +859,6 @@ def _resume_concept_evidence():
 # This is deterministic string mapping — no LLM involvement, so no hallucination risk here.
 
 
-
-
 def _compute_concept_match():
     """Tool-to-concept gap analysis: map JD required concepts against resume evidence.
     Returns real gaps (concept not evidenced) vs translations (tool differs but concept
@@ -695,10 +866,18 @@ def _compute_concept_match():
     jd = PROGRESS.get("_jd")
     resume = PROGRESS.get("_resume")
     if not jd:
-        return {"jd_loaded": False, "resume_loaded": bool(resume), "real_gaps": [],
-                "translations": [], "covered": [],
-                "real_gap_count": 0, "translation_count": 0, "covered_count": 0,
-                "verify_count": 0, "self_reported_count": 0}
+        return {
+            "jd_loaded": False,
+            "resume_loaded": bool(resume),
+            "real_gaps": [],
+            "translations": [],
+            "covered": [],
+            "real_gap_count": 0,
+            "translation_count": 0,
+            "covered_count": 0,
+            "verify_count": 0,
+            "self_reported_count": 0,
+        }
     user_confirmed = set(jd.get("user_confirmed", []))
     if not resume:
         # JD loaded but no resume — report every required concept as unverifiable.
@@ -707,17 +886,29 @@ def _compute_concept_match():
         real_gaps, self_reported = [], []
         for c in jd.get("concepts_required", []):
             concept = _normalize_concept(c.get("concept", ""))
-            entry = {"concept": c.get("concept"), "evidence": c.get("evidence", ""),
-                     "importance": c.get("importance", "must_have")}
+            entry = {
+                "concept": c.get("concept"),
+                "evidence": c.get("evidence", ""),
+                "importance": c.get("importance", "must_have"),
+            }
             if concept in user_confirmed:
                 self_reported.append(entry)
             else:
                 real_gaps.append(entry)
-        return {"jd_loaded": True, "resume_loaded": False,
-                "real_gaps": real_gaps, "translations": [], "covered": [],
-                "verify": [], "self_reported": self_reported,
-                "real_gap_count": len(real_gaps), "translation_count": 0, "covered_count": 0,
-                "verify_count": 0, "self_reported_count": len(self_reported)}
+        return {
+            "jd_loaded": True,
+            "resume_loaded": False,
+            "real_gaps": real_gaps,
+            "translations": [],
+            "covered": [],
+            "verify": [],
+            "self_reported": self_reported,
+            "real_gap_count": len(real_gaps),
+            "translation_count": 0,
+            "covered_count": 0,
+            "verify_count": 0,
+            "self_reported_count": len(self_reported),
+        }
 
     evidence_text, evidence_skills = _resume_concept_evidence()
 
@@ -742,41 +933,94 @@ def _compute_concept_match():
     # Scan capability text for known concept keywords so LLM under-extraction doesn't
     # silently drop a must-have concept from the analysis.
     CAPABILITY_CONCEPT_KEYWORDS = {
-        "feature_store": ["feature store", "feature serving", "feature development",
-                          "feature reuse", "feature freshness", "feature infrastructure",
-                          "low-latency feature", "real-time feature"],
-        "streaming_paradigm": ["real-time", "streaming", "event stream", "kafka", "flink"],
+        "feature_store": [
+            "feature store",
+            "feature serving",
+            "feature development",
+            "feature reuse",
+            "feature freshness",
+            "feature infrastructure",
+            "low-latency feature",
+            "real-time feature",
+        ],
+        "streaming_paradigm": [
+            "real-time",
+            "streaming",
+            "event stream",
+            "kafka",
+            "flink",
+        ],
         "cloud_platform": ["cloud platform", "multi-cloud", "aws", "gcp", "azure"],
-        "data_quality_observability": ["data quality", "monitoring", "data contracts",
-                                       "quality checks", "pipeline reliability"],
+        "data_quality_observability": [
+            "data quality",
+            "monitoring",
+            "data contracts",
+            "quality checks",
+            "pipeline reliability",
+        ],
         "iac": ["infrastructure as code", "terraform", "ci/cd", "deployment framework"],
         "orchestration": ["orchestrat", "scheduler", "pipelines"],
     }
     concepts_required = list(jd.get("concepts_required", []))
     cap_text = " ".join(jd.get("capabilities_required", [])).lower()
-    seen_concepts = {_normalize_concept(c.get("concept", "")) for c in concepts_required}
+    seen_concepts = {
+        _normalize_concept(c.get("concept", "")) for c in concepts_required
+    }
 
     # The JD extractor sometimes parks a cloud-platform brand (aws/azure/gcp) only in
     # tool_keywords and never emits the 'cloud_platform' concept. Without that concept,
     # the Azure->AWS translation never fires even when the resume shows a sibling cloud.
     # Synthesize the concept from tool_keywords so the translation path is reachable.
-    CLOUD_TOOL_KEYWORDS = ["aws", "azure", "gcp", "google cloud", "databricks", "cloud platform", "cloud"]
+    CLOUD_TOOL_KEYWORDS = [
+        "aws",
+        "azure",
+        "gcp",
+        "google cloud",
+        "databricks",
+        "cloud platform",
+        "cloud",
+    ]
     if "cloud_platform" not in seen_concepts and any(
-            kw in jd_tool_set for kw in CLOUD_TOOL_KEYWORDS):
-        cloud_evidence = next((t for t in jd.get("tool_keywords", [])
-                               if t.lower() in CLOUD_TOOL_KEYWORDS), "cloud platform")
-        concepts_required.append({"concept": "cloud_platform", "evidence": cloud_evidence,
-                                  "importance": "must_have", "from_tool_keyword": True})
+        kw in jd_tool_set for kw in CLOUD_TOOL_KEYWORDS
+    ):
+        cloud_evidence = next(
+            (
+                t
+                for t in jd.get("tool_keywords", [])
+                if t.lower() in CLOUD_TOOL_KEYWORDS
+            ),
+            "cloud platform",
+        )
+        concepts_required.append(
+            {
+                "concept": "cloud_platform",
+                "evidence": cloud_evidence,
+                "importance": "must_have",
+                "from_tool_keyword": True,
+            }
+        )
 
     for concept_key, kws in CAPABILITY_CONCEPT_KEYWORDS.items():
         if concept_key in seen_concepts:
             continue
         if any(kw in cap_text for kw in kws):
             # pull the matching capability phrase as evidence
-            evidence = next((cap for cap in jd.get("capabilities_required", [])
-                             if any(kw in cap.lower() for kw in kws)), cap_text[:80])
-            concepts_required.append({"concept": concept_key, "evidence": evidence,
-                                      "importance": "must_have", "from_capability": True})
+            evidence = next(
+                (
+                    cap
+                    for cap in jd.get("capabilities_required", [])
+                    if any(kw in cap.lower() for kw in kws)
+                ),
+                cap_text[:80],
+            )
+            concepts_required.append(
+                {
+                    "concept": concept_key,
+                    "evidence": evidence,
+                    "importance": "must_have",
+                    "from_capability": True,
+                }
+            )
 
     real_gaps = []
     translations = []
@@ -789,23 +1033,38 @@ def _compute_concept_match():
         concept = _normalize_concept(raw_concept)
         # user self-attestation overrides the gap — moves to self-reported, not proven
         if concept in user_confirmed:
-            self_reported.append({"concept": concept, "raw": raw_concept,
-                                  "evidence": c.get("evidence", ""),
-                                  "importance": c.get("importance", "must_have")})
+            self_reported.append(
+                {
+                    "concept": concept,
+                    "raw": raw_concept,
+                    "evidence": c.get("evidence", ""),
+                    "importance": c.get("importance", "must_have"),
+                }
+            )
             continue
-        present, confidence = _concept_is_present(concept, evidence_text, evidence_skills)
+        present, confidence = _concept_is_present(
+            concept, evidence_text, evidence_skills
+        )
         if present:
             if confidence == "low":
                 # don't assert coverage — surface for manual verification
-                verify.append({"concept": concept, "raw": raw_concept,
-                               "evidence": c.get("evidence", ""),
-                               "importance": c.get("importance", "must_have"),
-                               "note": "Weak signal in resume — verify you've actually done this."})
+                verify.append(
+                    {
+                        "concept": concept,
+                        "raw": raw_concept,
+                        "evidence": c.get("evidence", ""),
+                        "importance": c.get("importance", "must_have"),
+                        "note": "Weak signal in resume — verify you've actually done this.",
+                    }
+                )
             else:
-                entry = {"concept": concept, "raw": raw_concept,
-                         "evidence": c.get("evidence", ""),
-                         "importance": c.get("importance", "must_have"),
-                         "confidence": confidence}
+                entry = {
+                    "concept": concept,
+                    "raw": raw_concept,
+                    "evidence": c.get("evidence", ""),
+                    "importance": c.get("importance", "must_have"),
+                    "confidence": confidence,
+                }
                 # if the JD names a different cloud brand than the resume, attach a
                 # translation note so the candidate can frame Azure<->AWS equivalence
                 if concept == "cloud_platform":
@@ -814,7 +1073,8 @@ def _compute_concept_match():
                     if jd_tool and sibling and jd_tool != sibling:
                         entry["translation_note"] = (
                             f"JD mentions {jd_tool}; your resume shows {sibling} — "
-                            f"same concept (cloud platform), a translation not a gap.")
+                            f"same concept (cloud platform), a translation not a gap."
+                        )
                 covered.append(entry)
             continue
         # not directly evidenced — check if it's a tool translation
@@ -823,26 +1083,41 @@ def _compute_concept_match():
             # does the resume have a sibling tool in the same concept family?
             sibling = _find_translation_sibling(concept, resume_tool_set)
             if sibling:
-                translations.append({
-                    "concept": concept, "raw": raw_concept,
-                    "jd_tool": jd_tool,
-                    "your_tool": sibling,
-                    "message": f"You have {sibling}; {jd_tool} is the same concept ({concept.replace('_',' ')}) — a translation, not a gap.",
-                    "importance": c.get("importance", "must_have"),
-                })
+                translations.append(
+                    {
+                        "concept": concept,
+                        "raw": raw_concept,
+                        "jd_tool": jd_tool,
+                        "your_tool": sibling,
+                        "message": f"You have {sibling}; {jd_tool} is the same concept ({concept.replace('_', ' ')}) — a translation, not a gap.",
+                        "importance": c.get("importance", "must_have"),
+                    }
+                )
                 continue
-        real_gaps.append({"concept": concept, "raw": raw_concept, "evidence": c.get("evidence", ""),
-                           "importance": c.get("importance", "must_have")})
+        real_gaps.append(
+            {
+                "concept": concept,
+                "raw": raw_concept,
+                "evidence": c.get("evidence", ""),
+                "importance": c.get("importance", "must_have"),
+            }
+        )
 
     # sort so must_have gaps lead, and surface capability-derived gaps (e.g. feature_store)
     # before the longer concepts_required list so they aren't sliced off the end
-    real_gaps.sort(key=lambda g: (0 if g["importance"] == "must_have" else 1,
-                                   0 if g.get("from_capability") else 1))
+    real_gaps.sort(
+        key=lambda g: (
+            0 if g["importance"] == "must_have" else 1,
+            0 if g.get("from_capability") else 1,
+        )
+    )
     # flag stale taxonomy: if either extraction predates the current taxonomy
     # version, the concept mappings may be out of date. Matching still runs on
     # the stored data, but the dashboard can prompt a re-parse.
-    stale = (jd.get("taxonomy_version") != TAXONOMY_VERSION
-             or resume.get("taxonomy_version") != TAXONOMY_VERSION)
+    stale = (
+        jd.get("taxonomy_version") != TAXONOMY_VERSION
+        or resume.get("taxonomy_version") != TAXONOMY_VERSION
+    )
     return {
         "jd_loaded": True,
         "resume_loaded": True,
@@ -865,8 +1140,6 @@ def _compute_concept_match():
     }
 
 
-
-
 def _compute_role_readiness():
     """Composite role-readiness: concept coverage × resume claim validation × practice
     mastery. NOT a single reductive match score — three lenses the candidate can act on.
@@ -880,9 +1153,18 @@ def _compute_role_readiness():
     # Self-reported (user-confirmed) concepts DO count toward the headline coverage so
     # tapping "I've done this" makes the number visibly rise, but the count is also
     # shown separately so the reader knows how much is self-claimed vs resume-proven.
-    total_concepts = (match["real_gap_count"] + match["translation_count"]
-                      + match["covered_count"] + match["verify_count"] + match["self_reported_count"])
-    proven = match["covered_count"] + match["translation_count"] + match["self_reported_count"]
+    total_concepts = (
+        match["real_gap_count"]
+        + match["translation_count"]
+        + match["covered_count"]
+        + match["verify_count"]
+        + match["self_reported_count"]
+    )
+    proven = (
+        match["covered_count"]
+        + match["translation_count"]
+        + match["self_reported_count"]
+    )
     self_reported = match["self_reported_count"]
     # Headline = proven (resume evidence + self-claimed). verify stays in the denominator.
     coverage = round(100 * proven / total_concepts) if total_concepts else 0
@@ -890,8 +1172,11 @@ def _compute_role_readiness():
 
     # lens 2: resume claim validation (skills practiced at >=70%)
     cv = _compute_claim_validation()
-    claim_readiness = round(100 * cv.get("validated_count", 0) / cv.get("total_skills", 1)) \
-        if cv.get("total_skills") else None
+    claim_readiness = (
+        round(100 * cv.get("validated_count", 0) / cv.get("total_skills", 1))
+        if cv.get("total_skills")
+        else None
+    )
 
     # lens 3: SQL/Python mastery (pass rate across submissions)
     topic_attempts, topic_fails = {}, {}
@@ -902,7 +1187,11 @@ def _compute_role_readiness():
             if not h["passed"]:
                 topic_fails[t] = topic_fails.get(t, 0) + 1
     if topic_attempts:
-        overall = round(100 * (sum(topic_attempts.values()) - sum(topic_fails.values())) / sum(topic_attempts.values()))
+        overall = round(
+            100
+            * (sum(topic_attempts.values()) - sum(topic_fails.values()))
+            / sum(topic_attempts.values())
+        )
     else:
         overall = None
 
@@ -916,23 +1205,89 @@ def _compute_role_readiness():
     # If that file is absent we fall back to the legacy GAP_TO_QUESTIONS dict so the feature
     # never breaks.
     GAP_TO_QUESTIONS = {
-        "late_data_watermarks": ["sql-3", "sql-49", "py-2"],
-        "streaming_paradigm": ["sql-49", "py-2", "sql-45"],
-        "batch_vs_stream_choice": ["sql-3", "sql-49", "py-2"],
-        "idempotency_dedup": ["sql-2", "sql-24", "py-6"],
-        "backfill_reprocessing": ["sql-13", "sql-8", "sql-35"],
-        "partitioning_hot_key_skew": ["sql-7", "sql-12", "sql-20"],
-        "schema_evolution_compat": ["sql-43", "sql-41"],
+        "late_data_watermarks": ["sql-3", "sql-49", "py-2", "design-6"],
+        "streaming_paradigm": [
+            "sql-49",
+            "py-2",
+            "sql-45",
+            "design-1",
+            "design-8",
+            "tradeoff-1",
+        ],
+        "batch_vs_stream_choice": ["sql-3", "sql-49", "py-2", "tradeoff-5"],
+        "idempotency_dedup": ["sql-2", "sql-24", "py-6", "tradeoff-6"],
+        "backfill_reprocessing": [
+            "sql-13",
+            "sql-8",
+            "sql-35",
+            "design-7",
+            "decomposition-2",
+        ],
+        "partitioning_hot_key_skew": [
+            "sql-7",
+            "sql-12",
+            "sql-20",
+            "design-2",
+            "tradeoff-2",
+        ],
+        "schema_evolution_compat": [
+            "sql-43",
+            "sql-41",
+            "design-3",
+            "tradeoff-3",
+            "tradeoff-7",
+        ],
         "grain_awareness": ["sql-22", "sql-33", "sql-32"],
-        "scd_strategy": ["sql-8", "sql-13", "sql-35"],
-        "missing_dimension_audit": ["sql-4", "sql-11", "sql-57"],
-        "data_quality_observability": ["sql-41", "sql-43", "sql-35"],
-        "feature_store": ["sql-49", "py-2", "sql-45"],
-        "entity_enumeration": ["sql-9", "sql-26", "sql-48"],
-        "replication_consistency": ["sql-41", "sql-35"],
-        "storage_format_choice": ["sql-55", "sql-43"],
-        "domain_alignment": ["sql-34", "sql-52", "sql-40"],
+        "scd_strategy": ["sql-8", "sql-13", "sql-35", "design-5", "tradeoff-5"],
+        "missing_dimension_audit": [
+            "sql-4",
+            "sql-11",
+            "sql-57",
+            "design-15",
+            "design-16",
+        ],
+        "data_quality_observability": [
+            "sql-41",
+            "sql-43",
+            "sql-35",
+            "tradeoff-8",
+            "ai-design-4",
+        ],
+        "feature_store": ["sql-49", "py-2", "sql-45", "design-12", "tradeoff-9"],
+        "entity_enumeration": ["sql-9", "sql-26", "sql-48", "design-14"],
+        "replication_consistency": ["sql-41", "sql-35", "tradeoff-4", "tradeoff-6"],
+        "storage_format_choice": ["sql-55", "sql-43", "tradeoff-3", "tradeoff-13"],
+        "domain_alignment": ["sql-34", "sql-52", "sql-40", "design-11", "design-13"],
         "clarifying_requirements": ["sql-37", "sql-42"],
+        "pipeline_design": [
+            "design-1",
+            "design-8",
+            "design-9",
+            "design-10",
+            "design-14",
+        ],
+        "system_design_tradeoffs": [
+            "tradeoff-1",
+            "tradeoff-2",
+            "tradeoff-3",
+            "tradeoff-4",
+            "tradeoff-10",
+        ],
+        "architecture_decomposition": [
+            "decomposition-1",
+            "decomposition-2",
+            "decomposition-3",
+            "decomposition-4",
+            "decomposition-5",
+            "decomposition-6",
+        ],
+        "data_modeling": ["design-2", "design-13", "design-11", "design-16"],
+        "latency_throughput_tradeoffs": [
+            "tradeoff-4",
+            "tradeoff-10",
+            "tradeoff-11",
+            "ai-design-3",
+        ],
     }
     _concept_links = _load_concept_links()
     use_links = bool(_concept_links)
@@ -947,15 +1302,24 @@ def _compute_role_readiness():
         for qid, links in _concept_links.items():
             for link in links:
                 by_concept.setdefault(link["concept"], []).append(
-                    (qid, link.get("reason", ""), link.get("relevance", 1)))
+                    (qid, link.get("reason", ""), link.get("relevance", 1))
+                )
         for concept in gap_concepts:
-            for qid, reason, rel in sorted(by_concept.get(concept, []),
-                                           key=lambda x: -x[2]):
+            for qid, reason, rel in sorted(
+                by_concept.get(concept, []), key=lambda x: -x[2]
+            ):
                 q = QUESTIONS.get(qid)
                 if not q or qid in seen or is_solved(qid):
                     continue
-                framed.append({"id": qid, "title": q["title"], "lang": q["lang"],
-                               "gap": concept, "reason": reason})
+                framed.append(
+                    {
+                        "id": qid,
+                        "title": q["title"],
+                        "lang": q["lang"],
+                        "gap": concept,
+                        "reason": reason,
+                    }
+                )
                 seen.add(qid)
                 if len(framed) >= 5:
                     break
@@ -968,7 +1332,9 @@ def _compute_role_readiness():
                 q = QUESTIONS.get(qid)
                 if not q or qid in seen or is_solved(qid):
                     continue
-                framed.append({"id": qid, "title": q["title"], "lang": q["lang"], "gap": concept})
+                framed.append(
+                    {"id": qid, "title": q["title"], "lang": q["lang"], "gap": concept}
+                )
                 seen.add(qid)
                 if len(framed) >= 5:
                     break
@@ -1053,18 +1419,36 @@ ADVERSARIAL_PERSONAS = {
 }
 
 SCALING_TIERS = [
-    {"name": "Baseline", "scale": "1K req/day",
-     "desc": "Single-region, single-DB — does their basic shape work?"},
-    {"name": "Growth", "scale": "100K req/day",
-     "desc": "DB bottlenecks — caching? read replicas?"},
-    {"name": "Scale-up", "scale": "10M req/day, global",
-     "desc": "Single region breaks — partitioning? multi-region?"},
-    {"name": "Peak spike", "scale": "100M req/day, 10x burst",
-     "desc": "Auto-scaling? load-shedding queue?"},
-    {"name": "Write storm", "scale": "Write-heavy at 100M req/day",
-     "desc": "Queue vs batch vs stream, backpressure"},
-    {"name": "Global consistency", "scale": "1B req/day, cross-region",
-     "desc": "Replication, conflict resolution, CRDTs"},
+    {
+        "name": "Baseline",
+        "scale": "1K req/day",
+        "desc": "Single-region, single-DB — does their basic shape work?",
+    },
+    {
+        "name": "Growth",
+        "scale": "100K req/day",
+        "desc": "DB bottlenecks — caching? read replicas?",
+    },
+    {
+        "name": "Scale-up",
+        "scale": "10M req/day, global",
+        "desc": "Single region breaks — partitioning? multi-region?",
+    },
+    {
+        "name": "Peak spike",
+        "scale": "100M req/day, 10x burst",
+        "desc": "Auto-scaling? load-shedding queue?",
+    },
+    {
+        "name": "Write storm",
+        "scale": "Write-heavy at 100M req/day",
+        "desc": "Queue vs batch vs stream, backpressure",
+    },
+    {
+        "name": "Global consistency",
+        "scale": "1B req/day, cross-region",
+        "desc": "Replication, conflict resolution, CRDTs",
+    },
 ]
 
 ADVERSARIAL_RULES = """You already sketched a design for this scenario and it's sitting on the candidate's whiteboard — don't re-explain it, they can see it. Their job now is to critique it: find what breaks at scale, under failure, or at the edges.
@@ -1089,7 +1473,9 @@ Rules:
    "fix_choice_ok": true/false (did they choose the right fix or try to rebuild),
     "communication_ok": true/false (did they communicate to stakeholders)."""
 
-DECOMPOSITION_RULES_FILE = os.path.join(os.path.dirname(__file__), "prompts", "decomposition.yaml")
+DECOMPOSITION_RULES_FILE = os.path.join(
+    os.path.dirname(__file__), "prompts", "decomposition.yaml"
+)
 if os.path.exists(DECOMPOSITION_RULES_FILE):
     with open(DECOMPOSITION_RULES_FILE) as f:
         DECOMPOSITION_RULES = yaml.safe_load(f)["client_rules"]
@@ -1099,15 +1485,33 @@ else:
 # ---------------------------------------------------------------------------
 # Judge — post-hoc scoring model for decomposition sessions.
 # ---------------------------------------------------------------------------
-JUDGE_SYSTEM_PROMPT_FILE = os.path.join(os.path.dirname(__file__), "judge_system_prompt.md")
-JUDGE_OUTPUT_SCHEMA_FILE = os.path.join(os.path.dirname(__file__), "judge_output_schema.json")
-V2_SCENARIOS_FILE = os.path.join(os.path.dirname(__file__), "questions_hospital_scenario.json")
+JUDGE_SYSTEM_PROMPT_FILE = os.path.join(
+    os.path.dirname(__file__), "judge_system_prompt.md"
+)
+JUDGE_OUTPUT_SCHEMA_FILE = os.path.join(
+    os.path.dirname(__file__), "judge_output_schema.json"
+)
+V2_SCENARIOS_FILE = os.path.join(
+    os.path.dirname(__file__), "questions_hospital_scenario.json"
+)
 
-JUDGE_SYSTEM_PROMPT = open(JUDGE_SYSTEM_PROMPT_FILE).read() if os.path.exists(JUDGE_SYSTEM_PROMPT_FILE) else ""
-JUDGE_OUTPUT_SCHEMA = json.load(open(JUDGE_OUTPUT_SCHEMA_FILE)) if os.path.exists(JUDGE_OUTPUT_SCHEMA_FILE) else {}
-V2_SCENARIOS = json.load(open(V2_SCENARIOS_FILE)) if os.path.exists(V2_SCENARIOS_FILE) else {}
+JUDGE_SYSTEM_PROMPT = (
+    open(JUDGE_SYSTEM_PROMPT_FILE).read()
+    if os.path.exists(JUDGE_SYSTEM_PROMPT_FILE)
+    else ""
+)
+JUDGE_OUTPUT_SCHEMA = (
+    json.load(open(JUDGE_OUTPUT_SCHEMA_FILE))
+    if os.path.exists(JUDGE_OUTPUT_SCHEMA_FILE)
+    else {}
+)
+V2_SCENARIOS = (
+    json.load(open(V2_SCENARIOS_FILE)) if os.path.exists(V2_SCENARIOS_FILE) else {}
+)
 # Merge v2 scenarios into QUESTIONS so they're available through the same lookup
-QUESTIONS.update({k: v for k, v in V2_SCENARIOS.items() if v.get("lang") == "decomposition"})
+QUESTIONS.update(
+    {k: v for k, v in V2_SCENARIOS.items() if v.get("lang") == "decomposition"}
+)
 
 # Calibration gold transcripts: precomputed strong/borderline/weak attempts with expected
 # dimension ranges, used by the "Calibrate vs gold" feature so candidates can see the gap
@@ -1121,29 +1525,80 @@ if os.path.isdir(_CALIB_DIR):
             _sid = _cd.get("scenario_id")
             if not _sid:
                 continue
-            CALIBRATION_FIXTURES.setdefault(_sid, []).append({
-                "file": os.path.basename(_cf),
-                "note": _cd.get("gold_label_note", ""),
-                "expected": _cd.get("expected", {}),
-            })
+            CALIBRATION_FIXTURES.setdefault(_sid, []).append(
+                {
+                    "file": os.path.basename(_cf),
+                    "note": _cd.get("gold_label_note", ""),
+                    "expected": _cd.get("expected", {}),
+                }
+            )
         except Exception:
             pass
 
 JUDGE_RUBRIC = {
     "dimensions": [
-        {"id": "D1", "name": "Constraint discovery & clarification", "weight": 1.5, "always_scorable": True},
-        {"id": "D2", "name": "Architecture under hard constraints", "weight": 1.5, "always_scorable": True},
-        {"id": "D3", "name": "Stakeholder & trust management", "weight": 1.5, "always_scorable": False},
-        {"id": "D4", "name": "ML problem formulation", "weight": 1.5, "always_scorable": True},
-        {"id": "D5", "name": "Metrics tied to operations", "weight": 1.0, "always_scorable": False},
-        {"id": "D6", "name": "Regulatory & safety depth", "weight": 1.0, "always_scorable": True},
-        {"id": "D7", "name": "Scope realism & 30-day sequencing", "weight": 1.0, "always_scorable": False},
-        {"id": "D8", "name": "Communication & recovery", "weight": 1.0, "always_scorable": True},
+        {
+            "id": "D1",
+            "name": "Constraint discovery & clarification",
+            "weight": 1.5,
+            "always_scorable": True,
+        },
+        {
+            "id": "D2",
+            "name": "Architecture under hard constraints",
+            "weight": 1.5,
+            "always_scorable": True,
+        },
+        {
+            "id": "D3",
+            "name": "Stakeholder & trust management",
+            "weight": 1.5,
+            "always_scorable": False,
+        },
+        {
+            "id": "D4",
+            "name": "ML problem formulation",
+            "weight": 1.5,
+            "always_scorable": True,
+        },
+        {
+            "id": "D5",
+            "name": "Metrics tied to operations",
+            "weight": 1.0,
+            "always_scorable": False,
+        },
+        {
+            "id": "D6",
+            "name": "Regulatory & safety depth",
+            "weight": 1.0,
+            "always_scorable": True,
+        },
+        {
+            "id": "D7",
+            "name": "Scope realism & 30-day sequencing",
+            "weight": 1.0,
+            "always_scorable": False,
+        },
+        {
+            "id": "D8",
+            "name": "Communication & recovery",
+            "weight": 1.0,
+            "always_scorable": True,
+        },
     ],
     "disqualifiers": [
-        {"id": "DQ_generic", "description": "Candidate behavior that fundamentally violated the engagement constraints."}
+        {
+            "id": "DQ_generic",
+            "description": "Candidate behavior that fundamentally violated the engagement constraints.",
+        }
     ],
-    "bands": {"strong_hire": 4.20, "hire": 3.40, "borderline": 2.70, "no_hire": 1.80, "strong_no_hire": 0}
+    "bands": {
+        "strong_hire": 4.20,
+        "hire": 3.40,
+        "borderline": 2.70,
+        "no_hire": 1.80,
+        "strong_no_hire": 0,
+    },
 }
 
 # ponytail: conversation messages for the incident drill are stored under a ":incident" suffix
@@ -1158,7 +1613,9 @@ def _generate_report(qid, q, turns, judge_result):
     lines.append("")
     lines.append(f"**Question ID:** {qid}")
     lines.append(f"**Track:** {q.get('track', q.get('lang', 'FDE'))}")
-    lines.append(f"**Total Turns:** {len([t for t in turns if t.get('role') in ('user', 'assistant')])}")
+    lines.append(
+        f"**Total Turns:** {len([t for t in turns if t.get('role') in ('user', 'assistant')])}"
+    )
     lines.append("")
 
     if is_decomposition:
@@ -1170,15 +1627,28 @@ def _generate_report(qid, q, turns, judge_result):
             w = dim.get("weight", 1.0)
             w_label = f"{w:.1f}×" if w != 1.0 else "1.0×"
             ev = dim.get("evidence", [])
-            ev_str = "; ".join([f"Turn {e.get('turn','?')}: {e.get('quote','')[:80]}" for e in ev]) if ev else "—"
-            lines.append(f"| {dim.get('id', '?')}: {dim.get('name', '')} | {dim.get('score', '-')}/5 | {w_label} | {ev_str} |")
+            ev_str = (
+                "; ".join(
+                    [
+                        f"Turn {e.get('turn', '?')}: {e.get('quote', '')[:80]}"
+                        for e in ev
+                    ]
+                )
+                if ev
+                else "—"
+            )
+            lines.append(
+                f"| {dim.get('id', '?')}: {dim.get('name', '')} | {dim.get('score', '-')}/5 | {w_label} | {ev_str} |"
+            )
         lines.append("")
 
         ns = judge_result.get("normalized_score")
         if ns is not None:
             band_labels = {
-                "strong_hire": "Strong Hire (SH)", "hire": "Hire (H)",
-                "borderline": "Borderline (BL)", "no_hire": "No Hire (NH)",
+                "strong_hire": "Strong Hire (SH)",
+                "hire": "Hire (H)",
+                "borderline": "Borderline (BL)",
+                "no_hire": "No Hire (NH)",
                 "strong_no_hire": "Strong No Hire (SNH)",
             }
             band = judge_result.get("band", "")
@@ -1211,11 +1681,15 @@ def _generate_report(qid, q, turns, judge_result):
             sm = coaching.get("strongest_moment", {})
             if sm.get("note"):
                 lines.append("")
-                lines.append(f"**Strongest Moment** (Turn {sm.get('turn', '?')}): {sm['note']}")
+                lines.append(
+                    f"**Strongest Moment** (Turn {sm.get('turn', '?')}): {sm['note']}"
+                )
             cm = coaching.get("costliest_moment", {})
             if cm.get("note"):
                 lines.append("")
-                lines.append(f"**Costliest Moment** (Turn {cm.get('turn', '?')}): {cm['note']}")
+                lines.append(
+                    f"**Costliest Moment** (Turn {cm.get('turn', '?')}): {cm['note']}"
+                )
             lines.append("")
 
     else:
@@ -1239,7 +1713,9 @@ def _generate_report(qid, q, turns, judge_result):
                         max_total = len(rubric_scores) * 5
                         lines.append(f"- **Rubric Score:** {total}/{max_total}")
                     if missed:
-                        lines.append(f"- **Missed concepts ({len(missed)}):** {', '.join(missed)}")
+                        lines.append(
+                            f"- **Missed concepts ({len(missed)}):** {', '.join(missed)}"
+                        )
                     lines.append("")
                 except Exception:
                     pass
@@ -1274,10 +1750,21 @@ def _generate_report(qid, q, turns, judge_result):
     return "\n".join(lines) + "\n"
 
 
-SOLUTION_WORDS = re.compile(r"\b(use|build|deploy|implement|kafka|kubernetes|k8s|redis|postgresql|mongodb|spark|flink|airflow|docker|terraform)\b", re.I)
-CONSTRAINT_WORDS = re.compile(r"\b(budget|timeline|deadline|compliance|gdpr|hipaa|regulation|data.sovereign|privacy|security|risk|cost|bottleneck|team|stakeholder|dpo|legal)\b", re.I)
-OVERSIMPLIFY_WORDS = re.compile(r"\b(we should just|obviously|clearly|trivially|easy|just need to|simply)\b", re.I)
-RISK_WORDS = re.compile(r"\b(risk|fallback|backup|contingency|rollback|pilot|poc|mvp|phased|iteration|incremental|canary|blue.green)\b", re.I)
+SOLUTION_WORDS = re.compile(
+    r"\b(use|build|deploy|implement|kafka|kubernetes|k8s|redis|postgresql|mongodb|spark|flink|airflow|docker|terraform)\b",
+    re.I,
+)
+CONSTRAINT_WORDS = re.compile(
+    r"\b(budget|timeline|deadline|compliance|gdpr|hipaa|regulation|data.sovereign|privacy|security|risk|cost|bottleneck|team|stakeholder|dpo|legal)\b",
+    re.I,
+)
+OVERSIMPLIFY_WORDS = re.compile(
+    r"\b(we should just|obviously|clearly|trivially|easy|just need to|simply)\b", re.I
+)
+RISK_WORDS = re.compile(
+    r"\b(risk|fallback|backup|contingency|rollback|pilot|poc|mvp|phased|iteration|incremental|canary|blue.green)\b",
+    re.I,
+)
 
 
 def _replay_chat_key(args):
@@ -1287,7 +1774,23 @@ def _replay_chat_key(args):
     scaling = args.get("scaling") == "1"
     incident = args.get("incident") == "1"
     decomposition = args.get("decomposition") == "1"
-    return qid + (":clarify" if requirements_only else (":adversarial" if adversarial else (":scaling" if scaling else (":incident" if incident else (":decomposition" if decomposition else "")))))
+    return qid + (
+        ":clarify"
+        if requirements_only
+        else (
+            ":adversarial"
+            if adversarial
+            else (
+                ":scaling"
+                if scaling
+                else (
+                    ":incident"
+                    if incident
+                    else (":decomposition" if decomposition else "")
+                )
+            )
+        )
+    )
 
 
 TRADEOFF_ROLLS = {}
@@ -1295,6 +1798,7 @@ TRADEOFF_ROLLS = {}
 
 def _parse_review_sections(raw):
     import re, json as _json
+
     text = raw.strip()
     # strip accidental code fences
     if text.startswith("```"):
@@ -1303,7 +1807,10 @@ def _parse_review_sections(raw):
     try:
         obj = _json.loads(text)
         if isinstance(obj, dict):
-            return {k: (obj.get(k) or "").strip() for k in ("readability", "edge_cases", "followup", "alternate")}
+            return {
+                k: (obj.get(k) or "").strip()
+                for k in ("readability", "edge_cases", "followup", "alternate")
+            }
     except Exception:
         pass
     # fallback: split on labelled headers if model ignored the JSON instruction
@@ -1328,8 +1835,6 @@ if __name__ == "__main__":
     app.run(debug=True, port=5050)
 
 
-
-
 # ---------------------------------------------------------------------------
 # Phase 4 refactor — services extracted to services/ (verbatim; behavior unchanged).
 # Re-exported here so existing call sites keep working without edits.
@@ -1338,20 +1843,33 @@ if __name__ == "__main__":
 # ---------------------------------------------------------------------------
 from services.llm import chat_content, _call_json_extract  # noqa: E402,F401
 from services.extraction import (  # noqa: E402,F401
-    _ocr_with_stirling, _extract_text_from_resume, _clean_pdf_artifacts,
-    _is_technical_skill, _extract_skills_from_resume, _extract_concepts_from_jd,
-    _fallback_extract_jd, _fallback_extract_resume, _extraction_fallback_chain,
+    _ocr_with_stirling,
+    _extract_text_from_resume,
+    _clean_pdf_artifacts,
+    _is_technical_skill,
+    _extract_skills_from_resume,
+    _extract_concepts_from_jd,
+    _fallback_extract_jd,
+    _fallback_extract_resume,
+    _extraction_fallback_chain,
 )
 from services.execution import run_sql_case, get_sample_tables, run_python_case  # noqa: E402,F401
 from services.grading import (  # noqa: E402,F401
-    _repair_truncated_json, run_judge, build_judge_transcript,
-    split_wrap_up_reply, hire_verdict, WHITEBOARD_WRAP_RE,
+    _repair_truncated_json,
+    run_judge,
+    build_judge_transcript,
+    split_wrap_up_reply,
+    hire_verdict,
+    WHITEBOARD_WRAP_RE,
 )
 from services.persistence import (  # noqa: E402,F401
-    _atomic_json, save_progress, save_chats, save_judges,
-    save_replay_comments, current_user_id,
+    _atomic_json,
+    save_progress,
+    save_chats,
+    save_judges,
+    save_replay_comments,
+    current_user_id,
 )
-
 
 
 # Phase 5 refactor — routes -> blueprints (verbatim, behavior unchanged)
