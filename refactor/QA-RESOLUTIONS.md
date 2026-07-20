@@ -37,3 +37,13 @@ Status: ALL reported items resolved or explicitly deferred (infra-limited).
 - 63 pytest tests pass.
 - All JS modules `node --check` clean.
 - Live smoke (815be51): /login→302 /, /signup→302 /, /nope→404 styled, /api/me→anonymous, /api/interview {}→JSON error, /api/jd→200.
+
+## Retest #2 — regressions from fixes (76dae67)
+- Timezone script pasted without <script> tags (raw code visible + date fix never ran). FIXED: moved inside <script> in dashboard.html. Verified live: block inside a script tag.
+- Sidebar category counts all showed 204 (used total .q-item count of parent). FIXED: count per-section siblings; hide empty categories while filtering (60-module.js).
+- Mobile /practice layout never collapsed. ROOT CAUSE: index.html had no <meta viewport> so mobile rendered at desktop width. FIXED: added viewport to index.html + dashboard.html; strengthened @media (max-width:900px) to stack #body/#sidebar/#main, drop min-widths; added 560px phone tier; bumped app.css?v=3.
+
+## Still open (retest #2)
+- Onboarding accepts empty form (Skip exists — likely intentional; confirm with product).
+- Anonymous state volatility / ephemeral Render disk — infra; move persistence off local disk (Supabase already the cloud path).
+- /api/me 401 for anonymous — cosmetic monitoring noise; body already says mode:anonymous.
