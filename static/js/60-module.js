@@ -215,7 +215,6 @@ function selectQuestion(el, id) {
   document.querySelectorAll('.q-item.active').forEach(x => x.classList.remove('active'));
   el.classList.add('active');
   loadQuestion(id);
-  if (current && (current.lang === 'design' || current.lang === 'decomposition') && !micOn) setMicOn(true);
 }
 
 async function startPractice(lane) {
@@ -231,7 +230,6 @@ async function startPractice(lane) {
     const el = document.querySelector(`.q-item[data-id="${res.id}"]`);
     if (el) { selectQuestion(el, res.id); }
     else { await loadQuestion(res.id); }
-    if (current && (current.lang === 'design' || current.lang === 'decomposition') && !micOn) setMicOn(true);
   } catch (e) {
     showToast('Could not start practice: ' + e.message);
   } finally {
