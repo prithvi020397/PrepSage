@@ -1,4 +1,7 @@
 # Phase 3 refactor — pure concept-normalization helpers, verbatim from app.py.
+import json
+import os
+
 from core.constants import CONCEPT_NORMALIZATION
 
 
@@ -219,3 +222,28 @@ def _find_translation_sibling(concept, resume_tool_set):
         if t in resume_tool_set:
             return t
     return None
+
+
+def _build_concept_index():
+    """Build a mapping from each concept key to its associated questions."""
+    index = {}
+    questions_path = os.path.join(os.path.dirname(__file__), "..", "questions.json")
+    with open(questions_path) as f:
+        questions = json.load(f)
+    for q in questions:
+        tags = q.get("concept_tags", [])
+        if not tags:
+            continue
+        entry = {
+            "id": q["id"],
+            "title": q["title"],
+            "lang": q.get("lang", ""),
+            "track": q.get("track", ""),
+            "difficulty": q.get("difficulty", ""),
+        }
+        for tag in tags:
+            index.setdefault(tag, []).append(entry)
+    return index
+
+
+CONCEPT_QUESTION_INDEX = _build_concept_index()
