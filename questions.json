@@ -4405,6 +4405,12 @@
       "Storage layer: partitioning key choice for the event log and how it avoids hot-partition skew (e.g. a viral product spiking one partition)",
       "Consumers layer: distinguished the dashboard's latency needs from the batch pipeline's, rather than treating them identically",
       "Failure handling: what happens when a stream processor crashes mid-batch, and how events get replayed without duplicating results"
+    ],
+    "concept_tags": [
+      "batch_vs_stream_choice",
+      "partitioning_hot_key_skew",
+      "storage_format_choice",
+      "data_quality_observability"
     ]
   },
   {
@@ -4419,6 +4425,10 @@
       "Replication topology choice (leader-follower vs leaderless) justified against the stated consistency needs",
       "Addressed cross-shard queries or joins if the schema requires data from multiple tenants/shards",
       "Failure handling: what happens when a shard's leader node goes down"
+    ],
+    "concept_tags": [
+      "partitioning_hot_key_skew",
+      "domain_alignment"
     ]
   },
   {
@@ -4433,6 +4443,10 @@
       "Distinguished backward-compatible changes (e.g. adding an optional field) from breaking changes and how each gets rolled out",
       "Addressed what happens to events already on the log when the schema changes later",
       "Failure handling: what happens when a consumer receives a message in a schema version it doesn't recognize"
+    ],
+    "concept_tags": [
+      "schema_evolution_compat",
+      "batch_vs_stream_choice"
     ]
   },
   {
@@ -4447,6 +4461,11 @@
       "Addressed how data moves from OLTP into the analytical store (batch ETL vs CDC) and the freshness tradeoff of that choice",
       "Addressed schema design for analytics (e.g. star schema/denormalization) versus the normalized OLTP schema",
       "Failure handling: what happens if the ETL/CDC pipeline falls behind or breaks"
+    ],
+    "concept_tags": [
+      "storage_format_choice",
+      "grain_awareness",
+      "entity_enumeration"
     ]
   },
   {
@@ -4461,6 +4480,11 @@
       "Addressed how the pipeline tracks progress per shard (offsets/checkpoints) so a restart resumes exactly where it left off, not from the beginning or an arbitrary point",
       "Addressed schema drift: what happens when a shard's table schema changes mid-stream",
       "Failure handling: what happens when one shard's CDC stream falls behind the others"
+    ],
+    "concept_tags": [
+      "idempotency_dedup",
+      "backfill_reprocessing",
+      "late_data_watermarks"
     ]
   },
   {
@@ -4475,6 +4499,11 @@
       "Distinguished a fast best-effort report from a later corrected/final report if the design uses that pattern, and how consumers know which one they're looking at",
       "Storage/format choice supports cheaply mutating historical partitions (e.g. a table format with upserts) rather than requiring a full rewrite for every late correction",
       "Failure handling: what happens if a burst of very old events (e.g. a device offline for a month) arrives all at once"
+    ],
+    "concept_tags": [
+      "late_data_watermarks",
+      "batch_vs_stream_choice",
+      "storage_format_choice"
     ]
   },
   {
@@ -4489,110 +4518,130 @@
       "Addressed idempotency: reprocessing day N's data overwrites/replaces bad output rather than appending duplicate rows",
       "Proposed a concrete detection mechanism (data quality checks between stages) that would have caught this sooner than 30 days",
       "Failure handling: what happens if the backfill itself fails partway through the 30-day range"
+    ],
+    "concept_tags": [
+      "backfill_reprocessing",
+      "idempotency_dedup"
     ]
   },
   {
     "id": "tradeoff-1",
     "lang": "tradeoff",
     "title": "Exactly-Once Billing: Lambda or Kappa?",
-    "concept_tag": "batch_vs_stream_choice",
     "prompt": "A billing pipeline charges customers based on metered usage events. It needs to reprocess a full day of events if a pricing bug is found, without double-charging anyone. You must pick ONE architecture: a Lambda architecture (separate batch + speed layers, merged at query time) or a Kappa architecture (single streaming layer, replayed from a durable log for reprocessing). State your choice and defend it.",
     "key_points": [
       "Picks Kappa for a single code path (no batch/speed-layer drift) fed by a durable, replayable log \u2014 or Lambda for a genuine reason (e.g. very different batch-vs-real-time correction logic), not by default",
       "Explains reprocessing concretely: replaying the log from an offset, not just 'streaming handles it'",
       "Names idempotent writes (upsert by event id, not append) as the mechanism that makes replay safe without double-charging",
       "Acknowledges the real cost of the other option (Lambda's dual-codebase maintenance burden, or Kappa's requirement that the log retain enough history to replay from)"
+    ],
+    "concept_tags": [
+      "batch_vs_stream_choice"
     ]
   },
   {
     "id": "tradeoff-2",
     "lang": "tradeoff",
     "title": "Hash Sharding vs. Range Sharding for a Multi-Tenant DB",
-    "concept_tag": "partitioning_hot_key_skew",
     "prompt": "You're sharding a multi-tenant database by tenant_id across 16 shards. Tenant sizes vary wildly \u2014 a handful of enterprise tenants are 100x the size of a typical tenant. Choose hash-based sharding (hash(tenant_id) % N) or range-based sharding (contiguous tenant_id ranges per shard), and defend it.",
     "key_points": [
       "Picks hash sharding for even distribution across small/medium tenants and explicitly flags that a single giant tenant still creates a hot shard either way \u2014 the choice doesn't solve that on its own",
       "Names a mitigation for the giant-tenant case specifically (e.g. splitting one tenant across sub-shards, or a dedicated shard for outliers) rather than ignoring the stated skew",
       "If choosing range sharding, justifies it via a concrete need (range scans across tenants, easier rebalancing by moving contiguous ranges) rather than picking it by default",
       "Mentions rebalancing cost: hash sharding requires consistent hashing or a lookup layer to add shards without reshuffling everything; range sharding can split a range without touching others"
+    ],
+    "concept_tags": [
+      "partitioning_hot_key_skew"
     ]
   },
   {
     "id": "tradeoff-3",
     "lang": "tradeoff",
     "title": "Avro vs. Parquet for a Schema-Evolving Event Log",
-    "concept_tag": "storage_format_choice",
     "prompt": "You're choosing a serialization/storage format for an event stream that a schema registry enforces backward-compatible evolution on. Consumers read individual events in near-real-time AND analysts later run columnar aggregate queries over months of historical events. Pick Avro or Parquet as the primary format for the raw event log, and defend it.",
     "key_points": [
       "Recognizes these solve different problems: Avro is row-oriented and schema-evolution-friendly for per-record streaming reads/writes, Parquet is column-oriented and built for scan-heavy analytical queries",
       "Picks Avro for the raw/streaming log specifically because of per-event write pattern and tight schema-registry integration, not just 'it's the standard for Kafka'",
       "Proposes converting to Parquet downstream (e.g. in a batch/Silver layer) for the analytical workload instead of forcing one format to serve both patterns",
       "Notes the cost of the wrong choice: Parquet's column layout makes single-record streaming writes/reads inefficient; Avro's row layout makes scanning one column across millions of records wasteful"
+    ],
+    "concept_tags": [
+      "storage_format_choice"
     ]
   },
   {
     "id": "tradeoff-4",
     "lang": "tradeoff",
     "title": "Synchronous Multi-Region Replication vs. Async",
-    "concept_tag": "replication_consistency",
     "prompt": "A transactional OLTP database needs a replica in a second region for disaster recovery. Choose synchronous replication (commit waits for the replica to ack) or asynchronous replication (commit returns immediately, replica catches up), and defend it.",
     "key_points": [
       "Ties the choice to the actual requirement: synchronous only if zero data loss (RPO=0) is a hard requirement despite the latency cost of a cross-region round trip on every write",
       "Picks async as the default for most cases and explicitly names the tradeoff being accepted: a window of potential data loss on failover, bounded by replication lag",
       "Addresses failover behavior concretely: what happens to in-flight/unreplicated writes if the primary dies mid-lag",
       "Mentions that synchronous cross-region replication measurably raises write latency for every transaction, not just during failover"
+    ],
+    "concept_tags": [
+      "replication_consistency"
     ]
   },
   {
     "id": "tradeoff-5",
     "lang": "tradeoff",
     "title": "Batch ETL vs. CDC for Keeping an Analytical Store Fresh",
-    "concept_tag": "backfill_reprocessing",
     "prompt": "An OLTP Postgres database feeds a columnar analytical store. The analytics team wants dashboards that reflect OLTP changes within minutes, not the current nightly batch. Choose scheduled batch ETL (more frequent) or Change Data Capture (CDC) streaming the write-ahead log, and defend it.",
     "key_points": [
       "Picks CDC for minute-level freshness and explains why shrinking a batch window (e.g. hourly) doesn't cleanly get there \u2014 batch still re-scans/re-diffs full tables or needs fragile incremental logic",
       "Names a concrete CDC mechanism (reading the WAL/replication slot) rather than vaguely saying 'stream the changes'",
       "Addresses what happens if the CDC pipeline falls behind or breaks: does it need a backfill/replay story from the WAL or a snapshot, and does downstream stay consistent while it catches up",
       "Acknowledges CDC's added operational complexity (schema drift on the source table, replication slot management) as a real cost, not just an upgrade with no downside"
+    ],
+    "concept_tags": [
+      "batch_vs_stream_choice"
     ]
   },
   {
     "id": "tradeoff-6",
     "lang": "tradeoff",
     "title": "At-Least-Once Delivery: Dedup at the Consumer or the Broker?",
-    "concept_tag": "idempotency_dedup",
     "prompt": "Your event broker guarantees at-least-once delivery, so consumers can receive the same message more than once (e.g. after a consumer crash and rebalance before committing an offset). You must pick ONE place to guarantee idempotent processing: dedup logic in each consumer (checking a processed-ids store before acting), or a broker/gateway layer that filters duplicates before consumers ever see them. State your choice and defend it.",
     "key_points": [
       "Picks consumer-side idempotency (each consumer stores processed ids and does an idempotent upsert) as the robust default, since a broker-side dedup layer can itself fail or introduce its own duplicate window \u2014 or defends broker-side dedup for a specific reason (e.g. many downstream consumers that can't be trusted to implement dedup correctly)",
       "Explains the mechanism concretely: a unique event id plus an upsert/conditional-write pattern, not just 'we'll dedupe it'",
       "Names the tradeoff: consumer-side pushes the correctness burden onto every consumer team (repeated effort, risk one team gets it wrong) vs. broker-side adds a stateful bottleneck and its own duplication risk",
       "Acknowledges the processed-ids store itself needs a retention/expiry policy or it grows unbounded"
+    ],
+    "concept_tags": [
+      "idempotency_dedup"
     ]
   },
   {
     "id": "tradeoff-7",
     "lang": "tradeoff",
     "title": "Schema Registry Enforcement: Reject at Write Time or Read Time?",
-    "concept_tag": "schema_evolution_compat",
     "prompt": "Your team runs a schema registry for events published across dozens of independently-deployed services. You must pick ONE place to enforce schema compatibility: reject non-compatible schema changes at write time (a producer can't publish until the registry accepts the new schema), or allow any write and let consumers handle unexpected/incompatible messages at read time. State your choice and defend it.",
     "key_points": [
       "Picks write-time enforcement as the default (catches a breaking change before it reaches any consumer, at the cost of blocking a producer's deploy) \u2014 or defends read-time tolerance for a specific reason (e.g. consumers already handle unknown fields for other reasons, or the registry can't be a blocking dependency)",
       "Distinguishes backward-compatible changes (e.g. adding an optional field) that should be allowed by default from breaking changes (removing/renaming a required field) that should be rejected",
       "Explains what happens to old messages already on the log when the schema changes \u2014 read-time tolerance is still needed for historical data even under write-time enforcement",
       "Names the cost of the chosen approach: write-time enforcement makes the registry a hard dependency for every deploy; read-time tolerance means bugs surface at runtime instead of deploy time"
+    ],
+    "concept_tags": [
+      "schema_evolution_compat"
     ]
   },
   {
     "id": "tradeoff-8",
     "lang": "tradeoff",
     "title": "Data Quality Checks: Block the Pipeline or Alert and Continue?",
-    "concept_tag": "data_quality_observability",
     "prompt": "An upstream table starts feeding your pipeline null values in a column that's never had nulls before. You must pick ONE policy for what a data quality check does when it detects this kind of anomaly: hard-fail the pipeline run (block downstream from seeing the bad data) or let the run continue and just alert on-call. State your choice and defend it.",
     "key_points": [
       "Picks a policy based on blast radius/reversibility (e.g. hard-fail for anything feeding a financial or exec-facing metric, alert-and-continue for lower-stakes internal tables) rather than one blanket rule for everything",
       "Explains the cost of hard-failing: it can cascade (a downstream job that depends on this one also misses its SLA) and needs a clear unblock/override path, not just 'stop'",
       "Explains the cost of alert-and-continue: bad data reaches consumers and may need a costly backfill/correction later once someone acts on the alert",
       "Names a concrete detection mechanism (e.g. null-rate/volume/schema anomaly thresholds compared against a rolling baseline), not just 'we'll monitor it'"
+    ],
+    "concept_tags": [
+      "data_quality_observability"
     ]
   },
   {
@@ -4608,6 +4657,12 @@
       "Retrieval layer: how top-k / re-ranking is tuned, and what happens when nothing relevant is retrieved (say unsure vs guessing)",
       "Grounding: answers are tied back to retrieved sources with citations, and hallucination risk is explicitly addressed",
       "Freshness: how the index stays in sync as docs are added, edited, or deleted"
+    ],
+    "concept_tags": [
+      "retrieval_relevance_chunking",
+      "embedding_index_choice",
+      "hallucination_grounding",
+      "context_window_budget"
     ]
   },
   {
@@ -4623,6 +4678,11 @@
       "Guarded against infinite loops or repeated-failure retries (max iterations, progress checks, error-pattern detection)",
       "Context management: how prior steps/tool outputs are summarized or trimmed so the context window doesn't overflow on long tasks",
       "Failure handling: what happens when a tool call errors unexpectedly or returns something the agent doesn't understand"
+    ],
+    "concept_tags": [
+      "tool_use_safety",
+      "agent_loop_termination",
+      "latency_cost_tradeoff"
     ]
   },
   {
@@ -4638,6 +4698,11 @@
       "Handles rate limits/timeouts from the provider gracefully (backoff, circuit breaker, queueing) rather than surfacing raw errors to users",
       "Cost/latency tradeoff made explicit for each fallback tier, not just correctness",
       "Failure handling: what the user sees when every tier fails"
+    ],
+    "concept_tags": [
+      "latency_cost_tradeoff",
+      "prompt_versioning_regression",
+      "eval_observability"
     ]
   },
   {
@@ -4653,6 +4718,11 @@
       "Versioning: prompts and eval results are tracked together so a regression can be bisected to a specific change",
       "Production monitoring: some signal (user feedback, sampled review, drift metrics) catches regressions that offline evals miss",
       "Rollout safety: how a prompt/model change ships (shadow testing, canary, gradual rollout) rather than all-at-once"
+    ],
+    "concept_tags": [
+      "eval_observability",
+      "prompt_versioning_regression",
+      "hallucination_grounding"
     ]
   },
   {
@@ -4667,6 +4737,11 @@
       "Scoring layer: lightweight model serving (ONNX, TF Serving) called synchronously from the authorization path, not a separate async job",
       "Feedback loop: labeled review outcomes flow back into daily batch retraining, with a tunable threshold per merchant to control false-positive rates",
       "Failure mode: what happens when the feature store or model server is unavailable \u2014 fail-open (authorize anyway) vs fail-closed (decline) and the revenue implications of each"
+    ],
+    "concept_tags": [
+      "batch_vs_stream_choice",
+      "partitioning_hot_key_skew",
+      "data_quality_observability"
     ]
   },
   {
@@ -4681,6 +4756,11 @@
       "Alerting: anomaly detection triggers notifications without creating a notification-storm when 10K devices spike simultaneously \u2014 deduplication and rate-limiting strategy",
       "Storage: time-series database (TimescaleDB, InfluxDB) for recent data partitioned by device_id + time, cold archive to Parquet on S3 for data older than 30 days",
       "Failure mode: how the system handles a device that goes offline for 48 hours then reconnects and floods its backlog without starving other devices' processing"
+    ],
+    "concept_tags": [
+      "batch_vs_stream_choice",
+      "late_data_watermarks",
+      "storage_format_choice"
     ]
   },
   {
@@ -4695,6 +4775,11 @@
       "Explicitly addressed what gets dropped at peak \u2014 at 250GB/sec, indexing everything is cost-prohibitive, so sampling or tiered retention is mandatory and justified",
       "Processing: a streaming job (Flink) that parses, enriches (hostname, region, deploy version), and routes logs by severity with different quality-of-service guarantees per path",
       "Failure mode: what happens when the Elasticsearch cluster falls behind or a broker fails during a sustained ingestion peak \u2014 backpressure, shedding, and replay strategy"
+    ],
+    "concept_tags": [
+      "storage_format_choice",
+      "partitioning_hot_key_skew",
+      "domain_alignment"
     ]
   },
   {
@@ -4709,6 +4794,11 @@
       "Timeout handling: a scheduler or timer service publishes timeout events when a step doesn't complete within SLA (e.g. restaurant doesn't respond in 3 minutes \u2192 auto-cancel)",
       "Failure mode: what happens if the driver app crashes mid-delivery \u2014 GPS heartbeat monitoring detects the gap and reassigns without duplicating the delivery",
       "Exactly-once: acknowledged that true exactly-once across arbitrary services is impossible and proposed effectively-once through idempotent event handlers keyed on event ID"
+    ],
+    "concept_tags": [
+      "entity_enumeration",
+      "grain_awareness",
+      "scd_strategy"
     ]
   },
   {
@@ -4723,6 +4813,11 @@
       "Feature pipeline: streaming features computed by Flink dual-writing to both stores; batch features computed by Spark and backfilled to both stores with versioning",
       "Consistency guarantee: explicitly addressed point-in-time joins so training data exactly matches what inference would have seen \u2014 the core correctness property of a feature store",
       "Failure mode: what happens when the online store is unavailable during inference \u2014 fallback to default values, stale cache, or fail-open, and how each affects model accuracy"
+    ],
+    "concept_tags": [
+      "batch_vs_stream_choice",
+      "domain_alignment",
+      "data_quality_observability"
     ]
   },
   {
@@ -4737,71 +4832,90 @@
       "Driver onboarding funnel: modeled milestone timestamps (signup, docs_submitted, docs_approved, activated, first_trip) as columns in the driver dimension rather than a separate event table \u2014 justified by simple current-value query patterns",
       "Trip conversion: demonstrated a SQL approach (LEFT JOIN offer\u2192trip with CASE WHEN count logic) rather than hand-waving the metric definition",
       "Missing dimension self-audit: identified geo/location as a needed dimension when prompted, and explained what queries it enables (trip density, high-profit regions)"
+    ],
+    "concept_tags": [
+      "entity_enumeration",
+      "grain_awareness",
+      "scd_strategy",
+      "domain_alignment"
     ]
   },
   {
     "id": "tradeoff-9",
     "lang": "tradeoff",
     "title": "Synchronous Dual-Write vs. Log-Based Materialization for a Feature Store",
-    "concept_tag": "consistency_vs_latency",
     "prompt": "Your feature store needs to keep the online store (Redis, sub-5ms reads) and offline store (Delta Lake, historical queries) consistent. Option A: the streaming job dual-writes to both stores synchronously \u2014 the feature is only considered written after both succeed. Option B: the streaming job writes only to Kafka; a separate consumer materializes the online store, and a batch job materializes the offline store from the same log. Which do you choose and why?",
     "key_points": [
       "Dual-write consistency: synchronous writes guarantee the online and offline stores are always consistent, but double the write latency and make the pipeline vulnerable to partial failures (one store down blocks the other)",
       "Log-based materialization decouples the write paths \u2014 the online store can be updated in near-real-time while the offline store catches up on a batch schedule, and a Kafka outage doesn't block either",
       "Read-your-write consistency is the real constraint: if a model trains at 2pm, does it need features from a 1:59pm event that's still propagating to the offline store?",
       "Operational complexity: dual-write needs distributed transaction semantics or a saga; log-based needs idempotent consumers and handles replay naturally"
+    ],
+    "concept_tags": [
+      "idempotency_dedup",
+      "batch_vs_stream_choice"
     ]
   },
   {
     "id": "tradeoff-10",
     "lang": "tradeoff",
     "title": "Fail-Open vs. Fail-Closed for Real-Time Fraud Scoring",
-    "concept_tag": "availability_vs_correctness",
     "prompt": "Your fraud detection model server times out or returns an error during a 100ms transaction authorization window. Option A: fail-open \u2014 authorize the transaction anyway and flag it for async review. Option B: fail-closed \u2014 decline the transaction and let the customer retry. Which do you choose and why?",
     "key_points": [
       "Fail-open maximizes revenue and customer experience (legitimate transactions go through) but lets through every fraudulent transaction during the outage window",
       "Fail-closed protects against fraud losses during the outage but blocks legitimate transactions, hurting merchant relationships and customer trust",
       "The decision depends on fraud-to-false-positive cost ratio: for high-value finance (wire transfers) fail-closed is standard; for low-value e-commerce (coffee purchases) fail-open is common",
       "A hybrid approach is tunable per merchant based on their historical fraud rate and transaction amount \u2014 high-risk merchants get fail-closed, low-risk get fail-open"
+    ],
+    "concept_tags": [
+      "data_quality_observability"
     ]
   },
   {
     "id": "tradeoff-11",
     "lang": "tradeoff",
     "title": "Per-Device vs. Aggregated Timers for IoT Anomaly Detection",
-    "concept_tag": "state_granularity",
     "prompt": "For 1 million IoT devices, you need to detect when a device's reading deviates from its own recent history. Option A: maintain per-device rolling statistics in Flink state (1M entries, ~1GB of state). Option B: bucket devices by type/location and detect anomalies at the bucket level using aggregate statistics. Which do you choose and why?",
     "key_points": [
       "Per-device state is more accurate (catches individual device degradation) but costs ~1GB of Flink state plus checkpointing overhead at 1M keys",
       "Bucket-level aggregation is cheaper in state and compute but misses individual device failures if only one device in a large bucket degrades",
       "The right answer depends on what kind of failures matter: slow calibration drift (per-device needed) vs. plant-wide outages (bucket detects fine)",
       "A tiered approach is often best: bucket-level for real-time alerting, per-device for offline investigation, with the Flink job doing bucketing and a separate batch job computing per-device stats"
+    ],
+    "concept_tags": [
+      "batch_vs_stream_choice",
+      "storage_format_choice"
     ]
   },
   {
     "id": "tradeoff-12",
     "lang": "tradeoff",
     "title": "Airflow Executor: Celery vs. Kubernetes vs. Local",
-    "concept_tag": "orchestration_architecture",
     "prompt": "You need to pick an Airflow executor for a data platform running 500 DAGs with a mix of lightweight Python operators and heavy SparkSubmit operators. Option A: CeleryExecutor with a fixed pool of worker nodes. Option B: KubernetesExecutor with dynamic pod-per-task scaling. Option C: LocalExecutor on a single beefy instance. Which do you choose and why?",
     "key_points": [
       "CeleryExecutor offers predictable capacity with a fixed worker pool but suffers from static over-provisioning (paying for idle workers) or under-provisioning (backlogs during peak), and needs separate infrastructure (Redis/RabbitMQ) to manage",
       "KubernetesExecutor spins a pod per task \u2014 ideal for heterogeneous workloads where a lightweight Python operator needs 0.5GB and a Spark operator needs 8GB, but adds K8s networking overhead, slower pod startup, and requires K8s expertise to tune",
       "LocalExecutor is simple and free but runs everything on one node \u2014 a single memory-hungry task OOMs the scheduler and takes down unrelated DAGs, unsuitable beyond ~50 DAGs or any Spark workload",
       "The right choice depends on workload diversity and team skills: Celery is the safe default for uniform-medium workloads, K8sExecutor wins for heterogeneous workloads with existing K8s investment, LocalExecutor is a dev-only choice"
+    ],
+    "concept_tags": [
+      "batch_vs_stream_choice"
     ]
   },
   {
     "id": "tradeoff-13",
     "lang": "tradeoff",
     "title": "COPY vs. MERGE for Incremental Warehouse Loads",
-    "concept_tag": "ingestion_strategy",
     "prompt": "Loading 10M new rows daily into a 500M-row fact table. Option A: COPY (append new data into a new partition, then swap). Option B: MERGE INTO (upsert new rows into the existing table in place). Which do you choose and why?",
     "key_points": [
       "COPY + partition swap is idempotent, fast, and doesn't deadlock \u2014 you load into a staging table, validate, then swap the partition in a metadata-only operation. But it requires proper partitioning and means the table is briefly missing the newest partition during the swap",
       "MERGE INTO is atomic and doesn't require partitioning but is slower (full table scan to find matches), risks deadlocks under concurrent loads, and is harder to roll back if the merge is wrong",
       "COPY wins for large append-only fact tables with date-based partitioning (most common pattern), while MERGE is better for smaller dimension tables that need true upsert and can tolerate slower writes",
       "Some warehouses (Snowflake, BigQuery) have materialized-table-swap that combines both \u2014 always worth mentioning as a 3rd option"
+    ],
+    "concept_tags": [
+      "batch_vs_stream_choice",
+      "storage_format_choice"
     ]
   },
   {
@@ -4816,6 +4930,11 @@
       "Storage: an identity graph (Neo4j or a purpose-built ID service) mapping source IDs to canonical profiles, with versioning so historical queries can use the resolution that was live at the time",
       "Reconciliation: a scheduled batch job that re-resolves the graph as new data arrives (an email added to a device-ID profile can merge two previously separate canonical profiles), with conflict-resolution rules for when profiles merge",
       "Failure mode: what happens when two profiles auto-merge incorrectly \u2014 a rollback mechanism to split merged profiles without losing the event history that was attributed to the merged profile"
+    ],
+    "concept_tags": [
+      "idempotency_dedup",
+      "missing_dimension_audit",
+      "data_quality_observability"
     ]
   },
   {
@@ -4830,6 +4949,10 @@
       "Audit trail: a deletion-log table recording what was deleted, when, and by which request ID, retained separately from user data and not subject to deletion itself",
       "Verification: a post-deletion scan that confirms no residual PII for the deleted user exists in any layer, with periodic re-scans for backup/archive copies that may have been missed",
       "Failure mode: what happens when a deletion job partially fails (S3 succeeds, Snowflake fails) \u2014 a compensating transaction or a retry queue with exactly-once semantics per layer"
+    ],
+    "concept_tags": [
+      "backfill_reprocessing",
+      "data_quality_observability"
     ]
   },
   {
@@ -4844,6 +4967,10 @@
       "Audit: all queries logged with user identity, query text, rows returned, and timestamp, with an anomaly detector for access patterns outside normal baselines",
       "Operations: self-serve access request workflow with automated approval for low-sensitivity data and manual approval for PII, all recorded in the audit log",
       "Failure mode: what happens when a new table lands without a classification tag \u2014 deny-by-default prevents access, so a 'quarantine zone' with temporary 48-hour auto-access during classification processing"
+    ],
+    "concept_tags": [
+      "domain_alignment",
+      "data_quality_observability"
     ]
   },
   {
@@ -4905,6 +5032,10 @@
       "Addresses the read side explicitly: scatter-gather queries all shards and merges results, with a strategy for limiting fan-out (e.g. time-range filter per shard)",
       "Explains why simpler fixes fail: adding capacity doesn't redistribute one key, time-bucketing still creates a hot key per hour, jitter doesn't reduce sustained volume",
       "Failure mode: what happens when the hot tenant grows further \u2014 strategy for dynamic shard count increases (e.g. double and re-route), and how partial shard outages affect query completeness"
+    ],
+    "concept_tags": [
+      "partitioning_hot_key_skew",
+      "storage_format_choice"
     ]
   },
   {
@@ -4919,6 +5050,10 @@
       "Handles deduplication: a unique event ID (or idempotency key) in the outbox row so the relay and consumers can deduplicate even with at-least-once delivery from Kafka",
       "Addresses operational concerns: outbox retention/cleanup policy (TTL or archival after confirmed delivery), backpressure when Kafka is down (relay retries, outbox grows), ordering guarantees per entity ID (partition key in the outbox)",
       "Compares trade-offs against alternatives: dual-write with retry (unreliable), 2PC (Kafka doesn't support it, coordinator crash risk), dual-DB approach (two-phase XA \u2014 costly and fragile)"
+    ],
+    "concept_tags": [
+      "idempotency_dedup",
+      "replication_consistency"
     ]
   },
   {
@@ -4933,6 +5068,14 @@
       "Handles late-arriving data (e.g. shipment update arrives 3 hours after the order event): upsert semantics on the read model, watermark management to avoid re-processing entire windows, and how partially-projected rows are repaired",
       "Addresses schema evolution: if the raw event format changes (e.g. a new field added to line_items), how does the projection adapt without a full rebuild \u2014 versioned transformers, schema registry integration",
       "Failure mode: the projector crashes mid-stream \u2014 replay mechanism using offsets/watermarks, idempotent upserts so re-processing doesn't duplicate rows, and a data quality check comparing row counts between raw and projected stores"
+    ],
+    "concept_tags": [
+      "batch_vs_stream_choice",
+      "late_data_watermarks",
+      "storage_format_choice",
+      "schema_evolution_compat",
+      "data_quality_observability",
+      "domain_alignment"
     ]
   },
   {
@@ -4949,6 +5092,14 @@
       "Handles the Fin training feed: conversations turned into prompt/response pairs, deduped across channels, PII-redacted via an NLU pipeline, and version-snapped so a model A/B test against last month\u2019s export is reproducible. Also handles exclusion: conversations flagged as wrong-resolution by human reviewers are filtered out of export sets without rewriting the immutable archive",
       "Serves the compliance requirement explicitly: immutable log with cryptographic integrity check (hash chain across batches) and point-in-time replay via offset retention and watermark preservation so any conversation from any date can be reconstructed",
       "Failure mode: a source format changes without notice (e.g. MongoDB adds a field for DM read receipts) \u2014 schema registry rejects the new format, pipeline pauses, alert fires to the data quality team, and events buffer upstream until a versioned transformer is deployed. How does the pipeline recover without data loss during the gap"
+    ],
+    "concept_tags": [
+      "batch_vs_stream_choice",
+      "schema_evolution_compat",
+      "late_data_watermarks",
+      "storage_format_choice",
+      "data_quality_observability",
+      "partitioning_hot_key_skew"
     ]
   },
   {
@@ -4964,6 +5115,12 @@
       "Partitioning strategy: avoids hot partitions from noisy clusters (e.g. a large canary deployment rolling out across 500 pods generating 2,000 alerts in 5 minutes) \u2014 partition by cluster_id hash with a configurable shard count, and an overflow topic for clusters that saturate their shard so they don\u2019t delay other clusters\u2019 alerts",
       "Downstream routing: actionable incidents go to PagerDuty/Opsgenie with a grouped summary (e.g. \u201c12 pods crash-looping in namespace staging due to Node disk-pressure on 3 nodes\u201d); noisy/low-severity patterns go to a daily digest; anomalous patterns feed a Datadog custom dashboard for SRE review. Justified which path each alert type follows",
       "Failure mode: the Datadog Agent connection is interrupted and delivers a burst of 30-minutes-worth of delayed alerts \u2014 dedup and correlation windows must survive clock skew and out-of-order delivery. How does the pipeline avoid creating an incident storm from delayed alerts, and how are late-arriving events re-correlated into already-closed incidents"
+    ],
+    "concept_tags": [
+      "idempotency_dedup",
+      "late_data_watermarks",
+      "partitioning_hot_key_skew",
+      "data_quality_observability"
     ]
   },
   {
@@ -4979,6 +5136,12 @@
       "ML Platform analytics feed: exports fleet-wide utilization data aggregated by team/model/GPU-hour for cost allocation chargebacks, with efficiency reports (MFLOPS/Watt per model architecture, total GPU-hours wasted on failed jobs) refreshed daily via the columnar store",
       "Hardware engineering feedback loop: long-term reliability signals (ECC bit flip trends by MI-series lot, thermal cycle counts by data center region, PCIe correctable error rates by motherboard revision) shipped to AMD\u2019s engineering team as periodic snapshots with reproducible query definitions",
       "Failure mode: a customer\u2019s Prometheus remote write backs up during a network partition and delivers 6 hours of metrics in a burst \u2014 how does the pipeline handle late data without breaking live dashboards or double-counting in cost allocation, and how are anomaly baselines protected from the data gap"
+    ],
+    "concept_tags": [
+      "batch_vs_stream_choice",
+      "partitioning_hot_key_skew",
+      "storage_format_choice",
+      "data_quality_observability"
     ]
   },
   {
@@ -4994,6 +5157,16 @@
       "Storage and partitioning: columnar format (Parquet on Redshift/BigQuery/Snowflake), partitioned by date and clustered by emoji_sk for the hot query pattern (top emojis by region). Materialized views or aggregation tables for common dashboard queries, refreshed incrementally",
       "Answers the specific query: walks through the SQL joining fact to dim_user (with state=CA filtered to the SCD snapshot valid at reaction time) to dim_post (is_influencer_post=TRUE) to dim_emoji to dim_time (last 7 days), grouping by date + emoji_name, ranking by COUNT(*) per day, returning top 3",
       "Failure mode: a schema change in the source reaction topic (e.g. a new reaction_type field added for double-tap) \u2014 how the staging layer handles unknown fields, schema registry versioning, and backfill strategy for reprocessing historical data under the new schema"
+    ],
+    "concept_tags": [
+      "domain_alignment",
+      "schema_evolution_compat",
+      "late_data_watermarks",
+      "storage_format_choice",
+      "data_quality_observability",
+      "scd_strategy",
+      "entity_enumeration",
+      "grain_awareness"
     ]
   }
 ]
