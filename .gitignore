@@ -10,6 +10,7 @@ progress.json
 replay_comments.json
 research_cache.json
 judges.json
+app_state.db
 sample_rubric_from_internet/
 .venv/
 

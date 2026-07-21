@@ -1,17 +1,40 @@
 # Phase 5 refactor — routes (verbatim from app.py).
-import os
-
 from flask import Blueprint
 from flask import jsonify, request, session, g, render_template, redirect, flash, current_app, send_file, url_for, abort
 
-from app import (
-    SUPABASE_ENABLED, sb, LEGACY_FAKE_TOKEN, log, TEST_EMAIL, TEST_PASSWORD,
-    QUESTIONS, _reset_entry, current_progress,
-    PROGRESS_FILE, HISTORY_FILE, CHATS_FILE, REPLAY_COMMENTS_FILE, JUDGES_FILE,
-)
-from services.persistence import save_progress, current_user_id
-
 bp = Blueprint('auth', __name__)
+
+from services.state import (
+    PROGRESS, HISTORY, QUESTIONS, ATTEMPTS, STRUGGLES, PENDING_RECALL, PENDING_DRYRUN,
+    CHATS, REPLAY_COMMENTS, JUDGES,
+    sb, SUPABASE_ENABLED, LEGACY_FAKE_TOKEN, TEST_EMAIL, TEST_PASSWORD,
+    PRECOMPUTED_SOLUTIONS, PRECOMPUTED_CONCEPTS, PRECOMPUTED_TRACES,
+)
+from services.persistence import save_progress, save_chats, save_judges, save_replay_comments, current_user_id
+from core.constants import *
+from app import (
+    log, client, MODEL,
+    is_solved, is_due, schedule_review, _reset_entry,
+    _compute_gap_alerts, _compute_study_plan, _compute_claim_validation,
+    _compute_concept_match, _compute_role_readiness,
+    _stamp_taxonomy, _exec_case, _gen_question_context,
+    _generate_report, _replay_chat_key, _parse_review_sections,
+    recurring_missed_concepts, recurring_missed_topics,
+    CONCEPT_NORMALIZATION,
+    _normalize_concept, _extract_text_from_resume, _clean_pdf_artifacts,
+    _extraction_fallback_chain, _extract_concepts_from_jd, _fallback_extract_jd,
+    _extract_skills_from_resume, _fallback_extract_resume,
+    _call_json_extract,
+    WHITEBOARD_WRAP_RE, JUDGE_SYSTEM_PROMPT, JUDGE_OUTPUT_SCHEMA,
+    JD_CONCEPT_TRANSLATIONS,
+    CALIBRATION_FIXTURES,
+    ADVERSARIAL_PERSONAS, ADVERSARIAL_RULES, PERSONAS, SCALING_TIERS,
+    INCIDENT_RULES, V2_SCENARIOS, JUDGE_RUBRIC,
+    DEEPGRAM_API_KEY,
+    CONSTRAINT_WORDS, OVERSIMPLIFY_WORDS, RISK_WORDS,
+    TRADEOFF_ROLLS, SOLUTION_CACHE,
+)
+import json, re, os
 
 @bp.route("/login")
 @bp.route("/signup")
@@ -103,7 +126,7 @@ def api_test_login():
     if not SUPABASE_ENABLED or sb is None:
         fresh = request.args.get("fresh") == "1"
         if fresh:
-            current_progress().clear()
+            PROGRESS.clear()
             save_progress()
         return jsonify({
             "access_token": LEGACY_FAKE_TOKEN,
@@ -116,7 +139,7 @@ def api_test_login():
         return jsonify({"error": "supabase client unavailable"}), 500
     fresh = request.args.get("fresh") == "1"
     if fresh:
-        current_progress().clear()
+        PROGRESS.clear()
         save_progress()
     # try login first
     session = None
@@ -197,13 +220,8 @@ def reset_category(lang):
 
 @bp.route("/api/start-over", methods=["POST"])
 def start_over():
-    # ponytail: full clean slate — wipes every persistence file so the dashboard reads 0/N
-    # with no streaks, due reviews, saved code, chat history, or replay comments. Distinct
-    # from /api/reset-category which only clears working state and keeps solved credit.
-    import glob
-    for f in (PROGRESS_FILE, HISTORY_FILE, CHATS_FILE, REPLAY_COMMENTS_FILE, JUDGES_FILE):
-        if os.path.exists(f):
-            os.remove(f)
+    from services.store import clear_all
+    clear_all()
     return jsonify({"ok": True})
 
 

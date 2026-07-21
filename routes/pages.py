@@ -1,26 +1,47 @@
 # Phase 5 refactor — routes (verbatim from app.py).
 from datetime import datetime
-
 from flask import Blueprint
 from flask import jsonify, request, session, g, render_template, redirect, flash, current_app, send_file, url_for, abort
 
-from app import (
-    QUESTIONS, HISTORY, is_solved, current_progress,
-    _compute_role_readiness, _compute_gap_alerts, _compute_study_plan,
-    _compute_claim_validation, _compute_concept_match,
-)
-from core.constants import CONCEPT_TAXONOMY, CONCEPT_TAXONOMY_AI, CONCEPT_TAXONOMY_FDE, WAR_STORIES
-from core.concepts import CONCEPT_NORMALIZATION
-from services.persistence import save_progress
-
 bp = Blueprint('pages', __name__)
+
+from services.state import (
+    PROGRESS, HISTORY, QUESTIONS, ATTEMPTS, STRUGGLES, PENDING_RECALL, PENDING_DRYRUN,
+    CHATS, REPLAY_COMMENTS, JUDGES,
+    sb, SUPABASE_ENABLED, LEGACY_FAKE_TOKEN, TEST_EMAIL, TEST_PASSWORD,
+    PRECOMPUTED_SOLUTIONS, PRECOMPUTED_CONCEPTS, PRECOMPUTED_TRACES,
+)
+from services.persistence import save_progress, save_chats, save_judges, save_replay_comments, current_user_id
+from core.constants import *
+from app import (
+    log, client, MODEL,
+    is_solved, is_due, schedule_review, _reset_entry,
+    _compute_gap_alerts, _compute_study_plan, _compute_claim_validation,
+    _compute_concept_match, _compute_role_readiness,
+    _stamp_taxonomy, _exec_case, _gen_question_context,
+    _generate_report, _replay_chat_key, _parse_review_sections,
+    recurring_missed_concepts, recurring_missed_topics,
+    CONCEPT_NORMALIZATION,
+    _normalize_concept, _extract_text_from_resume, _clean_pdf_artifacts,
+    _extraction_fallback_chain, _extract_concepts_from_jd, _fallback_extract_jd,
+    _extract_skills_from_resume, _fallback_extract_resume,
+    _call_json_extract,
+    WHITEBOARD_WRAP_RE, JUDGE_SYSTEM_PROMPT, JUDGE_OUTPUT_SCHEMA,
+    JD_CONCEPT_TRANSLATIONS,
+    CALIBRATION_FIXTURES,
+    ADVERSARIAL_PERSONAS, ADVERSARIAL_RULES, PERSONAS, SCALING_TIERS,
+    INCIDENT_RULES, V2_SCENARIOS, JUDGE_RUBRIC,
+    DEEPGRAM_API_KEY,
+    CONSTRAINT_WORDS, OVERSIMPLIFY_WORDS, RISK_WORDS,
+    TRADEOFF_ROLLS, SOLUTION_CACHE,
+)
+import json, re, os
 
 @bp.route("/")
 def index():
     # Show onboarding for new users (no progress, no deadline set)
-    progress = current_progress()
-    has_progress = any(is_solved(qid) for qid in progress if qid in QUESTIONS)
-    has_deadline = isinstance(progress.get("_deadline"), dict) and progress["_deadline"].get("date")
+    has_progress = any(is_solved(qid) for qid in PROGRESS if qid in QUESTIONS)
+    has_deadline = isinstance(PROGRESS.get("_deadline"), dict) and PROGRESS["_deadline"].get("date")
     if not has_progress and not has_deadline:
         return redirect("/onboarding")
     return redirect("/dashboard")
@@ -49,7 +70,7 @@ def taxonomy():
 
 @bp.route("/practice")
 def practice():
-    jd = current_progress().get("_jd", {})
+    jd = PROGRESS.get("_jd", {})
     role = jd.get("role_title", "")
     domain = jd.get("domain", "")
     if role and domain:
@@ -77,14 +98,13 @@ def save_onboarding():
     deadline = data.get("deadline", "").strip()
     strongest = data.get("strongest", "").strip()
     weakest = data.get("weakest", "").strip()
-    progress = current_progress()
     if deadline:
         try:
             datetime.fromisoformat(deadline)
-            progress["_deadline"] = {"date": deadline}
+            PROGRESS["_deadline"] = {"date": deadline}
         except ValueError:
             pass
-    progress["_onboarding"] = {"strongest": strongest, "weakest": weakest}
+    PROGRESS["_onboarding"] = {"strongest": strongest, "weakest": weakest}
     save_progress()
     return jsonify({"ok": True})
 
@@ -92,9 +112,8 @@ def save_onboarding():
 
 @bp.route("/dashboard")
 def dashboard():
-    progress = current_progress()
     total_questions = len(QUESTIONS)
-    total_solved = sum(1 for qid in progress if is_solved(qid))
+    total_solved = sum(1 for qid in PROGRESS if is_solved(qid))
     postmortems = [h for h in HISTORY if h.get("event") == "postmortem"]
 
     role_readiness = _compute_role_readiness()
@@ -135,22 +154,22 @@ def dashboard():
         "dashboard.html",
         total_questions=total_questions,
         postmortems=list(reversed(postmortems))[:15],
-        resume_loaded=bool(progress.get("_resume")),
-        resume=progress.get("_resume", {}),
+        resume_loaded=bool(PROGRESS.get("_resume")),
+        resume=PROGRESS.get("_resume", {}),
         gap_alerts=_compute_gap_alerts(),
         study_plan=_compute_study_plan(),
         claim_validation=_compute_claim_validation(),
-        jd_loaded=bool(progress.get("_jd")),
-        jd=progress.get("_jd", {}),
-        jd_synthetic=bool((progress.get("_jd") or {}).get("synthetic")),
+        jd_loaded=bool(PROGRESS.get("_jd")),
+        jd=PROGRESS.get("_jd", {}),
+        jd_synthetic=bool((PROGRESS.get("_jd") or {}).get("synthetic")),
         concept_match=_compute_concept_match(),
         role_readiness=role_readiness,
-        first_use=(total_solved == 0 and bool(progress.get("_jd")) and bool(progress.get("_resume"))),
+        first_use=(total_solved == 0 and bool(PROGRESS.get("_jd")) and bool(PROGRESS.get("_resume"))),
         jd_concept_list=jd_concept_list,
         coverage_signal=coverage_signal,
         reparse_available=bool(
-            (progress.get("_jd") or {}).get("raw_text")
-            or (progress.get("_resume") or {}).get("raw_text")
+            (PROGRESS.get("_jd") or {}).get("raw_text")
+            or (PROGRESS.get("_resume") or {}).get("raw_text")
         ),
     )
 

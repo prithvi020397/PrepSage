@@ -18,6 +18,7 @@ from io import BytesIO
 from dotenv import load_dotenv
 from flask import Flask, jsonify, request, render_template, redirect, g
 from openai import OpenAI
+from services.store import save_history, load_all as _reload_shared_state
 
 # resume parsing — optional, graceful fallback if missing
 try:
@@ -87,12 +88,7 @@ def _req_start():
     except Exception:
         uid = None
     if not uid:
-        # No authenticated user: serve the shared legacy file-based state so a
-        # previous authenticated user's data doesn't leak into this request.
-        PROGRESS = _read_state(PROGRESS_FILE, {})
-        CHATS = _read_state(CHATS_FILE, {})
-        JUDGES = _read_state(JUDGES_FILE, {})
-        REPLAY_COMMENTS = _read_state(REPLAY_COMMENTS_FILE, {})
+        PROGRESS, _, CHATS, JUDGES, REPLAY_COMMENTS = _reload_shared_state()
         g._supabase_user = None
         g._supabase_loaded = False
         return
@@ -112,10 +108,7 @@ def _req_start():
         log.exception(
             "before_request: Supabase load failed for %s; using legacy state", uid
         )
-        PROGRESS = _read_state(PROGRESS_FILE, {})
-        CHATS = _read_state(CHATS_FILE, {})
-        JUDGES = _read_state(JUDGES_FILE, {})
-        REPLAY_COMMENTS = _read_state(REPLAY_COMMENTS_FILE, {})
+        PROGRESS, _, CHATS, JUDGES, REPLAY_COMMENTS = _reload_shared_state()
         g._supabase_loaded = False
 
 
@@ -186,97 +179,11 @@ except Exception:
     scan_code = None
     has_blocker = None
 
-# ponytail: Supabase multi-user layer is OPTIONAL. When SUPABASE_URL/SUPABASE_KEY
-# are unset, supabase_client degrades to the legacy file-based single-user backend,
-# so the app runs unchanged in local mode. Import failure must never break startup.
-try:
-    import supabase_client as sb
-
-    SUPABASE_ENABLED = sb.SUPABASE_ENABLED
-except Exception:
-    sb = None
-    SUPABASE_ENABLED = False
-
-# LEGACY_MODE=1 forces single-user file-based mode (bypasses Supabase). Useful locally
-# during a Supabase outage. Production leaves this unset so Supabase auth stays on.
-if os.environ.get("LEGACY_MODE", "").lower() in ("1", "true", "yes"):
-    SUPABASE_ENABLED = False
-    sb = None
-
-
-QUESTIONS = {q["id"]: q for q in json.load(open("questions.json"))}
-
-# ponytail: LLM-derived mapping of question -> gap concepts it builds, produced offline by
-# precompute.py (gen_concept_links). Loaded lazily and cached so runtime stays free; absent
-# file => framed-practice falls back to the legacy GAP_TO_QUESTIONS dict.
-_CONCEPT_LINKS_CACHE = None
-
-
-def _load_concept_links():
-    global _CONCEPT_LINKS_CACHE
-    if _CONCEPT_LINKS_CACHE is not None:
-        return _CONCEPT_LINKS_CACHE
-    path = "question_concept_links.json"
-    if not os.path.exists(path):
-        _CONCEPT_LINKS_CACHE = {}
-        return _CONCEPT_LINKS_CACHE
-    try:
-        _CONCEPT_LINKS_CACHE = json.load(open(path))
-    except Exception:
-        _CONCEPT_LINKS_CACHE = {}
-    return _CONCEPT_LINKS_CACHE
-
-
-# ponytail: in-memory, single-user, resets on restart — fine for a local tutor
-ATTEMPTS = {}
-STRUGGLES = {}  # qid -> {"title", "concept", "fails"} — for cross-question pattern callouts
-PENDING_RECALL = set()  # qids where the tutor just asked a recall-check question, awaiting the student's answer
-PENDING_DRYRUN = (
-    set()
-)  # qids where the tutor just posed a dry-run challenge, awaiting the student's trace
-
-PROGRESS_FILE = "progress.json"
-
-
-# qid -> {"solved_at": iso, "fails": int, "due_at": iso} — this one DOES persist to disk,
-# spaced-repetition scheduling is pointless if it resets every time Flask autoreloads.
-def _read_state(path, default):
-    """Reload a JSON state file (used to restore legacy globals per request)."""
-    try:
-        with open(path) as f:
-            return json.load(f)
-    except (FileNotFoundError, json.JSONDecodeError):
-        return default
-
-
-PROGRESS = json.load(open(PROGRESS_FILE)) if os.path.exists(PROGRESS_FILE) else {}
-
-HISTORY_FILE = "history.json"
-# append-only list of {ts, event: "submit"|"debrief", ...} — powers the trend dashboard.
-# Kept separate from PROGRESS (current-state-only) because trends need a timeline.
-HISTORY = json.load(open(HISTORY_FILE)) if os.path.exists(HISTORY_FILE) else []
-
-CHATS_FILE = "chats.json"
-# chat_key -> [{"role", "content"}, ...] — persisted so a shareable replay link still
-# works after a dyno restart, not just within the same running process.
-CHATS = json.load(open(CHATS_FILE)) if os.path.exists(CHATS_FILE) else {}
-
-REPLAY_COMMENTS_FILE = "replay_comments.json"
-# chat_key -> [{"turn_idx", "author", "text", "ts"}, ...] — same persistence shape as
-# CHATS, so a shared replay link's comments survive a restart too.
-REPLAY_COMMENTS = (
-    json.load(open(REPLAY_COMMENTS_FILE))
-    if os.path.exists(REPLAY_COMMENTS_FILE)
-    else {}
-)
-
-JUDGES_FILE = "judges.json"
-# chat_key -> judge_result dict — persisted so /api/export can reconstruct reports
-# after the session ends, without re-running the judge model.
-JUDGES = json.load(open(JUDGES_FILE)) if os.path.exists(JUDGES_FILE) else {}
+# State imported from services/state — see that file for definitions
+from services.state import *  # noqa: F401,F403
 
 # Phase 0 — accessors for the module globals _req_start() rebinds per-request.
-# Route/service modules must call these instead of importing PROGRESS/CHATS/JUDGES/
+# Route/service modules call these instead of importing PROGRESS/CHATS/JUDGES/
 # REPLAY_COMMENTS by value: a plain `from app import PROGRESS` captures whatever
 # object existed at import time (app startup) and goes stale the moment _req_start()
 # rebinds the name for a later request. These functions live in app.py itself, so
@@ -298,30 +205,6 @@ def current_replay_comments():
     return REPLAY_COMMENTS
 
 
-PRECOMPUTED_TRACES = (
-    json.load(open("traces.json")) if os.path.exists("traces.json") else {}
-)
-PRECOMPUTED_CONCEPTS = (
-    json.load(open("concept_maps.json")) if os.path.exists("concept_maps.json") else {}
-)
-PRECOMPUTED_SOLUTIONS = (
-    json.load(open("solutions.json")) if os.path.exists("solutions.json") else {}
-)
-PRECOMPUTED_CONTEXTS = (
-    json.load(open("question_contexts.json"))
-    if os.path.exists("question_contexts.json")
-    else {}
-)
-
-# ponytail: static keyword map, not an LLM call — topic tagging doesn't need to cost anything.
-
-
-LEGACY_FAKE_TOKEN = "legacy-local-mode"
-
-TEST_EMAIL = "test@theloop.dev"
-TEST_PASSWORD = "test-loop-2024"
-
-
 RESET_FIELDS = ("code", "trace", "pattern", "skeleton", "concept_map")
 
 
@@ -336,7 +219,7 @@ def _reset_entry(qid):
 def log_history(entry):
     entry["ts"] = datetime.now().isoformat()
     HISTORY.append(entry)
-    _atomic_json(HISTORY_FILE, HISTORY)
+    save_history(HISTORY)
 
 
 def _gen_question_context(q):
@@ -1886,7 +1769,6 @@ from services.grading import (  # noqa: E402,F401
     WHITEBOARD_WRAP_RE,
 )
 from services.persistence import (  # noqa: E402,F401
-    _atomic_json,
     save_progress,
     save_chats,
     save_judges,

@@ -1,56 +1,35 @@
-# Phase 4 refactor — persistence (verbatim from app.py).
-
-
-import json
-import os
-
-from app import (
-    PROGRESS_FILE, CHATS_FILE, JUDGES_FILE, REPLAY_COMMENTS_FILE,
-    SUPABASE_ENABLED, sb,
-    current_progress, current_chats, current_judges, current_replay_comments,
+"""Phase 4 refactor — persistence (verbatim from app.py).
+Phase 1: JSON file I/O replaced with SQLite store."""
+from services.state import sb, SUPABASE_ENABLED
+from services.store import (
+    save_progress as _store_save_progress,
+    save_chats as _store_save_chats,
+    save_judges as _store_save_judges,
+    save_replay_comments as _store_save_replay_comments,
 )
 
 
-def _atomic_json(path, data):
-    """Write JSON atomically: write to temp file, then rename. Prevents corruption on crash."""
-    tmp = path + ".tmp"
-    with open(tmp, "w") as f:
-        json.dump(data, f)
-    os.replace(tmp, path)
-
-
-
 def save_progress():
-    _atomic_json(PROGRESS_FILE, current_progress())
+    from services.state import PROGRESS
+    _store_save_progress(PROGRESS)
 
-
-# ---------------------------------------------------------------------------
-# Supabase multi-user auth (optional). When SUPABASE_ENABLED is False these
-# endpoints return 404 and the rest of the app runs in legacy single-user mode.
-# When enabled, they issue Supabase Auth JWTs and resolve the caller's id.
-# ---------------------------------------------------------------------------
 
 def save_chats():
-    _atomic_json(CHATS_FILE, current_chats())
-
+    from services.state import CHATS
+    _store_save_chats(CHATS)
 
 
 def save_judges():
-    _atomic_json(JUDGES_FILE, current_judges())
-
+    from services.state import JUDGES
+    _store_save_judges(JUDGES)
 
 
 def save_replay_comments():
-    _atomic_json(REPLAY_COMMENTS_FILE, current_replay_comments())
-
+    from services.state import REPLAY_COMMENTS
+    _store_save_replay_comments(REPLAY_COMMENTS)
 
 
 def current_user_id():
-    """Return the Supabase auth user id for the current request, or None.
-
-    None means: Supabase is off, or no valid bearer token — callers should
-    fall back to the legacy global PROGRESS/HISTORY/CHATS state.
-    """
     if not SUPABASE_ENABLED or sb is None:
         return None
     from flask import request as _req

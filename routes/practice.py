@@ -27,6 +27,38 @@ from services.persistence import save_progress, save_chats
 
 bp = Blueprint('practice', __name__)
 
+from services.state import (
+    PROGRESS, HISTORY, QUESTIONS, ATTEMPTS, STRUGGLES, PENDING_RECALL, PENDING_DRYRUN,
+    CHATS, REPLAY_COMMENTS, JUDGES,
+    sb, SUPABASE_ENABLED, LEGACY_FAKE_TOKEN, TEST_EMAIL, TEST_PASSWORD,
+    PRECOMPUTED_SOLUTIONS, PRECOMPUTED_CONCEPTS, PRECOMPUTED_TRACES,
+)
+from services.persistence import save_progress, save_chats, save_judges, save_replay_comments, current_user_id
+from core.constants import *
+from app import (
+    log, client, MODEL,
+    is_solved, is_due, schedule_review, _reset_entry,
+    _compute_gap_alerts, _compute_study_plan, _compute_claim_validation,
+    _compute_concept_match, _compute_role_readiness,
+    _stamp_taxonomy, _exec_case, _gen_question_context,
+    _generate_report, _replay_chat_key, _parse_review_sections,
+    recurring_missed_concepts, recurring_missed_topics,
+    CONCEPT_NORMALIZATION,
+    _normalize_concept, _extract_text_from_resume, _clean_pdf_artifacts,
+    _extraction_fallback_chain, _extract_concepts_from_jd, _fallback_extract_jd,
+    _extract_skills_from_resume, _fallback_extract_resume,
+    _call_json_extract,
+    WHITEBOARD_WRAP_RE, JUDGE_SYSTEM_PROMPT, JUDGE_OUTPUT_SCHEMA,
+    JD_CONCEPT_TRANSLATIONS,
+    CALIBRATION_FIXTURES,
+    ADVERSARIAL_PERSONAS, ADVERSARIAL_RULES, PERSONAS, SCALING_TIERS,
+    INCIDENT_RULES, V2_SCENARIOS, JUDGE_RUBRIC,
+    DEEPGRAM_API_KEY,
+    CONSTRAINT_WORDS, OVERSIMPLIFY_WORDS, RISK_WORDS,
+    TRADEOFF_ROLLS, SOLUTION_CACHE,
+)
+import json, re, os
+
 @bp.route("/api/questions")
 def list_questions():
     return jsonify([{"id": q["id"], "title": q["title"], "lang": q["lang"], "difficulty": q.get("difficulty"),
