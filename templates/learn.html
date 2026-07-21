@@ -116,7 +116,6 @@ function showLesson(key) {
         '<div class="qmeta">' + q.lang + (q.difficulty ? ' &middot; ' + q.difficulty : '') + '</div>' +
       '</div>' +
       '<div class="qactions">' +
-        (q.has_walkthrough ? '<a class="btn btn-ghost" href="/practice?question_id=' + q.id + '&show_trace=1">Walkthrough</a>' : '') +
         '<a class="btn btn-primary" href="/practice?question_id=' + q.id + '">Try this</a>' +
       '</div>' +
     '</div>';

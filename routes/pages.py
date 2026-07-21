@@ -13,6 +13,7 @@ from services.state import (
 )
 from services.persistence import save_progress, save_chats, save_judges, save_replay_comments, current_user_id
 from core.constants import *
+from core.concepts import CONCEPT_QUESTION_INDEX
 from app import (
     log, client, MODEL,
     is_solved, is_due, schedule_review, _reset_entry,
@@ -83,6 +84,45 @@ def practice():
                            concept_taxonomies={"data": CONCEPT_TAXONOMY, "ai": CONCEPT_TAXONOMY_AI, "fde": CONCEPT_TAXONOMY_FDE},
                            jd_context=jd_context,
                            jd_loaded=bool(jd))
+
+
+
+@bp.route("/learn")
+def learn():
+    tracks = {
+        "Data Engineering": CONCEPT_TAXONOMY,
+        "AI / ML": CONCEPT_TAXONOMY_AI,
+        "Full-Stack & Everything Else": CONCEPT_TAXONOMY_FDE,
+    }
+    all_war_stories = {}
+    all_war_stories.update(WAR_STORIES)
+    all_war_stories.update(WAR_STORIES_AI)
+    all_war_stories.update(WAR_STORIES_FDE)
+    concepts_by_track = {}
+    concept_data = {}
+    for track_name, keys in tracks.items():
+        items = []
+        for key in keys:
+            qs = CONCEPT_QUESTION_INDEX.get(key, [])
+            story = all_war_stories.get(key, "")
+            preview = (story[:200] + "…") if len(story) > 200 else story
+            items.append({
+                "key": key,
+                "name": key.replace("_", " ").title(),
+                "story_preview": preview,
+                "question_count": len(qs),
+            })
+            concept_data[key] = {
+                "name": key.replace("_", " ").title(),
+                "war_story": story,
+                "questions": qs,
+            }
+        concepts_by_track[track_name] = items
+    return render_template("learn.html",
+                           concepts_by_track=concepts_by_track,
+                           concept_data=concept_data)
+
+
 
 
 
