@@ -21,7 +21,7 @@ def tmp_workdir(monkeypatch):
 
 SAMPLE_PROGRESS = {"_deadline": {"date": "2026-08-01"}, "q-1": {"solved": True, "attempts": 3}}
 SAMPLE_HISTORY = [{"qid": "q-1", "event": "submit", "passed": True, "ts": "2026-01-01T00:00:00"}]
-SAMPLE_CHATS = {"q-1": {"entry-1": {"role": "user", "content": "hello"}}}
+SAMPLE_CHATS = {"q-1": [{"role": "user", "content": "hello"}]}
 SAMPLE_JUDGES = {"q-1": {"score": 85, "verdict": "hire"}}
 SAMPLE_REPLAY_COMMENTS = {"q-1-entry-1": {"comment": "good approach"}}
 
@@ -103,9 +103,9 @@ class TestStoreEdgeCases:
         p, _, _, _, _ = load_all()
         assert p == {"empty-dict": {}}
 
-    def test_empty_chats_subdict_produces_no_rows(self):
-        """CHATS qid with no entries produces no rows, so 'q-1 in CHATS' is False."""
+    def test_empty_chats_list_value_round_trips(self):
+        """An empty list as a chat value is stored and restored."""
         from services.store import load_all, save_chats
-        save_chats({"q-1": {}})
+        save_chats({"q-1": []})
         _, _, c, _, _ = load_all()
-        assert c == {}
+        assert c == {"q-1": []}

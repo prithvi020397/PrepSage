@@ -8,7 +8,7 @@ DB_FILE = "app_state.db"
 _TABLES = [
     "CREATE TABLE IF NOT EXISTS progress (key TEXT PRIMARY KEY, value TEXT)",
     "CREATE TABLE IF NOT EXISTS history (id INTEGER PRIMARY KEY AUTOINCREMENT, entry TEXT)",
-    "CREATE TABLE IF NOT EXISTS chats (qid TEXT, entry_id TEXT, value TEXT, PRIMARY KEY (qid, entry_id))",
+    "CREATE TABLE IF NOT EXISTS chats (key TEXT PRIMARY KEY, value TEXT)",
     "CREATE TABLE IF NOT EXISTS judges (qid TEXT PRIMARY KEY, value TEXT)",
     "CREATE TABLE IF NOT EXISTS replay_comments (key TEXT PRIMARY KEY, value TEXT)",
 ]
@@ -16,7 +16,7 @@ _TABLES = [
 _JSON_FILES = {
     "progress": ("progress.json", "key"),
     "history": ("history.json", None),
-    "chats": ("chats.json", None),
+    "chats": ("chats.json", "key"),
     "judges": ("judges.json", "qid"),
     "replay_comments": ("replay_comments.json", "key"),
 }
@@ -64,8 +64,8 @@ def load_all():
         history.append(json.loads(row[0]))
 
     chats = {}
-    for row in conn.execute("SELECT qid, entry_id, value FROM chats"):
-        chats.setdefault(row[0], {})[row[1]] = json.loads(row[2])
+    for row in conn.execute("SELECT key, value FROM chats"):
+        chats[row[0]] = json.loads(row[1])
 
     judges = {}
     for row in conn.execute("SELECT qid, value FROM judges"):
@@ -94,17 +94,7 @@ def save_history(data):
 
 
 def save_chats(data):
-    _init_db()
-    conn = _get_conn()
-    conn.execute("DELETE FROM chats")
-    for qid, entries in data.items():
-        for entry_id, value in entries.items():
-            conn.execute(
-                "INSERT INTO chats (qid, entry_id, value) VALUES (?, ?, ?)",
-                (qid, entry_id, json.dumps(value)),
-            )
-    conn.commit()
-    conn.close()
+    _replace_all("chats", data.items(), pk_col="key")
 
 
 def save_judges(data):
@@ -131,9 +121,6 @@ def _migrate_from_json():
         with open(filepath) as f:
             data = json.load(f)
         if pk_col is None:
-            if table == "history":
-                save_history(data)
-            elif table == "chats":
-                save_chats(data)
+            save_history(data)
         else:
             _replace_all(table, data.items(), pk_col=pk_col)
