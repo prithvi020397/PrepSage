@@ -2,9 +2,11 @@
 
 
 import re
+
+from app import client, MODEL, log
+
+
 def chat_content(resp):
-    import app as _app  # lazy: full app namespace (request-time)
-    globals().update({k: v for k, v in vars(_app).items() if not k.startswith('__')})
     """Safely pull text out of an OpenAI chat-completions response.
 
     The model intermittently returns an empty `content` (None), which used to crash every
@@ -21,8 +23,6 @@ def chat_content(resp):
 
 
 def _call_json_extract(prompt, max_tokens=1800):
-    import app as _app  # lazy: full app namespace (request-time)
-    globals().update({k: v for k, v in vars(_app).items() if not k.startswith('__')})
     """Call the LLM for a JSON-only extraction, with a truncation-safe retry.
     If the first response is cut off (finish_reason 'length'), retries once with a
     larger cap. Returns the cleaned response text, or None if both attempts fail."""

@@ -1,13 +1,29 @@
 # Phase 5 refactor — routes (verbatim from app.py).
+import json
+import re
+from datetime import datetime
+
 from flask import Blueprint
 from flask import jsonify, request, session, g, render_template, redirect, flash, current_app, send_file, url_for, abort
+
+from app import (
+    client, MODEL, log, QUESTIONS, HISTORY, is_solved, is_due, current_progress,
+    _stamp_taxonomy, _compute_concept_match, _compute_role_readiness,
+)
+from core.constants import CONCEPT_TAXONOMY
+from core.concepts import _normalize_concept
+from services.llm import chat_content, _call_json_extract
+from services.persistence import save_progress
+from services.extraction import (
+    _extract_text_from_resume, _clean_pdf_artifacts, _extraction_fallback_chain,
+    _extract_concepts_from_jd, _fallback_extract_jd,
+    _extract_skills_from_resume, _fallback_extract_resume,
+)
 
 bp = Blueprint('documents', __name__)
 
 @bp.route("/api/upload-jd", methods=["POST"])
 def upload_jd():
-    import app as _app  # lazy: entire app namespace (request-time)
-    globals().update({k: v for k, v in vars(_app).items() if not k.startswith('__')})
     """Accept a PDF/DOCX/TXT job description, extract concepts via LLM, store in progress."""
     file = request.files.get("jd")
     if not file:
@@ -33,7 +49,7 @@ def upload_jd():
     jd_data["filename"] = file.filename
     jd_data["_extraction_method"] = method
     _stamp_taxonomy(jd_data)
-    PROGRESS["_jd"] = jd_data
+    current_progress()["_jd"] = jd_data
     save_progress()
     return jsonify({"ok": True, "role_title": jd_data.get("role_title"),
                     "seniority": jd_data.get("seniority"),
@@ -45,17 +61,13 @@ def upload_jd():
 
 @bp.route("/api/jd", methods=["GET"])
 def get_jd():
-    import app as _app  # lazy: entire app namespace (request-time)
-    globals().update({k: v for k, v in vars(_app).items() if not k.startswith('__')})
     """Return stored JD concept data or empty."""
-    return jsonify(PROGRESS.get("_jd", {}))
+    return jsonify(current_progress().get("_jd", {}))
 
 
 
 @bp.route("/api/set-profile", methods=["POST"])
 def set_profile():
-    import app as _app  # lazy: entire app namespace (request-time)
-    globals().update({k: v for k, v in vars(_app).items() if not k.startswith('__')})
     """Generate a synthetic JD profile from role + industry + cloud via direct LLM prompt."""
     data = request.json or {}
     role = (data.get("role") or "").strip()
@@ -63,7 +75,7 @@ def set_profile():
     cloud = (data.get("cloud") or "").strip()
     if not role:
         return jsonify({"error": "Role is required"}), 400
-    resume = PROGRESS.get("_resume")
+    resume = current_progress().get("_resume")
     resume_text = (resume or {}).get("raw_text", "")
     concept_list = ", ".join(CONCEPT_TAXONOMY)
     prompt = f"""You are a technical interview coach. A user wants to practice for a target role.
@@ -111,7 +123,7 @@ Return ONLY this JSON — no markdown:
         "_extraction_method": "llm",
     }
     _stamp_taxonomy(jd_data)
-    PROGRESS["_jd"] = jd_data
+    current_progress()["_jd"] = jd_data
     save_progress()
     return jsonify({"ok": True, "role_title": jd_data.get("role_title"),
                     "concepts_required": len(jd_data.get("concepts_required", [])),
@@ -121,8 +133,6 @@ Return ONLY this JSON — no markdown:
 
 @bp.route("/api/upload-jd-text", methods=["POST"])
 def upload_jd_text():
-    import app as _app  # lazy: entire app namespace (request-time)
-    globals().update({k: v for k, v in vars(_app).items() if not k.startswith('__')})
     """Accept raw JD text (pasted), extract concepts via LLM, store in progress."""
     data = request.json or {}
     text = (data.get("text") or "").strip()
@@ -140,7 +150,7 @@ def upload_jd_text():
     jd_data["filename"] = "pasted"
     jd_data["_extraction_method"] = method
     _stamp_taxonomy(jd_data)
-    PROGRESS["_jd"] = jd_data
+    current_progress()["_jd"] = jd_data
     save_progress()
     return jsonify({"ok": True, "role_title": jd_data.get("role_title"),
                     "seniority": jd_data.get("seniority"),
@@ -152,8 +162,6 @@ def upload_jd_text():
 
 @bp.route("/api/upload-resume", methods=["POST"])
 def upload_resume():
-    import app as _app  # lazy: entire app namespace (request-time)
-    globals().update({k: v for k, v in vars(_app).items() if not k.startswith('__')})
     """Accept a PDF/DOCX/TXT resume, extract text, pull skills via LLM, store in progress."""
     file = request.files.get("resume")
     if not file:
@@ -179,7 +187,7 @@ def upload_resume():
     skills_data["filename"] = file.filename
     skills_data["_extraction_method"] = method
     _stamp_taxonomy(skills_data)
-    PROGRESS["_resume"] = skills_data
+    current_progress()["_resume"] = skills_data
     save_progress()
     # build summary for response
     skill_names = [s.get("name", s) if isinstance(s, dict) else s for s in skills_data.get("skills", [])]
@@ -192,20 +200,16 @@ def upload_resume():
 
 @bp.route("/api/resume", methods=["GET"])
 def get_resume():
-    import app as _app  # lazy: entire app namespace (request-time)
-    globals().update({k: v for k, v in vars(_app).items() if not k.startswith('__')})
     """Return stored resume data (skills, projects, domains) or empty."""
-    return jsonify(PROGRESS.get("_resume", {}))
+    return jsonify(current_progress().get("_resume", {}))
 
 
 
 @bp.route("/api/gap-alert", methods=["GET"])
 def gap_alert():
-    import app as _app  # lazy: entire app namespace (request-time)
-    globals().update({k: v for k, v in vars(_app).items() if not k.startswith('__')})
     """Compare resume-claimed skills against actual performance data.
     Returns a list of gaps: claimed skill with low or no accuracy."""
-    resume = PROGRESS.get("_resume")
+    resume = current_progress().get("_resume")
     if not resume:
         return jsonify({"gaps": [], "resume_loaded": False})
 
@@ -262,8 +266,6 @@ def gap_alert():
 
 @bp.route("/api/talk-about", methods=["POST"])
 def talk_about():
-    import app as _app  # lazy: entire app namespace (request-time)
-    globals().update({k: v for k, v in vars(_app).items() if not k.startswith('__')})
     """Generate interview follow-up questions for a resume project.
     Uses rich project data from resume extraction (specificity, interview probes)."""
     data = request.json
@@ -271,7 +273,7 @@ def talk_about():
     project_tech = data.get("tech", [])
     project_desc = data.get("one_liner", "")
 
-    resume = PROGRESS.get("_resume", {})
+    resume = current_progress().get("_resume", {})
     projects = resume.get("projects", [])
     project = next((p for p in projects if p.get("name") == project_name), None)
 
@@ -348,10 +350,8 @@ Respond ONLY with JSON — no markdown, no commentary:
 
 @bp.route("/api/study-plan", methods=["GET"])
 def study_plan():
-    import app as _app  # lazy: entire app namespace (request-time)
-    globals().update({k: v for k, v in vars(_app).items() if not k.startswith('__')})
     """Generate a personalized study plan based on resume + performance data."""
-    resume = PROGRESS.get("_resume")
+    resume = current_progress().get("_resume")
     if not resume:
         return jsonify({"plan": [], "resume_loaded": False})
 
@@ -381,11 +381,11 @@ def study_plan():
     unsolved_sql = sum(1 for q in QUESTIONS.values() if q["lang"] == "sql" and not is_solved(q["id"]))
     unsolved_py = sum(1 for q in QUESTIONS.values() if q["lang"] == "python" and not is_solved(q["id"]))
     unsolved_design = sum(1 for q in QUESTIONS.values() if q["lang"] == "design" and not is_solved(q["id"]))
-    due = sum(1 for qid in PROGRESS if is_due(qid))
+    due = sum(1 for qid in current_progress() if is_due(qid))
 
     # deadline info
     deadline_info = ""
-    deadline = PROGRESS.get("_deadline")
+    deadline = current_progress().get("_deadline")
     if isinstance(deadline, dict) and deadline.get("date"):
         days_left = (datetime.fromisoformat(deadline["date"]) - datetime.now()).days
         deadline_info = f"\nInterview in {days_left} days."
@@ -438,10 +438,8 @@ Respond ONLY with JSON — no markdown, no commentary:
 
 @bp.route("/api/claim-validation", methods=["GET"])
 def claim_validation():
-    import app as _app  # lazy: entire app namespace (request-time)
-    globals().update({k: v for k, v in vars(_app).items() if not k.startswith('__')})
     """Track which resume claims have been validated by practice performance."""
-    resume = PROGRESS.get("_resume")
+    resume = current_progress().get("_resume")
     if not resume:
         return jsonify({"validated": [], "unvalidated": [], "resume_loaded": False})
 
@@ -507,8 +505,6 @@ def claim_validation():
 
 @bp.route("/api/jd-gap", methods=["GET"])
 def jd_gap():
-    import app as _app  # lazy: entire app namespace (request-time)
-    globals().update({k: v for k, v in vars(_app).items() if not k.startswith('__')})
     """Tool-to-concept gap analysis between the loaded JD and resume."""
     return jsonify(_compute_concept_match())
 
@@ -516,12 +512,11 @@ def jd_gap():
 
 @bp.route("/api/jd-confirm", methods=["POST"])
 def jd_confirm():
-    import app as _app  # lazy: entire app namespace (request-time)
-    globals().update({k: v for k, v in vars(_app).items() if not k.startswith('__')})
     """Self-attest that a JD concept has been handled (even if the resume didn't
     evidence it). Stored on the JD record so it persists across re-renders and
     re-uploads. Toggling the same concept off removes the confirmation."""
-    jd = PROGRESS.get("_jd")
+    progress = current_progress()
+    jd = progress.get("_jd")
     if not jd:
         return jsonify({"error": "no JD loaded"}), 400
     data = request.json or {}
@@ -535,7 +530,7 @@ def jd_confirm():
     else:
         confirmed.discard(concept)
     jd["user_confirmed"] = sorted(confirmed)
-    PROGRESS["_jd"] = jd
+    progress["_jd"] = jd
     save_progress()
     return jsonify({"ok": True, "user_confirmed": sorted(confirmed)})
 
@@ -543,8 +538,6 @@ def jd_confirm():
 
 @bp.route("/api/role-readiness", methods=["GET"])
 def role_readiness():
-    import app as _app  # lazy: entire app namespace (request-time)
-    globals().update({k: v for k, v in vars(_app).items() if not k.startswith('__')})
     """Composite readiness + framed practice for the loaded JD."""
     return jsonify(_compute_role_readiness())
 
@@ -552,12 +545,11 @@ def role_readiness():
 
 @bp.route("/api/reparse-stale", methods=["POST"])
 def reparse_stale():
-    import app as _app  # lazy: entire app namespace (request-time)
-    globals().update({k: v for k, v in vars(_app).items() if not k.startswith('__')})
     """Re-extract concepts from stored raw text when taxonomy changes.
     Returns the number of concepts extracted for both resume and JD."""
-    jd = PROGRESS.get("_jd")
-    resume = PROGRESS.get("_resume")
+    progress = current_progress()
+    jd = progress.get("_jd")
+    resume = progress.get("_resume")
     result = {}
     if jd and jd.get("raw_text"):
         jd_data, method = _extraction_fallback_chain(
@@ -569,7 +561,7 @@ def reparse_stale():
             jd_data["filename"] = jd.get("filename", "reparsed")
             jd_data["_extraction_method"] = method
             _stamp_taxonomy(jd_data)
-            PROGRESS["_jd"] = jd_data
+            progress["_jd"] = jd_data
             result["jd"] = len(jd_data.get("concepts_required", []))
     if resume and resume.get("raw_text"):
         cleaned_text = _clean_pdf_artifacts(resume["raw_text"])
@@ -582,7 +574,7 @@ def reparse_stale():
             skills_data["filename"] = resume.get("filename", "reparsed")
             skills_data["_extraction_method"] = method
             _stamp_taxonomy(skills_data)
-            PROGRESS["_resume"] = skills_data
+            progress["_resume"] = skills_data
             result["resume"] = len(skills_data.get("skills", []))
     save_progress()
     return jsonify({"ok": True, **result})

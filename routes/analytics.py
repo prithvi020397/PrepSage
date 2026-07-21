@@ -1,32 +1,36 @@
 # Phase 5 refactor — routes (verbatim from app.py).
+from datetime import datetime, timedelta
+
 from flask import Blueprint
 from flask import jsonify, request, session, g, render_template, redirect, flash, current_app, send_file, url_for, abort
+
+from app import HISTORY, QUESTIONS, client, MODEL, log, current_progress, _parse_review_sections
+from core.questions import topic_for
+from services.llm import chat_content
+from services.persistence import save_progress
 
 bp = Blueprint('analytics', __name__)
 
 @bp.route("/api/deadline", methods=["GET", "POST"])
 def deadline():
-    import app as _app  # lazy: entire app namespace (request-time)
-    globals().update({k: v for k, v in vars(_app).items() if not k.startswith('__')})
     # ponytail: reuses PROGRESS's flat dict with a reserved "_deadline" key instead of a new file —
     # every PROGRESS.items() loop elsewhere already guards with `oid in QUESTIONS`, so this is safe.
+    progress = current_progress()
     if request.method == "POST":
         date_str = (request.json or {}).get("deadline", "").strip()
         if date_str:
             datetime.fromisoformat(date_str)  # raises ValueError -> 500 on bad input, fine for a solo local tool
-            PROGRESS["_deadline"] = {"date": date_str}
+            progress["_deadline"] = {"date": date_str}
         else:
-            PROGRESS.pop("_deadline", None)
+            progress.pop("_deadline", None)
         save_progress()
-    d = PROGRESS.get("_deadline")
+    d = progress.get("_deadline")
     return jsonify({"deadline": d["date"] if isinstance(d, dict) else None})
 
 
 
 @bp.route("/api/streak", methods=["GET"])
 def streak():
-    import app as _app  # lazy: entire app namespace (request-time)
-    globals().update({k: v for k, v in vars(_app).items() if not k.startswith('__')})
     """Phase 10: streak tracking — days with at least one practice event, plus today's count."""
     days = {}
     for h in HISTORY:
@@ -54,8 +58,6 @@ def streak():
 
 @bp.route("/api/takeaways", methods=["POST"])
 def takeaways():
-    import app as _app  # lazy: entire app namespace (request-time)
-    globals().update({k: v for k, v in vars(_app).items() if not k.startswith('__')})
     """Phase 2: distill a finished question/debrief into exactly 3 prioritized takeaways so
     the candidate leaves each session with a short, memorable list instead of a wall of text.
     Reuses the signals the debrief already computes (missed concepts, rubric gaps, weak topic)."""
@@ -103,8 +105,6 @@ def takeaways():
 
 @bp.route("/api/review", methods=["POST"])
 def review():
-    import app as _app  # lazy: entire app namespace (request-time)
-    globals().update({k: v for k, v in vars(_app).items() if not k.startswith('__')})
     data = request.json
     q = QUESTIONS.get(data["question_id"])
     if not q:

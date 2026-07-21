@@ -275,6 +275,29 @@ JUDGES_FILE = "judges.json"
 # after the session ends, without re-running the judge model.
 JUDGES = json.load(open(JUDGES_FILE)) if os.path.exists(JUDGES_FILE) else {}
 
+# Phase 0 — accessors for the module globals _req_start() rebinds per-request.
+# Route/service modules must call these instead of importing PROGRESS/CHATS/JUDGES/
+# REPLAY_COMMENTS by value: a plain `from app import PROGRESS` captures whatever
+# object existed at import time (app startup) and goes stale the moment _req_start()
+# rebinds the name for a later request. These functions live in app.py itself, so
+# the bare names inside them resolve against app.py's *current* globals at call
+# time — always correct, no flask.g or extra plumbing needed.
+def current_progress():
+    return PROGRESS
+
+
+def current_chats():
+    return CHATS
+
+
+def current_judges():
+    return JUDGES
+
+
+def current_replay_comments():
+    return REPLAY_COMMENTS
+
+
 PRECOMPUTED_TRACES = (
     json.load(open("traces.json")) if os.path.exists("traces.json") else {}
 )

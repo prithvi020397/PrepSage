@@ -1,6 +1,15 @@
 # Phase 5 refactor — routes (verbatim from app.py).
+import os
+
 from flask import Blueprint
 from flask import jsonify, request, session, g, render_template, redirect, flash, current_app, send_file, url_for, abort
+
+from app import (
+    SUPABASE_ENABLED, sb, LEGACY_FAKE_TOKEN, log, TEST_EMAIL, TEST_PASSWORD,
+    QUESTIONS, _reset_entry, current_progress,
+    PROGRESS_FILE, HISTORY_FILE, CHATS_FILE, REPLAY_COMMENTS_FILE, JUDGES_FILE,
+)
+from services.persistence import save_progress, current_user_id
 
 bp = Blueprint('auth', __name__)
 
@@ -12,8 +21,6 @@ def auth_pages():
 
 @bp.route("/api/signup", methods=["POST"])
 def api_signup():
-    import app as _app  # lazy: entire app namespace (request-time)
-    globals().update({k: v for k, v in vars(_app).items() if not k.startswith('__')})
     if not SUPABASE_ENABLED or sb is None:
         data = request.json or {}
         return jsonify({
@@ -61,8 +68,6 @@ def api_signup():
 
 @bp.route("/api/login", methods=["POST"])
 def api_login():
-    import app as _app  # lazy: entire app namespace (request-time)
-    globals().update({k: v for k, v in vars(_app).items() if not k.startswith('__')})
     if not SUPABASE_ENABLED or sb is None:
         data = request.json or {}
         return jsonify({
@@ -94,13 +99,11 @@ def api_login():
 
 @bp.route("/api/test-login", methods=["POST"])
 def api_test_login():
-    import app as _app  # lazy: entire app namespace (request-time)
-    globals().update({k: v for k, v in vars(_app).items() if not k.startswith('__')})
     """Login or signup a test user. If ?fresh=1, wipe progress first."""
     if not SUPABASE_ENABLED or sb is None:
         fresh = request.args.get("fresh") == "1"
         if fresh:
-            PROGRESS.clear()
+            current_progress().clear()
             save_progress()
         return jsonify({
             "access_token": LEGACY_FAKE_TOKEN,
@@ -113,7 +116,7 @@ def api_test_login():
         return jsonify({"error": "supabase client unavailable"}), 500
     fresh = request.args.get("fresh") == "1"
     if fresh:
-        PROGRESS.clear()
+        current_progress().clear()
         save_progress()
     # try login first
     session = None
@@ -156,8 +159,6 @@ def api_test_login():
 
 @bp.route("/api/me", methods=["GET"])
 def api_me():
-    import app as _app  # lazy: entire app namespace (request-time)
-    globals().update({k: v for k, v in vars(_app).items() if not k.startswith('__')})
     if not SUPABASE_ENABLED or sb is None:
         return jsonify({"user_id": None, "mode": "legacy"})
     uid = current_user_id()
@@ -174,8 +175,6 @@ def api_me():
 
 @bp.route("/api/reset-question/<qid>", methods=["POST"])
 def reset_question(qid):
-    import app as _app  # lazy: entire app namespace (request-time)
-    globals().update({k: v for k, v in vars(_app).items() if not k.startswith('__')})
     if qid not in QUESTIONS:
         return jsonify({"error": "not found"}), 404
     _reset_entry(qid)
@@ -186,8 +185,6 @@ def reset_question(qid):
 
 @bp.route("/api/reset-category/<lang>", methods=["POST"])
 def reset_category(lang):
-    import app as _app  # lazy: entire app namespace (request-time)
-    globals().update({k: v for k, v in vars(_app).items() if not k.startswith('__')})
     if lang not in ("sql", "python", "design", "tradeoff"):
         return jsonify({"error": "unknown lang"}), 404
     for qid, q in QUESTIONS.items():
@@ -200,8 +197,6 @@ def reset_category(lang):
 
 @bp.route("/api/start-over", methods=["POST"])
 def start_over():
-    import app as _app  # lazy: entire app namespace (request-time)
-    globals().update({k: v for k, v in vars(_app).items() if not k.startswith('__')})
     # ponytail: full clean slate — wipes every persistence file so the dashboard reads 0/N
     # with no streaks, due reviews, saved code, chat history, or replay comments. Distinct
     # from /api/reset-category which only clears working state and keeps solved credit.

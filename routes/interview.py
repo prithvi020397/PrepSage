@@ -1,13 +1,34 @@
 # Phase 5 refactor — routes (verbatim from app.py).
+import json
+import random
+import time
+from datetime import datetime
+
+import requests
 from flask import Blueprint
 from flask import jsonify, request, session, g, render_template, redirect, flash, current_app, send_file, url_for, abort
+
+from app import (
+    QUESTIONS, ATTEMPTS,
+    client, MODEL, log, DEEPGRAM_API_KEY, CALIBRATION_FIXTURES, TRADEOFF_ROLLS,
+    REQUIREMENTS_ONLY_RULES, ADVERSARIAL_PERSONAS, ADVERSARIAL_RULES, PERSONAS,
+    SCALING_TIERS, INCIDENT_RULES, DECOMPOSITION_RULES, V2_SCENARIOS, JUDGE_RUBRIC,
+    SOLUTION_WORDS, CONSTRAINT_WORDS, OVERSIMPLIFY_WORDS, RISK_WORDS,
+    current_progress, current_chats, current_judges, current_replay_comments,
+    is_due, is_solved,
+    log_history, schedule_review, recurring_missed_concepts, recurring_missed_topics,
+    _replay_chat_key, _generate_report,
+)
+from core.constants import CONCEPT_TAXONOMY, TOPIC_KEYWORDS, DESIGN_RUBRIC_44, RETRO_QUESTIONS
+from core.questions import persona_for, baseline_rubric_for, war_stories_for, taxonomy_for, topic_for
+from services.llm import chat_content
+from services.grading import WHITEBOARD_WRAP_RE, run_judge, split_wrap_up_reply, hire_verdict
+from services.persistence import save_chats, save_judges, save_replay_comments
 
 bp = Blueprint('interview', __name__)
 
 @bp.route("/api/interview", methods=["POST"])
 def interview():
-    import app as _app  # lazy: entire app namespace (request-time)
-    globals().update({k: v for k, v in vars(_app).items() if not k.startswith('__')})
     data = request.json or {}
     qid = data.get("question_id")
     if not qid:
@@ -153,7 +174,7 @@ What's happening: {q['prompt']}
             persona_note = f"\n\nInterviewer persona for this session: {PERSONAS[persona_key]}"
 
         resume_note = ""
-        resume = PROGRESS.get("_resume")
+        resume = current_progress().get("_resume")
         if resume and data.get("start"):
             domains_raw = resume.get("domains", [])[:3]
             skills_raw = resume.get("skills", [])[:4]
@@ -277,7 +298,8 @@ Rules:
     if diagram and not is_meta:
         user_turn = f"[Candidate's current whiteboard]\n{diagram}\n\n[Candidate says]\n{user_turn}"
 
-    history = CHATS.get(chat_key, [])
+    chats = current_chats()
+    history = chats.get(chat_key, [])
     if is_meta:
         # Meta instructions (start/wrap_up/end_drill) go to the LLM
         # but are NOT persisted in chat history — prevents confusion
@@ -285,7 +307,7 @@ Rules:
         llm_messages = [{"role": "system", "content": system_prompt}] + history + [{"role": "user", "content": user_turn}]
     else:
         history.append({"role": "user", "content": user_turn})
-        CHATS[chat_key] = history
+        chats[chat_key] = history
         llm_messages = [{"role": "system", "content": system_prompt}] + history
 
     reply_max_tokens = 700 if (data.get("wrap_up") or data.get("end_drill")) else 400
@@ -297,23 +319,23 @@ Rules:
     except Exception as e:
         if not is_meta:
             history.pop()
-            CHATS[chat_key] = history
+            chats[chat_key] = history
         return jsonify({"error": str(e)}), 502
     reply = resp.choices[0].message.content
     if not reply:
         if not is_meta:
             history.pop()
-            CHATS[chat_key] = history
+            chats[chat_key] = history
         return jsonify({"error": "model returned an empty response — try again"}), 502
 
     if not is_meta:
         history.append({"role": "assistant", "content": reply})
-        CHATS[chat_key] = history
+        chats[chat_key] = history
         save_chats()
     elif data.get("start"):
         # Persist the opening statement so it survives page reloads
         history.append({"role": "assistant", "content": reply})
-        CHATS[chat_key] = history
+        chats[chat_key] = history
         save_chats()
 
     prose_reply = reply
@@ -358,7 +380,7 @@ Rules:
             log_history({"event": "fde_debrief", "qid": qid,
                          "judge_verdict": judge_result.get("band"),
                          "normalized_score": judge_result.get("normalized_score")})
-            JUDGES[chat_key] = judge_result
+            current_judges()[chat_key] = judge_result
             save_judges()
             return jsonify({"reply": prose_reply, "wrap_up": True,
                              "decomposition": True,
@@ -391,19 +413,17 @@ Rules:
 
 @bp.route("/api/export", methods=["POST"])
 def export_session():
-    import app as _app  # lazy: entire app namespace (request-time)
-    globals().update({k: v for k, v in vars(_app).items() if not k.startswith('__')})
     data = request.json
     qid = data.get("question_id", "")
     if not qid:
         return jsonify({"error": "question_id required"}), 400
     decomposition = bool(data.get("decomposition"))
     chat_key = qid + (":decomposition" if decomposition else "")
-    turns = CHATS.get(chat_key, [])
+    turns = current_chats().get(chat_key, [])
     if not turns:
         return jsonify({"error": f"Session not found for {chat_key}"}), 404
     q = QUESTIONS.get(qid) or V2_SCENARIOS.get(qid) or {}
-    judge_result = JUDGES.get(chat_key) if decomposition else None
+    judge_result = current_judges().get(chat_key) if decomposition else None
     md = _generate_report(qid, q, turns, judge_result)
     return md, 200, {"Content-Type": "text/markdown; charset=utf-8"}
 
@@ -411,8 +431,6 @@ def export_session():
 
 @bp.route("/api/calibration", methods=["POST"])
 def calibration():
-    import app as _app  # lazy: entire app namespace (request-time)
-    globals().update({k: v for k, v in vars(_app).items() if not k.startswith('__')})
     data = request.json
     qid = data.get("question_id", "")
     if not qid:
@@ -447,8 +465,6 @@ def calibration():
 
 @bp.route("/api/transcribe", methods=["POST"])
 def transcribe_audio():
-    import app as _app  # lazy: entire app namespace (request-time)
-    globals().update({k: v for k, v in vars(_app).items() if not k.startswith('__')})
     if not DEEPGRAM_API_KEY:
         return jsonify({"error": "Deepgram API key not configured"}), 500
     if "audio" not in request.files:
@@ -485,8 +501,6 @@ def transcribe_audio():
 
 @bp.route("/api/tts", methods=["POST"])
 def text_to_speech():
-    import app as _app  # lazy: entire app namespace (request-time)
-    globals().update({k: v for k, v in vars(_app).items() if not k.startswith('__')})
     if not DEEPGRAM_API_KEY:
         return jsonify({"error": "Deepgram API key not configured"}), 500
     data = request.json
@@ -514,8 +528,6 @@ def text_to_speech():
 
 @bp.route("/api/coach", methods=["POST"])
 def coach():
-    import app as _app  # lazy: entire app namespace (request-time)
-    globals().update({k: v for k, v in vars(_app).items() if not k.startswith('__')})
     data = request.json
     msg = (data.get("message") or "").strip()
     turn = int(data.get("turn", 1))
@@ -551,8 +563,6 @@ def coach():
 
 @bp.route("/api/interview-history")
 def interview_history():
-    import app as _app  # lazy: entire app namespace (request-time)
-    globals().update({k: v for k, v in vars(_app).items() if not k.startswith('__')})
     """Replays a design interview's chat turns paired with the whiteboard state as it stood at
     each turn — reuses CHATS as-is (the diagram is already embedded in each user turn's stored
     content), no separate snapshot storage needed."""
@@ -566,7 +576,7 @@ def interview_history():
 
     turns = []
     diagram = ""
-    for msg in CHATS.get(chat_key, []):
+    for msg in current_chats().get(chat_key, []):
         content = msg["content"]
         if msg["role"] == "user":
             m = WHITEBOARD_WRAP_RE.match(content)
@@ -583,19 +593,15 @@ def interview_history():
 
 @bp.route("/api/replay-comments")
 def replay_comments():
-    import app as _app  # lazy: entire app namespace (request-time)
-    globals().update({k: v for k, v in vars(_app).items() if not k.startswith('__')})
     """Comments anchored to a turn index in a shared replay link — same chat_key as
     interview-history, so no separate lookup/auth needed to find the right thread."""
     chat_key = _replay_chat_key(request.args)
-    return jsonify({"comments": REPLAY_COMMENTS.get(chat_key, [])})
+    return jsonify({"comments": current_replay_comments().get(chat_key, [])})
 
 
 
 @bp.route("/api/replay-comment", methods=["POST"])
 def replay_comment():
-    import app as _app  # lazy: entire app namespace (request-time)
-    globals().update({k: v for k, v in vars(_app).items() if not k.startswith('__')})
     data = request.json
     chat_key = _replay_chat_key(data)
     text = (data.get("text") or "").strip()
@@ -604,7 +610,7 @@ def replay_comment():
     if not text or not isinstance(turn_idx, int):
         return jsonify({"error": "text and turn_idx required"}), 400
     comment = {"turn_idx": turn_idx, "author": author, "text": text, "ts": datetime.now().isoformat()}
-    REPLAY_COMMENTS.setdefault(chat_key, []).append(comment)
+    current_replay_comments().setdefault(chat_key, []).append(comment)
     save_replay_comments()
     return jsonify({"comment": comment})
 
@@ -612,8 +618,6 @@ def replay_comment():
 
 @bp.route("/api/postmortem", methods=["POST"])
 def postmortem():
-    import app as _app  # lazy: entire app namespace (request-time)
-    globals().update({k: v for k, v in vars(_app).items() if not k.startswith('__')})
     """Log a question from a REAL interview (not this app), classify it against the same taxonomy
     used for practice questions, and fold it into HISTORY so it counts toward weak-areas/mastery
     tracking exactly like a practice miss would."""
@@ -663,8 +667,6 @@ Respond ONLY strict JSON, no markdown fences, no commentary:
 
 @bp.route("/api/reference-design", methods=["POST"])
 def reference_design():
-    import app as _app  # lazy: entire app namespace (request-time)
-    globals().update({k: v for k, v in vars(_app).items() if not k.startswith('__')})
     """Post-hoc only — called after wrap-up, never during the live interview."""
     data = request.json
     q = QUESTIONS.get(data["question_id"])
@@ -707,8 +709,6 @@ Respond ONLY strict JSON, no markdown fences, no commentary:
 
 @bp.route("/api/adversarial-design", methods=["POST"])
 def adversarial_design():
-    import app as _app  # lazy: entire app namespace (request-time)
-    globals().update({k: v for k, v in vars(_app).items() if not k.startswith('__')})
     """Generates a flawed reference design + its flaw list to seed the whiteboard before an
     adversarial 'break this design' drill starts. The flaw list never reaches the client verbatim
     as text — the frontend only uses it to prime /api/interview's system prompt server-side."""
@@ -751,8 +751,6 @@ Respond ONLY strict JSON, no markdown fences, no commentary:
 
 @bp.route("/api/incident-scenario", methods=["POST"])
 def incident_scenario():
-    import app as _app  # lazy: entire app namespace (request-time)
-    globals().update({k: v for k, v in vars(_app).items() if not k.startswith('__')})
     """Generates a vivid failure scenario for the 3am stress-test drill, grounded in
     the design question's scenario."""
     data = request.json
@@ -796,8 +794,6 @@ Respond ONLY strict JSON, no markdown fences:
 
 @bp.route("/api/staff-comparison", methods=["POST"])
 def staff_comparison():
-    import app as _app  # lazy: entire app namespace (request-time)
-    globals().update({k: v for k, v in vars(_app).items() if not k.startswith('__')})
     """After a design interview, generates a side-by-side 'what you said vs what a Staff
     engineer would have said' comparison at key decision points."""
     data = request.json
@@ -809,7 +805,7 @@ def staff_comparison():
     scaling = bool(data.get("scaling"))
     incident = bool(data.get("incident"))
     chat_key = data["question_id"] + (":adversarial" if adversarial else (":scaling" if scaling else (":incident" if incident else "")))
-    turns = CHATS.get(chat_key, [])
+    turns = current_chats().get(chat_key, [])
     if len(turns) < 3:
         return jsonify({"error": "not enough conversation to compare — have a few more exchanges first"}), 400
 
@@ -853,14 +849,12 @@ Respond ONLY strict JSON, no markdown fences:
 
 @bp.route("/api/tradeoff-regenerate", methods=["POST"])
 def tradeoff_regenerate():
-    import app as _app  # lazy: entire app namespace (request-time)
-    globals().update({k: v for k, v in vars(_app).items() if not k.startswith('__')})
     data = request.json
     q = QUESTIONS.get(data["question_id"])
     if not q or q["lang"] != "tradeoff":
         return jsonify({"error": "not found"}), 404
 
-    resume = PROGRESS.get("_resume")
+    resume = current_progress().get("_resume")
     resume_hint = ""
     if resume:
         skills_raw = resume.get("skills", [])[:5]
@@ -901,8 +895,6 @@ Respond ONLY strict JSON, no markdown fences, no commentary:
 
 @bp.route("/api/tradeoff-grade", methods=["POST"])
 def tradeoff_grade():
-    import app as _app  # lazy: entire app namespace (request-time)
-    globals().update({k: v for k, v in vars(_app).items() if not k.startswith('__')})
     data = request.json
     q = QUESTIONS.get(data["question_id"])
     if not q or q["lang"] != "tradeoff":
@@ -956,8 +948,6 @@ Respond with ONLY strict JSON, no markdown fences, no commentary:
 
 @bp.route("/api/tradeoff-spar", methods=["POST"])
 def tradeoff_spar():
-    import app as _app  # lazy: entire app namespace (request-time)
-    globals().update({k: v for k, v in vars(_app).items() if not k.startswith('__')})
     """Back-and-forth debate on a tradeoff drill — reuses the CHATS persistence pattern with a
     ':spar' chat_key, same as the design chat's ':clarify'/':adversarial' suffixes."""
     data = request.json
@@ -984,7 +974,7 @@ Rules:
 - Stay concrete and scenario-specific, never generic. 2-4 sentences, no preamble."""
 
     chat_key = q["id"] + ":spar"
-    history = CHATS.setdefault(chat_key, [])
+    history = current_chats().setdefault(chat_key, [])
     history.append({"role": "user", "content": message})
     try:
         resp = client.chat.completions.create(
@@ -1010,8 +1000,6 @@ Rules:
 
 @bp.route("/api/start")
 def smart_start():
-    import app as _app  # lazy: entire app namespace (request-time)
-    globals().update({k: v for k, v in vars(_app).items() if not k.startswith('__')})
     """Phase 1: one-tap entry. Picks the single most useful question to do right now:
     a due review > a weak-area unsolved > resume-matched unsolved > otherwise the next unsolved one.
     Accepts ?lane=focused|weak|mock to bias the pick (the practice command-center lanes)."""
@@ -1037,7 +1025,7 @@ def smart_start():
         return jsonify({"id": weak_hits[0][0], "reason": "weak_area"})
 
     # resume-skill bias: if resume uploaded, prefer questions matching claimed skills/domains
-    resume = PROGRESS.get("_resume")
+    resume = current_progress().get("_resume")
     if resume:
         claimed = [s.lower() for s in resume.get("skills", []) + resume.get("domains", [])]
         if claimed:

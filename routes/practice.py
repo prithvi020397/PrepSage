@@ -1,13 +1,34 @@
 # Phase 5 refactor — routes (verbatim from app.py).
+import difflib
+import json
+import os
+import random
+import re
+import subprocess
+import tempfile
+
 from flask import Blueprint
 from flask import jsonify, request, session, g, render_template, redirect, flash, current_app, send_file, url_for, abort
+
+from app import (
+    QUESTIONS, HISTORY, ATTEMPTS, STRUGGLES, PENDING_RECALL, PENDING_DRYRUN,
+    TRADEOFF_ROLLS, CURVEBALLS, REVERSE_STATE, REVERSE_SYSTEM, SOLUTION_CACHE,
+    CONCEPT_MAP_NODES, PRECOMPUTED_CONTEXTS, PRECOMPUTED_SOLUTIONS,
+    PRECOMPUTED_CONCEPTS, PRECOMPUTED_TRACES,
+    client, MODEL, log, fc, has_blocker,
+    current_progress, current_chats, is_solved, is_due,
+    _gen_question_context, _exec_case, log_history, schedule_review, recurring_missed_topics,
+)
+from core.constants import WAR_STORIES_CODE
+from core.questions import topic_for, pattern_for
+from services.llm import chat_content
+from services.execution import get_sample_tables
+from services.persistence import save_progress, save_chats
 
 bp = Blueprint('practice', __name__)
 
 @bp.route("/api/questions")
 def list_questions():
-    import app as _app  # lazy: entire app namespace (request-time)
-    globals().update({k: v for k, v in vars(_app).items() if not k.startswith('__')})
     return jsonify([{"id": q["id"], "title": q["title"], "lang": q["lang"], "difficulty": q.get("difficulty"),
                       "solved": is_solved(q["id"]), "due": is_due(q["id"])}
                      for q in QUESTIONS.values()])
@@ -16,13 +37,12 @@ def list_questions():
 
 @bp.route("/api/mock-loop/start")
 def mock_loop_start():
-    import app as _app  # lazy: entire app namespace (request-time)
-    globals().update({k: v for k, v in vars(_app).items() if not k.startswith('__')})
     """Picks one SQL-or-Python + one design + one tradeoff question for a chained mock
     interview — biased toward unsolved ones, falling back to the full pool if everything
     in that category is already solved. Resume-aware: favors questions matching the
     candidate's claimed domains and skills."""
-    resume = PROGRESS.get("_resume")
+    progress = current_progress()
+    resume = progress.get("_resume")
     resume_domains = []
     resume_skills = []
     if resume:
@@ -30,7 +50,7 @@ def mock_loop_start():
         resume_skills = [s.get("name", s).lower() if isinstance(s, dict) else s.lower()
                          for s in resume.get("skills", [])]
 
-    jd = PROGRESS.get("_jd")
+    jd = progress.get("_jd")
     jd_hints = []
     if jd:
         # translate JD concepts -> search hints so frameable questions surface
@@ -97,8 +117,6 @@ def mock_loop_start():
 
 @bp.route("/api/mock-loop/report")
 def mock_loop_report():
-    import app as _app  # lazy: entire app namespace (request-time)
-    globals().update({k: v for k, v in vars(_app).items() if not k.startswith('__')})
     """Final report for a mock-loop run — reuses PROGRESS + HISTORY as-is rather than
     tracking loop state server-side; the frontend already knows how to render each
     event type's payload since it renders the same shape live during solving."""
@@ -119,8 +137,6 @@ def mock_loop_report():
 
 @bp.route("/api/questions/<qid>")
 def get_question(qid):
-    import app as _app  # lazy: entire app namespace (request-time)
-    globals().update({k: v for k, v in vars(_app).items() if not k.startswith('__')})
     q = QUESTIONS.get(qid)
     if not q:
         return jsonify({"error": "not found"}), 404
@@ -138,7 +154,7 @@ def get_question(qid):
             resp["prompt"] = roll["prompt"] if roll else q["prompt"]
         return jsonify(resp)
     first_case = q["test_cases"][0]
-    p = PROGRESS.get(qid, {})
+    p = current_progress().get(qid, {})
     saved_code = p.get("code", "") if isinstance(p, dict) else ""
     resp = {"id": q["id"], "lang": q["lang"], "title": q["title"], "prompt": q["prompt"],
             "starter_code": q["starter_code"], "code": saved_code, "concept": q["concept"],
@@ -173,8 +189,6 @@ def get_question(qid):
 
 @bp.route("/api/run", methods=["POST"])
 def run():
-    import app as _app  # lazy: entire app namespace (request-time)
-    globals().update({k: v for k, v in vars(_app).items() if not k.startswith('__')})
     """Sample-only check: no grading, no attempt/struggle tracking."""
     data = request.json
     q = QUESTIONS.get(data["question_id"])
@@ -190,8 +204,6 @@ def run():
 
 @bp.route("/api/debug", methods=["POST"])
 def debug():
-    import app as _app  # lazy: entire app namespace (request-time)
-    globals().update({k: v for k, v in vars(_app).items() if not k.startswith('__')})
     """Step-by-step variable walkthrough for Python questions using sys.settrace."""
     data = request.json
     q = QUESTIONS.get(data["question_id"])
@@ -274,8 +286,6 @@ print("__DEBUG_END__")
 
 @bp.route("/api/diff", methods=["POST"])
 def diff():
-    import app as _app  # lazy: entire app namespace (request-time)
-    globals().update({k: v for k, v in vars(_app).items() if not k.startswith('__')})
     data = request.json
     q = QUESTIONS.get(data["question_id"])
     if not q or q["lang"] not in ("sql", "python"):
@@ -358,17 +368,16 @@ Explain in one short sentence why this difference matters conceptually — not j
 
 @bp.route("/api/submit", methods=["POST"])
 def submit():
-    import app as _app  # lazy: entire app namespace (request-time)
-    globals().update({k: v for k, v in vars(_app).items() if not k.startswith('__')})
     data = request.json
     q = QUESTIONS.get(data["question_id"])
     if not q:
         return jsonify({"error": "not found"}), 404
     code = data["code"]
     # save code
-    p = PROGRESS.get(q["id"], {})
+    progress = current_progress()
+    p = progress.get(q["id"], {})
     if isinstance(p, dict):
-        PROGRESS[q["id"]] = p
+        progress[q["id"]] = p
         p["code"] = code
         save_progress()
 
@@ -395,8 +404,6 @@ def submit():
 
 @bp.route("/api/check-approach", methods=["POST"])
 def check_approach():
-    import app as _app  # lazy: entire app namespace (request-time)
-    globals().update({k: v for k, v in vars(_app).items() if not k.startswith('__')})
     data = request.json
     q = QUESTIONS.get(data["question_id"])
     if not q:
@@ -439,8 +446,6 @@ Respond with ONLY strict JSON, no markdown fences, no commentary:
 
 @bp.route("/api/spot-bug", methods=["POST"])
 def spot_bug():
-    import app as _app  # lazy: entire app namespace (request-time)
-    globals().update({k: v for k, v in vars(_app).items() if not k.startswith('__')})
     """SQL/Python's version of adversarial-design: generates plausible-but-buggy code with
     one deliberate concept-tagged bug baked in, for a 'find the bug' drill instead of write-from-scratch.
     Mirrors adversarial_design's pattern of round-tripping the ground truth through the client, hidden
@@ -480,8 +485,6 @@ Respond ONLY strict JSON, no markdown fences, no commentary:
 
 @bp.route("/api/spot-bug-grade", methods=["POST"])
 def spot_bug_grade():
-    import app as _app  # lazy: entire app namespace (request-time)
-    globals().update({k: v for k, v in vars(_app).items() if not k.startswith('__')})
     data = request.json
     q = QUESTIONS.get(data["question_id"])
     if not q or q["lang"] not in ("sql", "python"):
@@ -521,8 +524,6 @@ Respond with ONLY strict JSON, no markdown fences, no commentary:
 
 @bp.route("/api/reverse", methods=["POST"])
 def reverse():
-    import app as _app  # lazy: entire app namespace (request-time)
-    globals().update({k: v for k, v in vars(_app).items() if not k.startswith('__')})
     data = request.json
     q = QUESTIONS.get(data["question_id"])
     if not q or q["lang"] not in ("sql", "python"):
@@ -614,8 +615,6 @@ Code: ```{q['lang']}
 
 @bp.route("/api/curveball", methods=["POST"])
 def curveball():
-    import app as _app  # lazy: entire app namespace (request-time)
-    globals().update({k: v for k, v in vars(_app).items() if not k.startswith('__')})
     """Mid-solve requirement change: interviewer changes the ask while the candidate is still coding,
     instead of a fresh problem. Reuses the check-approach LLM-judge pattern, applied to code instead of a plan."""
     data = request.json
@@ -667,8 +666,6 @@ Respond ONLY strict JSON, no markdown fences, no commentary:
 
 @bp.route("/api/fresh-angle", methods=["POST"])
 def fresh_angle():
-    import app as _app  # lazy: entire app namespace (request-time)
-    globals().update({k: v for k, v in vars(_app).items() if not k.startswith('__')})
     """Standalone hybrid endpoint: a web-sourced real-world framing for a question's concept.
 
     Returns {"angle": <text>} on success or {"angle": null} when Firecrawl is unavailable / failed,
@@ -687,8 +684,6 @@ def fresh_angle():
 
 @bp.route("/api/curveball-grade", methods=["POST"])
 def curveball_grade():
-    import app as _app  # lazy: entire app namespace (request-time)
-    globals().update({k: v for k, v in vars(_app).items() if not k.startswith('__')})
     data = request.json
     q = QUESTIONS.get(data["question_id"])
     if not q or q["lang"] not in ("sql", "python"):
@@ -735,8 +730,6 @@ Respond with ONLY strict JSON, no markdown fences, no commentary:
 
 @bp.route("/api/debrief", methods=["POST"])
 def debrief():
-    import app as _app  # lazy: entire app namespace (request-time)
-    globals().update({k: v for k, v in vars(_app).items() if not k.startswith('__')})
     data = request.json
     q = QUESTIONS.get(data["question_id"])
     if not q:
@@ -813,8 +806,6 @@ Respond with ONLY strict JSON, no markdown fences, no commentary:
 
 @bp.route("/api/whatif", methods=["POST"])
 def whatif():
-    import app as _app  # lazy: entire app namespace (request-time)
-    globals().update({k: v for k, v in vars(_app).items() if not k.startswith('__')})
     """Generate a 'what if' scenario for a solved+debriefed question, or grade the user's answer.
     Phase 1 (no user_answer): returns a scenario. Phase 2 (with user_answer): grades it."""
     data = request.json or {}
@@ -880,14 +871,13 @@ Respond with strict JSON:
 
 @bp.route("/api/concept-map", methods=["POST"])
 def concept_map():
-    import app as _app  # lazy: entire app namespace (request-time)
-    globals().update({k: v for k, v in vars(_app).items() if not k.startswith('__')})
     data = request.json
     q = QUESTIONS.get(data["question_id"])
     if not q or q["lang"] not in ("sql", "python"):
         return jsonify({"error": "not found"}), 404
 
-    p = PROGRESS.get(q["id"], {})
+    progress = current_progress()
+    p = progress.get(q["id"], {})
     if isinstance(p, dict) and p.get("concept_map"):
         cached = dict(p["concept_map"])
         cached["active_count"] = len(cached.get("nodes", CONCEPT_MAP_NODES)) if is_solved(q["id"]) else 3
@@ -896,10 +886,10 @@ def concept_map():
     pre = PRECOMPUTED_CONCEPTS.get(q["id"])
     if pre:
         pre["active_count"] = len(pre.get("nodes", CONCEPT_MAP_NODES)) if is_solved(q["id"]) else 3
-        if q["id"] not in PROGRESS:
-            PROGRESS[q["id"]] = {}
-        if isinstance(PROGRESS[q["id"]], dict):
-            PROGRESS[q["id"]]["concept_map"] = pre
+        if q["id"] not in progress:
+            progress[q["id"]] = {}
+        if isinstance(progress[q["id"]], dict):
+            progress[q["id"]]["concept_map"] = pre
             save_progress()
         return jsonify(pre)
 
@@ -944,10 +934,10 @@ Respond ONLY strict JSON, no markdown fences:
     active_count = len(CONCEPT_MAP_NODES) if is_solved(q["id"]) else 3
     output = {"nodes": CONCEPT_MAP_NODES, "details": details, "active_count": active_count}
 
-    if q["id"] not in PROGRESS:
-        PROGRESS[q["id"]] = {}
-    if isinstance(PROGRESS[q["id"]], dict):
-        PROGRESS[q["id"]]["concept_map"] = output
+    if q["id"] not in progress:
+        progress[q["id"]] = {}
+    if isinstance(progress[q["id"]], dict):
+        progress[q["id"]]["concept_map"] = output
     save_progress()
 
     return jsonify(output)
@@ -956,32 +946,31 @@ Respond ONLY strict JSON, no markdown fences:
 
 @bp.route("/api/trace", methods=["POST"])
 def gen_trace():
-    import app as _app  # lazy: entire app namespace (request-time)
-    globals().update({k: v for k, v in vars(_app).items() if not k.startswith('__')})
     data = request.json
     q = QUESTIONS.get(data["question_id"])
     if not q:
         return jsonify({"error": "not found"}), 404
+    progress = current_progress()
     # save code unconditionally so it persists across restarts
     if data.get("code"):
-        if q["id"] not in PROGRESS:
-            PROGRESS[q["id"]] = {}
-        if isinstance(PROGRESS[q["id"]], dict):
-            PROGRESS[q["id"]]["code"] = data["code"]
+        if q["id"] not in progress:
+            progress[q["id"]] = {}
+        if isinstance(progress[q["id"]], dict):
+            progress[q["id"]]["code"] = data["code"]
             save_progress()
     # check cache
-    p = PROGRESS.get(q["id"], {})
+    p = progress.get(q["id"], {})
     if isinstance(p, dict) and p.get("trace"):
         return jsonify({"trace": p["trace"], "pattern": p.get("pattern", ""), "skeleton": p.get("skeleton", ""), "solved": is_solved(q["id"])})
 
     pre = PRECOMPUTED_TRACES.get(q["id"])
     if pre:
-        if q["id"] not in PROGRESS:
-            PROGRESS[q["id"]] = {}
-        if isinstance(PROGRESS[q["id"]], dict):
-            PROGRESS[q["id"]]["trace"] = pre["trace"]
-            PROGRESS[q["id"]]["pattern"] = pre["pattern"]
-            PROGRESS[q["id"]]["skeleton"] = pre["skeleton"]
+        if q["id"] not in progress:
+            progress[q["id"]] = {}
+        if isinstance(progress[q["id"]], dict):
+            progress[q["id"]]["trace"] = pre["trace"]
+            progress[q["id"]]["pattern"] = pre["pattern"]
+            progress[q["id"]]["skeleton"] = pre["skeleton"]
         save_progress()
         return jsonify({"trace": pre["trace"], "pattern": pre["pattern"], "skeleton": pre["skeleton"], "solved": is_solved(q["id"])})
 
@@ -1089,14 +1078,14 @@ Respond with ONLY JSON:
     except Exception:
         steps = [{"q": "What's the first step to solve this?", "a": "Identify the core operation and apply the pattern."}]
 
-    if q["id"] not in PROGRESS:
-        PROGRESS[q["id"]] = {}
-    if isinstance(PROGRESS[q["id"]], dict):
-        PROGRESS[q["id"]]["trace"] = steps
-        PROGRESS[q["id"]]["pattern"] = pattern_info[0]
-        PROGRESS[q["id"]]["skeleton"] = pattern_info[1]
+    if q["id"] not in progress:
+        progress[q["id"]] = {}
+    if isinstance(progress[q["id"]], dict):
+        progress[q["id"]]["trace"] = steps
+        progress[q["id"]]["pattern"] = pattern_info[0]
+        progress[q["id"]]["skeleton"] = pattern_info[1]
         if data.get("code"):
-            PROGRESS[q["id"]]["code"] = data["code"]
+            progress[q["id"]]["code"] = data["code"]
     save_progress()
 
     return jsonify({"trace": steps, "pattern": pattern_info[0], "skeleton": pattern_info[1], "solved": is_solved(q["id"])})
@@ -1105,13 +1094,11 @@ Respond with ONLY JSON:
 
 @bp.route("/api/trace-check", methods=["POST"])
 def trace_check():
-    import app as _app  # lazy: entire app namespace (request-time)
-    globals().update({k: v for k, v in vars(_app).items() if not k.startswith('__')})
     data = request.json
     q = QUESTIONS.get(data["question_id"])
     if not q:
         return jsonify({"error": "not found"}), 404
-    p = PROGRESS.get(q["id"], {})
+    p = current_progress().get(q["id"], {})
     steps = p.get("trace") if isinstance(p, dict) else None
     if not steps:
         return jsonify({"error": "no trace generated for this question yet"}), 400
@@ -1161,8 +1148,6 @@ Respond with ONLY strict JSON, no markdown fences, no commentary:
 
 @bp.route("/api/hint", methods=["POST"])
 def hint():
-    import app as _app  # lazy: entire app namespace (request-time)
-    globals().update({k: v for k, v in vars(_app).items() if not k.startswith('__')})
     data = request.json
     qid = data["question_id"]
     q = QUESTIONS.get(qid)
@@ -1182,7 +1167,7 @@ def hint():
     # ponytail: STRUGGLES resets on restart (this session only) — also pull qids that took
     # >=2 fails to solve in a PAST session from persisted PROGRESS, so pattern callbacks span days,
     # not just today. Reuses PROGRESS/schedule_review's existing "fails at solve time" field.
-    for oid, p in PROGRESS.items():
+    for oid, p in current_progress().items():
         if oid != qid and oid not in other_struggles and isinstance(p, dict) and p.get("fails", 0) >= 2 and oid in QUESTIONS:
             other_struggles[oid] = {"title": QUESTIONS[oid]["title"], "concept": QUESTIONS[oid]["concept"]}
     other_struggles = list(other_struggles.values())
@@ -1237,7 +1222,7 @@ Rules:
 - {escalation}
 - Reply in 2-4 sentences, no preamble."""
 
-    history = CHATS.setdefault(qid, [])
+    history = current_chats().setdefault(qid, [])
 
     code_context = (
         f"Their current code:\n```{q['lang']}\n{data.get('code', '')}\n```\n"

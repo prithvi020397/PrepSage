@@ -3,9 +3,15 @@
 
 import json
 import os
+
+from app import (
+    PROGRESS_FILE, CHATS_FILE, JUDGES_FILE, REPLAY_COMMENTS_FILE,
+    SUPABASE_ENABLED, sb,
+    current_progress, current_chats, current_judges, current_replay_comments,
+)
+
+
 def _atomic_json(path, data):
-    import app as _app  # lazy: full app namespace (request-time)
-    globals().update({k: v for k, v in vars(_app).items() if not k.startswith('__')})
     """Write JSON atomically: write to temp file, then rename. Prevents corruption on crash."""
     tmp = path + ".tmp"
     with open(tmp, "w") as f:
@@ -15,9 +21,7 @@ def _atomic_json(path, data):
 
 
 def save_progress():
-    import app as _app  # lazy: full app namespace (request-time)
-    globals().update({k: v for k, v in vars(_app).items() if not k.startswith('__')})
-    _atomic_json(PROGRESS_FILE, PROGRESS)
+    _atomic_json(PROGRESS_FILE, current_progress())
 
 
 # ---------------------------------------------------------------------------
@@ -27,29 +31,21 @@ def save_progress():
 # ---------------------------------------------------------------------------
 
 def save_chats():
-    import app as _app  # lazy: full app namespace (request-time)
-    globals().update({k: v for k, v in vars(_app).items() if not k.startswith('__')})
-    _atomic_json(CHATS_FILE, CHATS)
+    _atomic_json(CHATS_FILE, current_chats())
 
 
 
 def save_judges():
-    import app as _app  # lazy: full app namespace (request-time)
-    globals().update({k: v for k, v in vars(_app).items() if not k.startswith('__')})
-    _atomic_json(JUDGES_FILE, JUDGES)
+    _atomic_json(JUDGES_FILE, current_judges())
 
 
 
 def save_replay_comments():
-    import app as _app  # lazy: full app namespace (request-time)
-    globals().update({k: v for k, v in vars(_app).items() if not k.startswith('__')})
-    _atomic_json(REPLAY_COMMENTS_FILE, REPLAY_COMMENTS)
+    _atomic_json(REPLAY_COMMENTS_FILE, current_replay_comments())
 
 
 
 def current_user_id():
-    import app as _app  # lazy: full app namespace (request-time)
-    globals().update({k: v for k, v in vars(_app).items() if not k.startswith('__')})
     """Return the Supabase auth user id for the current request, or None.
 
     None means: Supabase is off, or no valid bearer token — callers should
