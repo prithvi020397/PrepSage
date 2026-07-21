@@ -80,10 +80,12 @@ def practice():
         jd_context = role
     else:
         jd_context = ""
+    question_id = request.args.get("question_id", "")
     return render_template("index.html",
                            concept_taxonomies={"data": CONCEPT_TAXONOMY, "ai": CONCEPT_TAXONOMY_AI, "fde": CONCEPT_TAXONOMY_FDE},
                            jd_context=jd_context,
-                           jd_loaded=bool(jd))
+                           jd_loaded=bool(jd),
+                           initial_question_id=question_id)
 
 
 

@@ -90,6 +90,7 @@
   <span id="streak-widget" style="color: var(--text-dim); font-size: 13px;" title="Practice streak (days in a row you've done at least one question)">🔥 <span id="streak-count">0</span>d</span>
   <button class="btn btn-ghost" style="margin-left: 8px;" onclick="gateStart(event).then(ok => { if (ok) startMockLoop(); })" title="Chain a SQL/Python, design, and tradeoff question into one continuous mock interview">🔁 Mock interview</button>
   <a href="/dashboard" style="color: var(--text-dim); text-decoration: none; font-size: 13px;">Diagnose</a>
+  <a href="/learn" style="color: var(--text-dim); text-decoration: none; font-size: 13px; margin-left: 10px;">Learn</a>
   <a href="/taxonomy" style="color: var(--text-dim); text-decoration: none; font-size: 13px; margin-left: 10px;">Taxonomy</a>
   <a href="#" onclick="event.preventDefault(); localStorage.removeItem('loop_token'); showAuthOverlay();" style="color: var(--text-dim); text-decoration: none; font-size: 12px; margin-left: 10px; opacity:0.6;" title="Log out">Logout</a>
 </div>
@@ -425,8 +426,18 @@
   window.APP_BOOT = {
     jd_context: {{ jd_context | tojson | safe }},
     concept_taxonomies: {{ concept_taxonomies | tojson }},
+    initial_question_id: {{ initial_question_id | tojson | safe }},
     debug: false
   };
+  if (window.APP_BOOT.initial_question_id) {
+    document.addEventListener('DOMContentLoaded', function loadInit() {
+      if (document.querySelector('#sidebar-list .q-entry')) {
+        var qid = window.APP_BOOT.initial_question_id;
+        var el = document.querySelector('[data-question-id="' + qid + '"]');
+        if (el) { el.click(); }
+      }
+    });
+  }
 </script>
 <script defer src="{{ url_for('static', filename='js/00-config.js') }}?v=4"></script>
 <script defer src="{{ url_for('static', filename='js/20-module.js') }}?v=4"></script>
