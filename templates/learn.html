@@ -1,0 +1,131 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>The Loop — Learn</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0e1015; --panel: #14161d; --card: #1b1e27; --card-2: #20232e;
+    --border: rgba(255,255,255,0.08); --text: #e7e9ee; --text-dim: #9299ab;
+    --text-faint: #656c7e; --accent: #7c6cf6; --accent-2: #5ee6d8;
+    --accent-soft: rgba(124,108,246,0.14); --success: #3ddc97;
+    --success-soft: rgba(61,220,151,0.12); --error: #ff6b6b;
+  }
+  * { box-sizing: border-box; }
+  body { font-family: 'Inter', sans-serif; margin: 0; background: var(--bg); color: var(--text); font-size: 14px; }
+  #topbar {
+    display: flex; align-items: baseline; gap: 14px;
+    padding: 16px 24px;
+    background: linear-gradient(180deg, var(--panel), var(--bg));
+    border-bottom: 1px solid var(--border);
+  }
+  #topbar h1 { font-size: 16px; margin: 0; letter-spacing: 0.02em; }
+  #topbar a { color: var(--text-dim); text-decoration: none; font-size: 13px; }
+  #topbar a:hover { color: var(--text); }
+  #topbar .tab { color: var(--text-dim); font-size: 13px; cursor: pointer; padding: 4px 10px; border-radius: 6px; }
+  #topbar .tab.active { color: var(--accent); background: var(--accent-soft); }
+  main { max-width: 1100px; margin: 0 auto; padding: 24px; }
+  .track-group { margin-bottom: 28px; }
+  .track-group h2 { font-size: 15px; font-weight: 600; margin: 0 0 10px; color: var(--accent-2); letter-spacing: 0.01em; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 12px; }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; cursor: pointer; transition: border-color 0.15s; }
+  .card:hover { border-color: var(--accent); }
+  .card h3 { font-size: 14px; font-weight: 600; margin: 0 0 4px; }
+  .card .key { font-size: 11px; color: var(--text-faint); font-family: 'JetBrains Mono', monospace; margin-bottom: 5px; }
+  .card .story { font-size: 12.5px; color: var(--text-dim); line-height: 1.5; margin-bottom: 6px; }
+  .card .qcount { font-size: 11px; color: var(--accent); }
+  #lesson-view { display: none; }
+  #browser-view { display: block; }
+  .show-lesson #lesson-view { display: block; }
+  .show-lesson #browser-view { display: none; }
+  .back-link { color: var(--accent); cursor: pointer; font-size: 13px; margin-bottom: 16px; display: inline-block; }
+  .back-link:hover { color: var(--accent-2); }
+  .war-story { background: var(--card-2); border-radius: 8px; padding: 14px 16px; margin: 12px 0 20px; font-size: 13.5px; line-height: 1.6; color: var(--text-dim); border-left: 3px solid var(--accent); }
+  .qlist { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+  .qitem { display: flex; align-items: center; justify-content: space-between; background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; }
+  .qitem .qinfo { display: flex; flex-direction: column; }
+  .qitem .qtitle { font-size: 13px; font-weight: 500; }
+  .qitem .qmeta { font-size: 11px; color: var(--text-faint); margin-top: 2px; }
+  .qitem .qactions { display: flex; gap: 8px; }
+  .btn { padding: 6px 14px; border-radius: 6px; font-size: 12px; font-weight: 500; cursor: pointer; border: none; text-decoration: none; display: inline-block; }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-primary:hover { background: #8a7af7; }
+  .btn-ghost { background: var(--card-2); color: var(--text-dim); }
+  .btn-ghost:hover { background: var(--border); color: var(--text); }
+  .walkthrough { background: var(--card-2); border: 1px solid var(--border); border-radius: 8px; padding: 14px; margin-top: 8px; font-size: 13px; line-height: 1.5; white-space: pre-wrap; }
+  .no-questions { color: var(--text-faint); font-size: 13px; font-style: italic; }
+</style>
+</head>
+<body>
+<div id="topbar">
+  <h1>The Loop</h1>
+  <a href="/dashboard">Dashboard</a>
+  <span class="tab active">Learn</span>
+  <a class="tab" href="/practice">Practice</a>
+  <a href="/taxonomy">Taxonomy</a>
+</div>
+<main>
+<div id="browser-view">
+  {% for track_name, concepts in concepts_by_track.items() %}
+  <div class="track-group">
+    <h2>{{ track_name }}</h2>
+    <div class="grid">
+      {% for c in concepts %}
+      <div class="card" onclick="showLesson('{{ c.key }}')">
+        <div class="key">{{ c.key }}</div>
+        <h3>{{ c.name }}</h3>
+        <div class="story">{{ c.story_preview }}</div>
+        <div class="qcount">{{ c.question_count }} question{% if c.question_count != 1 %}s{% endif %}</div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+<div id="lesson-view">
+  <span class="back-link" onclick="showBrowser()">&larr; Back to concepts</span>
+  <h2 id="lesson-title"></h2>
+  <div id="lesson-war-story" class="war-story"></div>
+  <h3 style="font-size:14px;font-weight:600;margin:16px 0 8px;">Related Questions</h3>
+  <div id="lesson-questions" class="qlist"></div>
+</div>
+</main>
+
+<script>
+const conceptData = {{ concept_data | tojson | safe }};
+
+function showLesson(key) {
+  var d = conceptData[key];
+  if (!d) return;
+  document.body.classList.add('show-lesson');
+  document.getElementById('lesson-title').textContent = d.name;
+  document.getElementById('lesson-war-story').textContent = d.war_story;
+  var qlist = document.getElementById('lesson-questions');
+  if (d.questions.length === 0) {
+    qlist.innerHTML = '<div class="no-questions">No questions tagged with this concept yet.</div>';
+    return;
+  }
+  qlist.innerHTML = d.questions.map(function(q) {
+    return '<div class="qitem">' +
+      '<div class="qinfo">' +
+        '<div class="qtitle">' + q.title + '</div>' +
+        '<div class="qmeta">' + q.lang + (q.difficulty ? ' &middot; ' + q.difficulty : '') + '</div>' +
+      '</div>' +
+      '<div class="qactions">' +
+        (q.has_walkthrough ? '<a class="btn btn-ghost" href="/practice?question_id=' + q.id + '&show_trace=1">Walkthrough</a>' : '') +
+        '<a class="btn btn-primary" href="/practice?question_id=' + q.id + '">Try this</a>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+}
+
+function showBrowser() {
+  document.body.classList.remove('show-lesson');
+}
+</script>
+</body>
+</html>
