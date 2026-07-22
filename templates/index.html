@@ -431,11 +431,9 @@
   };
   if (window.APP_BOOT.initial_question_id) {
     document.addEventListener('DOMContentLoaded', function loadInit() {
-      if (document.querySelector('#sidebar-list .q-entry')) {
-        var qid = window.APP_BOOT.initial_question_id;
-        var el = document.querySelector('[data-question-id="' + qid + '"]');
-        if (el) { el.click(); }
-      }
+      var qid = window.APP_BOOT.initial_question_id;
+      var el = document.querySelector('.q-item[data-id="' + qid + '"]');
+      if (el) { el.click(); }
     });
   }
 </script>
