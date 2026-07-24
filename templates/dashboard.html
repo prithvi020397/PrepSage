@@ -994,7 +994,9 @@ input::placeholder, textarea::placeholder { opacity: 0.7; color: var(--text-dim)
       try {
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), 60000);
-        const r = await api('/api/upload-resume', {method: 'POST', body: form, signal: controller.signal});
+        const token = localStorage.getItem('loop_token');
+        const headers = token ? {'Authorization': 'Bearer ' + token} : {};
+        const r = await fetch('/api/upload-resume', {method: 'POST', body: form, signal: controller.signal, headers: headers});
         clearTimeout(timeout);
         const res = await r.json();
         if (!r.ok || res.error) {
@@ -1123,7 +1125,7 @@ input::placeholder, textarea::placeholder { opacity: 0.7; color: var(--text-dim)
         status.className = 'sub ok';
         setTimeout(() => location.reload(), 800);
       } catch (e) {
-        status.textContent = 'Parse failed — try again';
+        status.textContent = 'Upload failed — ' + (e.message || 'try again');
         status.className = 'sub bad';
       }
     }
@@ -1140,7 +1142,9 @@ input::placeholder, textarea::placeholder { opacity: 0.7; color: var(--text-dim)
       try {
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), 60000);
-        const r = await api('/api/upload-jd', {method: 'POST', body: form, signal: controller.signal});
+        const token = localStorage.getItem('loop_token');
+        const headers = token ? {'Authorization': 'Bearer ' + token} : {};
+        const r = await fetch('/api/upload-jd', {method: 'POST', body: form, signal: controller.signal, headers: headers});
         clearTimeout(timeout);
         const res = await r.json();
         if (!r.ok || res.error) {
@@ -1152,7 +1156,7 @@ input::placeholder, textarea::placeholder { opacity: 0.7; color: var(--text-dim)
         status.className = 'sub ok';
         setTimeout(() => location.reload(), 800);
       } catch (e) {
-        status.textContent = 'Upload failed — try again';
+        status.textContent = 'Upload failed — ' + (e.message || 'try again');
         status.className = 'sub bad';
       }
     }
