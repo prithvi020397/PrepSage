@@ -10,6 +10,12 @@ function log(...args) {
 async function api(path, opts) {
   const t0 = performance.now();
   const method = (opts && opts.method) || "GET";
+  opts = opts || {};
+  opts.headers = opts.headers || {};
+  const token = localStorage.getItem('loop_token');
+  if (token && !opts.headers['Authorization']) {
+    opts.headers['Authorization'] = 'Bearer ' + token;
+  }
   const res = await fetch(path, opts);
   log(method, path, res.status, Math.round(performance.now() - t0) + "ms");
   return res;
