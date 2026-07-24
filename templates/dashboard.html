@@ -992,7 +992,10 @@ input::placeholder, textarea::placeholder { opacity: 0.7; color: var(--text-dim)
       const form = new FormData();
       form.append('resume', file);
       try {
-        const r = await fetch('/api/upload-resume', {method: 'POST', body: form});
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 60000);
+        const r = await api('/api/upload-resume', {method: 'POST', body: form, signal: controller.signal});
+        clearTimeout(timeout);
         const res = await r.json();
         if (!r.ok || res.error) {
           status.textContent = res.error || 'Upload failed';
@@ -1135,7 +1138,10 @@ input::placeholder, textarea::placeholder { opacity: 0.7; color: var(--text-dim)
       const form = new FormData();
       form.append('jd', file);
       try {
-        const r = await fetch('/api/upload-jd', {method: 'POST', body: form});
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 60000);
+        const r = await api('/api/upload-jd', {method: 'POST', body: form, signal: controller.signal});
+        clearTimeout(timeout);
         const res = await r.json();
         if (!r.ok || res.error) {
           status.textContent = res.error || 'Upload failed';
