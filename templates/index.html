@@ -429,13 +429,6 @@
     initial_question_id: {{ initial_question_id | tojson | safe }},
     debug: false
   };
-  if (window.APP_BOOT.initial_question_id) {
-    document.addEventListener('DOMContentLoaded', function loadInit() {
-      var qid = window.APP_BOOT.initial_question_id;
-      var el = document.querySelector('.q-item[data-id="' + qid + '"]');
-      if (el) { el.click(); }
-    });
-  }
 </script>
 <script defer src="{{ url_for('static', filename='js/00-config.js') }}?v=4"></script>
 <script defer src="{{ url_for('static', filename='js/20-module.js') }}?v=4"></script>
