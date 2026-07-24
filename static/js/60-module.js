@@ -162,7 +162,7 @@ async function loadList() {
 
   updateProgress();
   applySidebarFilter();
-  const deepLinkId = new URLSearchParams(location.search).get('q');
+  const deepLinkId = new URLSearchParams(location.search).get('q') || (window.APP_BOOT && window.APP_BOOT.initial_question_id);
   const deepLinkQ = qs.find(q => q.id === deepLinkId);
   const deepLinkEl = deepLinkQ && document.querySelector(`.q-item[data-id="${deepLinkId}"]`);
   if (deepLinkEl) {
