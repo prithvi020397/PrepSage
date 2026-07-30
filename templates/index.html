@@ -85,6 +85,10 @@
   <div class="stats">
     <span id="solved-count">0/0 solved</span>
     <div class="bar"><div class="bar-fill" id="solved-bar"></div></div>
+    <div id="progress-panel" style="display: none; font-size: 12px; margin-top: 6px; color: var(--text-dim);">
+      <div>Interview readiness: <span id="readiness-percent">0</span>%</div>
+      <div>Concepts mastered: <span id="concepts-count">0</span></div>
+    </div>
   </div>
   <span id="deadline-widget" style="color: var(--text-dim); font-size: 13px; cursor: pointer;" onclick="setInterviewDeadline()" title="Set your interview date — review intervals compress as it approaches"></span>
   <span id="streak-widget" style="color: var(--text-dim); font-size: 13px;" title="Practice streak (days in a row you've done at least one question)">🔥 <span id="streak-count">0</span>d</span>

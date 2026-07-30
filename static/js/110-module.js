@@ -319,6 +319,7 @@ async function requestInterview(body) {
       speakTutor(res.reply);
       extractChips(res.reply);
       if (res.wrap_up) clearPacingNudge(); else armPacingNudge();
+      if (res.wrap_up && typeof refreshProgress !== 'undefined') refreshProgress();
     }
   } catch (e) {
     placeholder.className += ' err';
