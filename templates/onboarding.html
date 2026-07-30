@@ -118,6 +118,25 @@
     text-decoration: none;
   }
   .skip:hover { color: var(--text-dim); }
+  .progress-dots {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+    margin-bottom: 24px;
+  }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--border); transition: all 0.2s; }
+  .dot.active { background: var(--accent); transform: scale(1.3); }
+  .screen { display: none; }
+  .screen.active { display: block; }
+  .nav-buttons { display: flex; gap: 12px; margin-top: 24px; }
+  .nav-buttons button { flex: 1; }
+  .btn-secondary {
+    background: var(--panel) !important;
+    border: 1px solid var(--border) !important;
+    color: var(--text) !important;
+  }
+  .btn-secondary:hover { background: var(--card) !important; }
+  .plan-item { padding: 12px; background: var(--panel); border-radius: 8px; margin: 8px 0; border-left: 3px solid var(--accent); }
 </style>
 </head>
 <body>
@@ -128,55 +147,127 @@
   </div>
   <p class="subtitle">Interview prep that adapts to you. Let's set you up in 30 seconds.</p>
 
-  <div class="step">
-    <label>When's your interview?</label>
-    <input type="date" id="onboard-deadline">
+  <div class="progress-dots">
+    <div class="dot active" id="dot-0"></div>
+    <div class="dot" id="dot-1"></div>
+    <div class="dot" id="dot-2"></div>
+    <div class="dot" id="dot-3"></div>
   </div>
 
-  <div class="step">
-    <label>What's your strongest area?</label>
-    <select id="onboard-strongest">
-      <option value="">Select...</option>
-      <option value="sql">SQL</option>
-      <option value="python">Python / Coding</option>
-      <option value="system_design">System Design</option>
-      <option value="tradeoffs">Architecture Tradeoffs</option>
-      <option value="nervous">Honestly, none yet</option>
-    </select>
+  <!-- Screen 1: Deadline -->
+  <div class="screen active" id="screen-0">
+    <div class="step">
+      <label>When's your interview?</label>
+      <input type="date" id="onboard-deadline">
+    </div>
   </div>
 
-  <div class="step">
-    <label>What's your weakest area?</label>
-    <select id="onboard-weakest">
-      <option value="">Select...</option>
-      <option value="sql">SQL</option>
-      <option value="python">Python / Coding</option>
-      <option value="system_design">System Design</option>
-      <option value="tradeoffs">Architecture Tradeoffs</option>
-      <option value="nervous">Honestly, none yet</option>
-    </select>
+  <!-- Screen 2: Skill level -->
+  <div class="screen" id="screen-1">
+    <div class="step">
+      <label>Your coding interview level?</label>
+      <select id="onboard-level">
+        <option value="">Select...</option>
+        <option value="beginner">🟢 Beginner (know syntax, weak on algorithms)</option>
+        <option value="intermediate">🟡 Intermediate (can solve medium problems)</option>
+        <option value="advanced">🔴 Advanced (can solve hard problems)</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- Screen 3: Strongest/Weakest -->
+  <div class="screen" id="screen-2">
+    <div class="step">
+      <label>Strongest area?</label>
+      <select id="onboard-strongest">
+        <option value="">Select...</option>
+        <option value="sql">SQL</option>
+        <option value="python">Python / Coding</option>
+        <option value="system_design">System Design</option>
+        <option value="tradeoffs">Architecture Tradeoffs</option>
+        <option value="nervous">Not sure yet</option>
+      </select>
+    </div>
+    <div class="step">
+      <label>Weakest area?</label>
+      <select id="onboard-weakest">
+        <option value="">Select...</option>
+        <option value="sql">SQL</option>
+        <option value="python">Python / Coding</option>
+        <option value="system_design">System Design</option>
+        <option value="tradeoffs">Architecture Tradeoffs</option>
+        <option value="nervous">Not sure yet</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- Screen 4: Recommended plan -->
+  <div class="screen" id="screen-3">
+    <p style="font-size: 13px; color: var(--text-dim); margin-bottom: 16px;">Here's your personalized plan:</p>
+    <div class="plan-item">
+      <strong>🎯 Start with:</strong> SQL & Python fundamentals (5-7 days)
+    </div>
+    <div class="plan-item">
+      <strong>📈 Then:</strong> System Design (3-5 days)
+    </div>
+    <div class="plan-item">
+      <strong>⚡ Finally:</strong> Tradeoffs & Mock interviews (2-3 days)
+    </div>
+    <p style="font-size: 12px; color: var(--text-faint); margin-top: 16px;">👉 Practice 3-4 problems per day to stay on track</p>
   </div>
 
   <div class="actions">
-    <button onclick="saveOnboarding()">Get started</button>
+    <div class="nav-buttons">
+      <button class="btn-secondary" id="btn-prev" onclick="prevScreen()" style="display:none;">← Back</button>
+      <button id="btn-next" onclick="nextScreen()">Next →</button>
+    </div>
+    <button id="btn-start" onclick="saveOnboarding()" style="display:none; margin-top: 8px;">Start Practice</button>
   </div>
-  <p id="onboard-hint" style="display:none; color:#e0574f; font-size:13px; margin:8px 0 0; text-align:center;">Fill in at least one field, or use Skip below.</p>
   <a class="skip" href="/dashboard">Skip — I'll figure it out</a>
 </div>
 <script>
+let currentScreen = 0;
+const totalScreens = 4;
+
+function updateScreen() {
+  // Update progress dots
+  for (let i = 0; i < totalScreens; i++) {
+    document.getElementById('dot-' + i).classList.toggle('active', i === currentScreen);
+    document.getElementById('screen-' + i).classList.toggle('active', i === currentScreen);
+  }
+
+  // Update buttons
+  document.getElementById('btn-prev').style.display = currentScreen > 0 ? 'block' : 'none';
+  document.getElementById('btn-next').style.display = currentScreen < totalScreens - 1 ? 'block' : 'none';
+  document.getElementById('btn-start').style.display = currentScreen === totalScreens - 1 ? 'block' : 'none';
+}
+
+function nextScreen() {
+  if (currentScreen < totalScreens - 1) {
+    currentScreen++;
+    updateScreen();
+  }
+}
+
+function prevScreen() {
+  if (currentScreen > 0) {
+    currentScreen--;
+    updateScreen();
+  }
+}
+
 async function saveOnboarding() {
   const body = {
     deadline: document.getElementById('onboard-deadline').value,
+    level: document.getElementById('onboard-level').value,
     strongest: document.getElementById('onboard-strongest').value,
     weakest: document.getElementById('onboard-weakest').value,
   };
-  if (!body.deadline && !body.strongest && !body.weakest) {
-    document.getElementById('onboard-hint').style.display = '';
-    return;
-  }
   await fetch('/api/onboarding', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)});
   window.location.href = '/dashboard';
 }
+
+updateScreen();
 </script>
 </body>
 </html>

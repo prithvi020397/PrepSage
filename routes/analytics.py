@@ -88,6 +88,87 @@ def streak():
 
 
 
+@bp.route("/api/progress", methods=["GET"])
+def progress():
+    """Get user progress: concept mastery, interview readiness %, and streak."""
+    progress = current_progress()
+
+    # Compute concept mastery
+    concept_mastery = {}
+    concept_total = {}
+    for qid, q in QUESTIONS.items():
+        concept = q.get("concept", "unknown").replace("_", " ").title()
+        if concept not in concept_total:
+            concept_total[concept] = 0
+            concept_mastery[concept] = 0
+        concept_total[concept] += 1
+        if is_solved(qid):
+            concept_mastery[concept] += 1
+
+    # Compute interview readiness by category
+    categories = {"SQL/Python": 0, "System Design": 0, "Tradeoffs": 0}
+    category_totals = {"SQL/Python": 0, "System Design": 0, "Tradeoffs": 0}
+    for qid, q in QUESTIONS.items():
+        lang = q.get("lang", "unknown")
+        if lang in ("sql", "python"):
+            cat = "SQL/Python"
+        elif lang == "design":
+            cat = "System Design"
+        elif lang == "tradeoff":
+            cat = "Tradeoffs"
+        else:
+            continue
+        category_totals[cat] += 1
+        if is_solved(qid):
+            categories[cat] += 1
+
+    # Overall readiness
+    total_solved = sum(1 for qid in QUESTIONS if is_solved(qid))
+    total_questions = len(QUESTIONS)
+    overall_readiness = int((total_solved / total_questions * 100)) if total_questions > 0 else 0
+
+    # Streak data
+    days = {}
+    for h in HISTORY:
+        ts = h.get("ts")
+        if not ts:
+            continue
+        day = ts[:10]
+        days[day] = days.get(day, 0) + 1
+    today = datetime.now().strftime("%Y-%m-%d")
+    streak_count = 0
+    cursor = datetime.now().date()
+    if today not in days:
+        cursor = cursor - timedelta(days=1)
+    while cursor.strftime("%Y-%m-%d") in days:
+        streak_count += 1
+        cursor = cursor - timedelta(days=1)
+
+    return jsonify({
+        "concept_mastery": [
+            {
+                "name": concept,
+                "solved": concept_mastery.get(concept, 0),
+                "total": concept_total.get(concept, 0),
+                "percentage": int((concept_mastery.get(concept, 0) / concept_total.get(concept, 1)) * 100)
+            }
+            for concept in sorted(concept_mastery.keys())
+        ],
+        "readiness_by_category": {
+            cat: {
+                "solved": categories.get(cat, 0),
+                "total": category_totals.get(cat, 0),
+                "percentage": int((categories.get(cat, 0) / category_totals.get(cat, 1)) * 100)
+            }
+            for cat in categories
+        },
+        "overall_readiness": overall_readiness,
+        "total_solved": total_solved,
+        "total_questions": total_questions,
+        "streak": streak_count,
+        "today_count": days.get(today, 0),
+    })
+
 @bp.route("/api/takeaways", methods=["POST"])
 def takeaways():
     """Phase 2: distill a finished question/debrief into exactly 3 prioritized takeaways so

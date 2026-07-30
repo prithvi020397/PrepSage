@@ -185,38 +185,59 @@ function closeDiff() {
 }
 
 async function runSample() {
-  const res = await (await api('/api/run', {
-    method: 'POST', headers: {'Content-Type': 'application/json'},
+  const res = await (await api(‘/api/run’, {
+    method: ‘POST’, headers: {‘Content-Type’: ‘application/json’},
     body: JSON.stringify({question_id: current.id, code: cm.getValue()})
   })).json();
-  const el = document.getElementById('results');
-  el.innerHTML = '';
-  el.className = (res.passed ? 'pass' : 'fail') + ' sample';
+  const el = document.getElementById(‘results’);
+  el.innerHTML = ‘’;
+  el.className = (res.passed ? ‘pass’ : ‘fail’) + ‘ sample’;
 
-  const header = document.createElement('div');
-  header.className = 'result-banner';
-  const icon = document.createElement('span');
-  icon.className = 'result-icon';
-  icon.textContent = res.passed ? '✓' : '✕';
-  const label = document.createElement('span');
-  label.textContent = res.passed
-    ? 'Sample matches'
-    : 'Sample doesn’t match' + (res.error ? ` — error: ${res.error}` : '');
+  const header = document.createElement(‘div’);
+  header.className = ‘result-banner’;
+  const icon = document.createElement(‘span’);
+  icon.className = ‘result-icon’;
+  icon.textContent = res.passed ? ‘✓’ : ‘✕’;
+  const label = document.createElement(‘span’);
+
+  if (res.error) {
+    // Parse error to extract line number if available
+    const errorMatch = res.error.match(/line (\d+)/i);
+    const lineNo = errorMatch ? ` (line ${errorMatch[1]})` : ‘’;
+    label.textContent = ‘Error: ‘ + res.error + lineNo;
+  } else {
+    label.textContent = res.passed
+      ? ‘Sample matches’
+      : ‘Sample doesn’t match’;
+  }
+
   header.appendChild(icon);
   header.appendChild(label);
   el.appendChild(header);
 
-  const body = document.createElement('div');
-  body.className = 'result-body';
-  if (current.lang === 'sql') {
-    body.appendChild(makeLabeled(res.passed ? 'output' : 'actual', makeTable(res.actual_columns, res.actual)));
-    if (!res.passed && !res.error) body.appendChild(makeLabeled('expected', makeTable(res.expected_columns, res.expected)));
+  const body = document.createElement(‘div’);
+  body.className = ‘result-body’;
+
+  if (res.error) {
+    // Show error details
+    const errorDiv = document.createElement(‘div’);
+    errorDiv.style.cssText = ‘padding: 12px; background: rgba(220, 38, 38, 0.1); border-left: 3px solid #dc2626; border-radius: 6px; color: #fca5a5;’;
+    errorDiv.innerHTML = ‘<strong style="color: #dc2626;">Error details:</strong><br><code style="font-size: 12px; word-break: break-word;">’ + res.error.replace(/</g, ‘&lt;’).replace(/>/g, ‘&gt;’) + ‘</code>’;
+    body.appendChild(errorDiv);
+  } else if (current.lang === ‘sql’) {
+    body.appendChild(makeLabeled(res.passed ? ‘output’ : ‘actual’, makeTable(res.actual_columns, res.actual)));
+    if (!res.passed && !res.error) body.appendChild(makeLabeled(‘expected’, makeTable(res.expected_columns, res.expected)));
   } else {
-    const actualPre = document.createElement('pre'); actualPre.textContent = res.actual;
-    body.appendChild(makeLabeled(res.passed ? 'output' : 'your output', actualPre));
+    const actualPre = document.createElement(‘pre’);
+    actualPre.style.cssText = ‘background: var(--panel); padding: 10px; border-radius: 6px; overflow-x: auto;’;
+    actualPre.textContent = res.actual || ‘(no output)’;
+    body.appendChild(makeLabeled(res.passed ? ‘✓ Output’ : ‘Your output’, actualPre));
+
     if (!res.passed && !res.error) {
-      const expectedPre = document.createElement('pre'); expectedPre.textContent = res.expected;
-      body.appendChild(makeLabeled('expected output', expectedPre));
+      const expectedPre = document.createElement(‘pre’);
+      expectedPre.style.cssText = ‘background: var(--panel); padding: 10px; border-radius: 6px; overflow-x: auto;’;
+      expectedPre.textContent = res.expected;
+      body.appendChild(makeLabeled(‘Expected output’, expectedPre));
     }
   }
   el.appendChild(body);

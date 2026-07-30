@@ -387,12 +387,22 @@ function escapeHtml(s) {
 
 async function startMockLoop() {
   if (!(await requireAuth())) return;
-  const res = await (await api('/api/mock-loop/start')).json();
-  if (!res.ids || !res.ids.length) { showToast('Not enough questions across categories to start a mock interview.'); return; }
-  mockLoop = {ids: res.ids, stage: 0};
-  document.getElementById('mock-loop-bar').style.display = 'flex';
-  updateMockLoopLabel();
-  loadQuestion(mockLoop.ids[0]);
+  try {
+    const r = await api('/api/mock-loop/start');
+    if (!r.ok) {
+      showToast('Failed to start mock loop. Please try again.');
+      return;
+    }
+    const res = await r.json();
+    if (!res.ids || !res.ids.length) { showToast('Not enough questions across categories to start a mock interview.'); return; }
+    mockLoop = {ids: res.ids, stage: 0};
+    document.getElementById('mock-loop-bar').style.display = 'flex';
+    updateMockLoopLabel();
+    loadQuestion(mockLoop.ids[0]);
+  } catch (e) {
+    log('startMockLoop error:', e);
+    showToast('Error starting mock loop: ' + (e.message || 'unknown error'));
+  }
 }
 
 function updateMockLoopLabel() {
@@ -420,8 +430,18 @@ async function finishMockLoop() {
   const ids = mockLoop.ids;
   document.getElementById('mock-loop-bar').style.display = 'none';
   mockLoop = null;
-  const res = await (await api('/api/mock-loop/report?ids=' + ids.join(','))).json();
-  renderMockReport(res.report || []);
+  try {
+    const r = await api('/api/mock-loop/report?ids=' + ids.join(','));
+    if (!r.ok) {
+      showToast('Failed to load mock report. Your progress has been saved.');
+      return;
+    }
+    const res = await r.json();
+    renderMockReport(res.report || []);
+  } catch (e) {
+    log('finishMockLoop error:', e);
+    showToast('Error loading report: ' + (e.message || 'unknown error'));
+  }
 }
 
 function renderMockReport(report) {
@@ -745,10 +765,22 @@ window.addEventListener('mouseup', () => {
 loadList();
 loadDeadline();
 refreshStreak();
+refreshProgress();
 
 function refreshStreak() {
   api('/api/streak').then(r => r.json()).then(s => {
     document.getElementById('streak-count').textContent = s.streak || 0;
+  }).catch(() => {});
+}
+
+function refreshProgress() {
+  api('/api/progress').then(r => r.json()).then(p => {
+    document.getElementById('readiness-percent').textContent = p.overall_readiness || 0;
+    const masteredCount = (p.concept_mastery || []).filter(c => c.percentage >= 60).length;
+    document.getElementById('concepts-count').textContent = masteredCount + '/' + (p.concept_mastery ? p.concept_mastery.length : 0);
+    if (p.total_solved > 0) {
+      document.getElementById('progress-panel').style.display = 'block';
+    }
   }).catch(() => {});
 }
 
